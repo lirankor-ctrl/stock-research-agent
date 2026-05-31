@@ -1,0 +1,23 @@
+{
+  "name": "stock-agent",
+  "version": "1.0.0",
+  "description": "Local AI stock research agent using Alpha Vantage (free tier)",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "report": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": ["stocks", "alpha-vantage", "research", "nasdaq"],
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}
