@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { EnrichedStock, NewsItem } from "./types";
+import { EnrichedStock, NewsItem, RunStatus, SourceInfo } from "./types";
+
+// ---------- formatting helpers ----------
 
 function fmtNum(n: number): string {
   return n.toLocaleString("en-US");
@@ -17,6 +19,26 @@ function fmtMarketCap(mc?: number): string {
   if (mc >= 1e6) return `$${(mc / 1e6).toFixed(0)}M`;
   return `$${mc}`;
 }
+
+// Hebrew badge for any data source
+function sourceBadgeHe(s: SourceInfo): string {
+  if (s.source === "live") return "🟢 נתונים חיים (live)";
+  if (s.source === "cached") {
+    const age =
+      s.ageHours !== undefined ? ` – נשמר לפני ~${s.ageHours.toFixed(1)} שעות` : "";
+    return `🟡 נתונים מהמטמון (cached)${age}`;
+  }
+  return "🔴 לא זמין (unavailable)";
+}
+
+function shortBadge(s: SourceInfo): string {
+  if (s.source === "live") return "🟢 live";
+  if (s.source === "cached")
+    return `🟡 cached${s.ageHours !== undefined ? ` (~${s.ageHours.toFixed(1)}h)` : ""}`;
+  return "🔴 unavailable";
+}
+
+// ---------- tables ----------
 
 function moversTable(stocks: EnrichedStock[]): string {
   if (stocks.length === 0) return "_אין נתונים_";
@@ -40,15 +62,13 @@ function opportunityBlock(s: EnrichedStock, rank: number): string {
     s.news.length > 0
       ? s.news
           .slice(0, 3)
-          .map(
-            (n) =>
-              `  - [${n.title}](${n.url}) _(${n.source})_`
-          )
+          .map((n) => `  - [${n.title}](${n.url}) _(${n.source})_`)
           .join("\n")
       : "  - _לא נמצאו חדשות רלוונטיות_";
 
   return `### ${rank}. ${s.ticker} – ${name}
 
+- **מקור פרופיל:** ${sourceBadgeHe(s.profileSource)} · **מקור חדשות:** ${sourceBadgeHe(s.newsSource)}
 - **בורסה / סקטור:** ${exchange} · ${sector}
 - **מחיר:** $${s.price.toFixed(2)} (${fmtChange(s.changePercent)}) · **מחזור:** ${fmtNum(s.volume)} · **שווי שוק:** ${marketCap}
 - **ציון כולל:** **${s.finalScore.toFixed(1)}/10**
@@ -59,18 +79,18 @@ ${newsList}
 `;
 }
 
-function flattenKeyNews(stocks: EnrichedStock[], max = 10): Array<{ ticker: string; item: NewsItem }> {
+function flattenKeyNews(
+  stocks: EnrichedStock[],
+  max = 10
+): Array<{ ticker: string; item: NewsItem }> {
   const all: Array<{ ticker: string; item: NewsItem }> = [];
   for (const s of stocks) {
     for (const n of s.news) {
-      if ((n.relevanceScore ?? 0) >= 0.3) {
-        all.push({ ticker: s.ticker, item: n });
-      }
+      if ((n.relevanceScore ?? 0) >= 0.3) all.push({ ticker: s.ticker, item: n });
     }
   }
   all.sort(
-    (a, b) =>
-      (b.item.relevanceScore ?? 0) - (a.item.relevanceScore ?? 0)
+    (a, b) => (b.item.relevanceScore ?? 0) - (a.item.relevanceScore ?? 0)
   );
   return all.slice(0, max);
 }
@@ -91,53 +111,48 @@ function buildMarketSummary(
     );
   }).length;
 
-  const avgScore =
-    all.length > 0
-      ? (all.reduce((a, b) => a + b.finalScore, 0) / all.length).toFixed(1)
-      : "—";
-
   const bestMove =
     all.length > 0
-      ? all
-          .slice()
-          .sort((a, b) => b.changePercent - a.changePercent)[0]
+      ? all.slice().sort((a, b) => b.changePercent - a.changePercent)[0]
       : null;
   const worstMove =
     all.length > 0
-      ? all
-          .slice()
-          .sort((a, b) => a.changePercent - b.changePercent)[0]
+      ? all.slice().sort((a, b) => a.changePercent - b.changePercent)[0]
       : null;
 
   return `- **מקור גולמי מ-Alpha Vantage:** ${rawCounts.gainers} עולים · ${rawCounts.losers} יורדים · ${rawCounts.active} פעילים
-- **לאחר סינון פני/OTC ומחיר מתחת ל-$5:** ${all.length} מניות נכנסו לדירוג
-- **חברות בענפי טכנולוגיה / AI / סייבר / סמיקונדקטור:** ${techCount}
-- **ציון ממוצע (1–10):** ${avgScore}
+- **לאחר סינון פני/OTC ומחיר מתחת ל-$5:** ${all.length} מניות בדירוג
+- **חברות בענפי טכנולוגיה / AI / סייבר / סמיקונדקטור (מבין המועשרות):** ${techCount}
 - **תנועה חיובית בולטת:** ${bestMove ? `${bestMove.ticker} ${fmtChange(bestMove.changePercent)}` : "—"}
 - **תנועה שלילית בולטת:** ${worstMove ? `${worstMove.ticker} ${fmtChange(worstMove.changePercent)}` : "—"}`;
 }
 
+// ---------- main report ----------
+
 export function generateReport(
-  all: EnrichedStock[],
-  rawCounts: { gainers: number; losers: number; active: number }
+  enrichedTop: EnrichedStock[],
+  skeletonRest: EnrichedStock[],
+  rawCounts: { gainers: number; losers: number; active: number },
+  status: RunStatus
 ): string {
   const today = new Date().toISOString().slice(0, 10);
 
-  const topOpportunities = all.slice(0, 3);
-  const topMovers = all
+  // For top-movers / negative / most-active we use the *combined* list,
+  // but those rows show minimal info because we only enriched the top 3.
+  const combined = [...enrichedTop, ...skeletonRest];
+
+  const topOpportunities = enrichedTop.slice(0, 3);
+  const topMovers = combined
     .filter((s) => s.changePercent > 0)
     .sort((a, b) => b.changePercent - a.changePercent)
     .slice(0, 5);
-  const negativeMovers = all
+  const negativeMovers = combined
     .filter((s) => s.changePercent < 0)
     .sort((a, b) => a.changePercent - b.changePercent)
     .slice(0, 5);
-  const mostActive = all
-    .slice()
-    .sort((a, b) => b.volume - a.volume)
-    .slice(0, 5);
+  const mostActive = combined.slice().sort((a, b) => b.volume - a.volume).slice(0, 5);
 
-  const keyNews = flattenKeyNews(all, 10);
+  const keyNews = flattenKeyNews(enrichedTop, 10);
   const keyNewsList =
     keyNews.length > 0
       ? keyNews
@@ -148,51 +163,71 @@ export function generateReport(
               })_`
           )
           .join("\n")
-      : "_לא נמצאו חדשות בולטות לדוח זה._";
+      : "_לא נמצאו חדשות בולטות בריצה הזו (ייתכן בשל מטמון חסר או הגעה למגבלת ה-API)._";
 
   const opportunitiesSection =
     topOpportunities.length > 0
       ? topOpportunities.map((s, i) => opportunityBlock(s, i + 1)).join("\n")
-      : "_לא זוהו הזדמנויות איכותיות לפי הסינון היום._";
+      : "_אין הזדמנויות מועשרות בריצה הזו._";
+
+  const notesBlock =
+    status.notes.length > 0
+      ? "\n**הערות מהריצה:**\n" +
+        status.notes
+          .slice(-8)
+          .map((n) => `- ${n}`)
+          .join("\n")
+      : "";
+
+  const rateLimitBanner = status.rateLimitHit
+    ? "> ⚠️ **הופעלה מגבלת API במהלך הריצה.** חלק מהנתונים נטענו מהמטמון או סומנו כלא זמינים.\n\n"
+    : "";
 
   return `# דוח מחקר מניות יומי – ${today}
 
 > דוח אוטומטי שנוצר על ידי **stock-agent** בהתבסס על נתוני Alpha Vantage (תוכנית חינמית).
-> מותאם לסגנון משקיע מקצועי: סינון מניות פני / OTC, פוקוס על Nasdaq וחברות צמיחה בטכנולוגיה / AI / סייבר / סמיקונדקטור.
+> פוקוס: חברות צמיחה ב-Nasdaq / טכנולוגיה / AI / סייבר / סמיקונדקטור.
+
+${rateLimitBanner}## מצב מקורות הנתונים
+
+- **רשימת מניות פעילות (Top Gainers/Losers/Active):** ${sourceBadgeHe(status.movers)}
+- **העשרה (פרופיל + חדשות) ל-Top 3:** ${sourceBadgeHe(status.enriched)}
+- **שאר הרשימה (Top Movers / Negative / Most Active):** 🔴 ללא העשרה – ציון מבוסס מחיר ומחזור בלבד (חיסכון במגבלת API)
+${notesBlock}
 
 ---
 
-## 1. סקירת שוק (Market Summary)
+## 1. סקירת שוק (Market Summary) – ${shortBadge(status.movers)}
 
-${buildMarketSummary(all, rawCounts)}
+${buildMarketSummary(combined, rawCounts)}
 
 ---
 
-## 2. הזדמנויות מובילות (Top 3 Opportunities)
+## 2. הזדמנויות מובילות (Top 3 Opportunities) – ${shortBadge(status.enriched)}
 
 ${opportunitiesSection}
 
 ---
 
-## 3. עולים בולטים (Top Movers)
+## 3. עולים בולטים (Top Movers) – ${shortBadge(status.movers)}
 
 ${moversTable(topMovers)}
 
 ---
 
-## 4. יורדים בולטים (Negative Movers)
+## 4. יורדים בולטים (Negative Movers) – ${shortBadge(status.movers)}
 
 ${moversTable(negativeMovers)}
 
 ---
 
-## 5. הכי פעילים (Most Active Stocks)
+## 5. הכי פעילים (Most Active Stocks) – ${shortBadge(status.movers)}
 
 ${moversTable(mostActive)}
 
 ---
 
-## 6. חדשות מרכזיות (Key News)
+## 6. חדשות מרכזיות (Key News) – ${shortBadge(status.enriched)}
 
 ${keyNewsList}
 
@@ -200,11 +235,11 @@ ${keyNewsList}
 
 ## 7. סיכונים (Risks)
 
-- **איכות נתונים:** Alpha Vantage בתוכנית חינמית מוגבל ב-5 קריאות/דקה ו-25 קריאות/יום – חלק מהמניות עשויות לחזור ללא פרופיל מלא או ללא חדשות.
-- **ציון אלגוריתמי בלבד:** הציון 1–10 הוא נוסחה היוריסטית (תנועה, מחזור, חדשות, איכות חברה, שווי שוק). הוא **אינו** מבטא הסתברות לרווח.
-- **רעש שוק:** תנועות חזקות ביום בודד יכולות להיות תוצאה של חדשה נקודתית, סקוויז, או מניפולציה ולא של שינוי פונדמנטלי.
-- **סיכון מטבע וזירה:** המחירים בדולר, ייתכן חשיפה לשערי חליפין ולשעות מסחר אמריקאיות בלבד.
-- **חדשות לא תמיד עדכניות:** ה-NEWS_SENTIMENT API מחזיר חדשות עד 24–48 שעות אחורה; ייתכן שאירוע מהותי טרי עדיין לא מתועד.
+- **מגבלת API חינמית:** Alpha Vantage Free Tier = 25 קריאות/יום. הסוכן מטמיין נתוני שוק ל-12 שעות ונתוני פרופיל/חדשות ל-24 שעות. אם המטמון חסר ה-API חסום, חלקים בדוח יסומנו "לא זמין".
+- **רק 3 מניות מועשרות:** כדי לחסוך במכסה, רק 3 ההזדמנויות המובילות מקבלות פרופיל וחדשות מלאים. שאר המניות בדוח – ציון מבוסס מחיר ומחזור בלבד.
+- **ציון אלגוריתמי בלבד:** הציון 1–10 הוא נוסחה היוריסטית – אינו הסתברות לרווח.
+- **רעש שוק:** תנועות חזקות יומיות יכולות להיות תוצאה של סקוויז, חדשה נקודתית או מניפולציה.
+- **חדשות עשויות להיות מאוחרות:** ה-NEWS_SENTIMENT API מכסה את 24–48 השעות האחרונות; אירועים טריים עלולים לא להופיע.
 
 ---
 
@@ -220,9 +255,7 @@ _נוצר אוטומטית ב-${new Date().toISOString()}_
 
 export function writeReport(content: string, outDir = "reports"): string {
   const fullDir = path.resolve(process.cwd(), outDir);
-  if (!fs.existsSync(fullDir)) {
-    fs.mkdirSync(fullDir, { recursive: true });
-  }
+  if (!fs.existsSync(fullDir)) fs.mkdirSync(fullDir, { recursive: true });
   const filePath = path.join(fullDir, "daily-stock-report.md");
   fs.writeFileSync(filePath, content, "utf8");
   return filePath;

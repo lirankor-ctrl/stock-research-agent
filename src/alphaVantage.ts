@@ -7,13 +7,31 @@ import {
 
 const BASE_URL = "https://www.alphavantage.co/query";
 
+export class RateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
+// Alpha Vantage returns 200 OK with a `Note` or `Information` field
+// when you hit the daily/per-minute quota. Convert that to a typed error
+// so callers can distinguish quota issues from real network failures.
 function checkApiError(data: any, context: string): void {
-  if (data?.Note) {
-    throw new Error(`Alpha Vantage rate limit (${context}): ${data.Note}`);
+  const noteOrInfo: string | undefined = data?.Note ?? data?.Information;
+  if (!noteOrInfo) return;
+
+  const lower = noteOrInfo.toLowerCase();
+  if (
+    lower.includes("api") ||
+    lower.includes("limit") ||
+    lower.includes("rate") ||
+    lower.includes("premium") ||
+    lower.includes("call frequency")
+  ) {
+    throw new RateLimitError(`Alpha Vantage quota hit (${context}): ${noteOrInfo}`);
   }
-  if (data?.Information) {
-    throw new Error(`Alpha Vantage info (${context}): ${data.Information}`);
-  }
+  throw new Error(`Alpha Vantage info (${context}): ${noteOrInfo}`);
 }
 
 export async function fetchTopMovers(
@@ -48,9 +66,10 @@ export async function fetchCompanyOverview(
     exchange: data.Exchange,
     sector: data.Sector,
     industry: data.Industry,
-    marketCap: marketCapRaw && marketCapRaw !== "None"
-      ? Number(marketCapRaw)
-      : undefined,
+    marketCap:
+      marketCapRaw && marketCapRaw !== "None"
+        ? Number(marketCapRaw)
+        : undefined,
     description: data.Description,
     country: data.Country,
     peRatio: peRaw && peRaw !== "None" ? Number(peRaw) : undefined,
@@ -97,11 +116,7 @@ export async function fetchNewsForTicker(
     };
   });
 
-  // Prefer high-relevance items first
-  items.sort(
-    (a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0)
-  );
-
+  items.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
   return items.slice(0, limit);
 }
 

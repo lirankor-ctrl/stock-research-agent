@@ -59,10 +59,26 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+export type DataSource = "live" | "cached" | "unavailable";
+
+export interface SourceInfo {
+  source: DataSource;
+  ageHours?: number; // populated when source === "cached"
+}
+
 export interface EnrichedStock extends Stock {
   profile?: CompanyProfile;
   news: NewsItem[];
   whyHebrew: string;
   score: ScoreBreakdown;
   finalScore: number;
+  profileSource: SourceInfo;
+  newsSource: SourceInfo;
+}
+
+export interface RunStatus {
+  movers: SourceInfo;
+  enriched: SourceInfo; // overall status of enrichment phase
+  rateLimitHit: boolean;
+  notes: string[];
 }
