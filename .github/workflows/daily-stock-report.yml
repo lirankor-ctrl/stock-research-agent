@@ -1,0 +1,45 @@
+name: Daily Stock Report
+
+on:
+  schedule:
+    # 12:00 UTC, Monday–Friday = 14:00 IST (winter) / 15:00 IDT (summer).
+    # GitHub may delay scheduled runs by several minutes during high load.
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  email-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate and email report
+        env:
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+          EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: npm run email-report
+
+      - name: Upload report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-stock-report
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 14
