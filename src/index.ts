@@ -5,6 +5,10 @@ import {
   DEFAULT_ENRICH_TOP_N,
   enrichStocks,
 } from "./enricher";
+import {
+  generateHtmlReport,
+  writeHtmlReport,
+} from "./htmlReportGenerator";
 import { preRank } from "./ranker";
 import { generateReport, writeReport } from "./reportGenerator";
 import { EnrichedStock, RunStatus, SourceInfo } from "./types";
@@ -27,6 +31,15 @@ async function main() {
     enriched: { source: "unavailable" },
     rateLimitHit: false,
     notes: [],
+    liveCount: 0,
+    cachedCount: 0,
+    missingCount: 0,
+  };
+
+  const tallyStatus = (src: SourceInfo) => {
+    if (src.source === "live") status.liveCount++;
+    else if (src.source === "cached") status.cachedCount++;
+    else status.missingCount++;
   };
 
   // ===== Phase 1: Market Movers (cache-first, 12h TTL) =====
@@ -37,15 +50,18 @@ async function main() {
     status.notes.push(m);
   });
   status.movers = moversRes.source;
+  tallyStatus(moversRes.source);
   console.log(`   source: ${describeSource(moversRes.source)}`);
 
   if (!moversRes.value) {
     console.error(
       "⚠️  No movers data available (no live API + no cache). Writing empty report."
     );
-    const report = generateReport([], [], { gainers: 0, losers: 0, active: 0 }, status);
-    const fp = writeReport(report);
-    console.log(`📝 Empty report written to: ${fp}`);
+    const empty = { gainers: 0, losers: 0, active: 0 };
+    const mdPath = writeReport(generateReport([], [], empty, status));
+    const htmlPath = writeHtmlReport(generateHtmlReport([], [], empty, status));
+    console.log(`📝 Empty Markdown report: ${mdPath}`);
+    console.log(`🌐 Empty HTML report:     ${htmlPath}`);
     return;
   }
 
@@ -83,6 +99,9 @@ async function main() {
       liveCalls = res.liveCalls;
       cachedCalls = res.cachedCalls;
       unavailableCalls = res.unavailableCalls;
+      status.liveCount += liveCalls;
+      status.cachedCount += cachedCalls;
+      status.missingCount += unavailableCalls;
     } catch (err: any) {
       console.error(
         `⚠️  enrichment failed entirely: ${err.message} – continuing with skeleton data`
@@ -108,16 +127,24 @@ async function main() {
     .filter((s) => !enrichedTickers.has(s.ticker))
     .map(buildSkeletonEnriched);
 
-  // ===== Phase 4: Report =====
-  console.log("📝 [4/4] Generating Hebrew report...");
-  const report = generateReport(
+  // ===== Phase 4: Report (Markdown + HTML) =====
+  console.log("📝 [4/4] Generating Hebrew reports (Markdown + HTML)...");
+  const mdReport = generateReport(
     enrichedTop,
     skeletonRest,
     ranked.rawCounts,
     status
   );
-  const fp = writeReport(report);
-  console.log(`✅ Report written to: ${fp}`);
+  const htmlReport = generateHtmlReport(
+    enrichedTop,
+    skeletonRest,
+    ranked.rawCounts,
+    status
+  );
+  const mdPath = writeReport(mdReport);
+  const htmlPath = writeHtmlReport(htmlReport);
+  console.log(`✅ Markdown report: ${mdPath}`);
+  console.log(`✅ HTML report:     ${htmlPath}`);
 
   console.log("\n🏆 Top opportunities:");
   for (const s of enrichedTop) {

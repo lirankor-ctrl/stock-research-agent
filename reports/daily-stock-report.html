@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📈 דוח שוק יומי – 2026-05-31 09:31 UTC</title>
+  <style>
+  :root {
+    --navy: #0f172a;
+    --navy-2: #1e3a8a;
+    --blue: #3b82f6;
+    --blue-soft: #dbeafe;
+    --bg: #ffffff;
+    --bg-soft: #f8fafc;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --green: #10b981;
+    --green-soft: #d1fae5;
+    --amber: #f59e0b;
+    --amber-soft: #fef3c7;
+    --red: #ef4444;
+    --red-soft: #fee2e2;
+    --slate-soft: #f1f5f9;
+    --shadow: 0 1px 3px rgba(15,23,42,.04), 0 4px 12px rgba(15,23,42,.06);
+    --shadow-lg: 0 4px 6px rgba(15,23,42,.04), 0 10px 30px rgba(15,23,42,.08);
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Heebo",
+                 "Rubik", "Assistant", Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+  }
+
+  /* ===== Hero ===== */
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 100%);
+    color: #fff;
+    padding: 48px 0 64px;
+    margin-bottom: 32px;
+    border-bottom-left-radius: 24px;
+    border-bottom-right-radius: 24px;
+    box-shadow: var(--shadow-lg);
+  }
+  .hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .hero-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .hero-emoji { font-size: 36px; line-height: 1; }
+  .hero h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    margin: 4px 0 20px;
+    color: rgba(255,255,255,.85);
+    font-size: clamp(14px, 2.5vw, 17px);
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    font-size: 13px;
+    color: rgba(255,255,255,.92);
+  }
+  .meta-item {
+    background: rgba(255,255,255,.12);
+    padding: 6px 12px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+  }
+  .meta-item strong { color: #fff; font-weight: 600; }
+
+  /* ===== Generic card ===== */
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 22px;
+    box-shadow: var(--shadow);
+  }
+  section { margin-bottom: 28px; }
+  .section-title {
+    font-size: clamp(18px, 3vw, 22px);
+    font-weight: 700;
+    color: var(--navy);
+    margin: 32px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .emoji { font-size: 1.1em; line-height: 1; }
+  .empty {
+    color: var(--muted);
+    background: var(--bg-soft);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+  }
+
+  /* ===== Mood card ===== */
+  .mood-card { border-right: 4px solid var(--blue); }
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .card-head h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .mood-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mood-tag {
+    background: var(--blue-soft);
+    color: var(--navy-2);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+  .mood-tag.muted { background: var(--slate-soft); color: var(--muted); }
+  .mood-text {
+    margin: 6px 0 0;
+    color: var(--text);
+    font-size: 15px;
+  }
+
+  /* ===== Opportunity cards ===== */
+  .opportunities {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .opportunity-card {
+    border-right: 5px solid var(--blue);
+    padding: 24px;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .opportunity-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+  }
+  .opportunity-card.strong { border-right-color: var(--green); }
+  .opportunity-card.watchlist { border-right-color: var(--amber); }
+  .opportunity-card.cautious { border-right-color: var(--muted); }
+
+  .opp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .opp-id { display: flex; align-items: center; gap: 14px; }
+  .rank {
+    background: var(--navy);
+    color: #fff;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .opp-id h3.ticker {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--navy);
+    letter-spacing: -.01em;
+  }
+  .opp-id p.company {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .score-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 12px;
+    min-width: 90px;
+    text-align: center;
+    background: var(--slate-soft);
+    color: var(--muted);
+  }
+  .score-badge.strong { background: var(--green-soft); color: #065f46; }
+  .score-badge.watchlist { background: var(--amber-soft); color: #92400e; }
+  .score-badge.cautious { background: var(--slate-soft); color: var(--muted); }
+  .score-num { font-size: 22px; font-weight: 800; line-height: 1; }
+  .score-denom { font-size: 12px; opacity: .8; margin-top: 2px; }
+  .score-tier { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-top: 4px; }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .metric-label { font-size: 12px; color: var(--muted); }
+  .metric-value { font-size: 15px; font-weight: 700; color: var(--navy); }
+  .metric-value.sm { font-size: 13px; font-weight: 600; }
+  .metric-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .metric-value.up { color: var(--green); }
+  .metric-value.down { color: var(--red); }
+
+  .opp-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: center;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .badge-label { font-weight: 600; color: var(--navy); }
+
+  .opp-section { margin-top: 14px; }
+  .opp-section h4 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: .01em;
+  }
+  .opp-section p {
+    margin: 0;
+    color: var(--text);
+    font-size: 14.5px;
+  }
+  .risks {
+    margin: 4px 0 0;
+    padding-inline-start: 18px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .risks li { margin-bottom: 4px; }
+
+  /* ===== Badges ===== */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .badge.live { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
+  .badge.cached { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+  .badge.unavailable { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
+
+  /* ===== Tables ===== */
+  .table-wrap {
+    padding: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table.movers {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 520px;
+  }
+  table.movers th,
+  table.movers td {
+    text-align: start;
+    padding: 12px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.movers thead th {
+    background: var(--bg-soft);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  table.movers tbody tr:last-child td { border-bottom: 0; }
+  table.movers tbody tr:hover { background: var(--bg-soft); }
+  td.symbol { font-weight: 800; color: var(--navy); }
+  td.up { color: var(--green); font-weight: 700; }
+  td.down { color: var(--red); font-weight: 700; }
+  td.flat { color: var(--muted); }
+
+  .mini-score {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--slate-soft);
+    color: var(--muted);
+  }
+  .mini-score.strong { background: var(--green-soft); color: #065f46; }
+  .mini-score.watchlist { background: var(--amber-soft); color: #92400e; }
+
+  /* ===== Data quality ===== */
+  .quality-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .quality-stat {
+    border-radius: var(--radius);
+    padding: 22px;
+    text-align: center;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .live-bg { background: var(--green-soft); border-color: #a7f3d0; }
+  .cached-bg { background: var(--amber-soft); border-color: #fde68a; }
+  .unavailable-bg { background: var(--red-soft); border-color: #fecaca; }
+  .quality-num {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--navy);
+  }
+  .quality-label {
+    margin-top: 6px;
+    color: var(--navy);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .warn {
+    margin-top: 14px;
+    padding: 12px 16px;
+    background: var(--amber-soft);
+    color: #92400e;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    border: 1px solid #fde68a;
+  }
+
+  /* ===== Disclaimer ===== */
+  .disclaimer {
+    margin-top: 36px;
+    background: var(--bg-soft);
+    border-color: var(--border);
+  }
+  .disclaimer h3 {
+    margin: 0 0 8px;
+    color: var(--navy);
+    font-size: 16px;
+  }
+  .disclaimer p {
+    margin: 6px 0;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .disclaimer .generated {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* ===== Mobile ===== */
+  @media (max-width: 640px) {
+    .container { padding: 0 14px 60px; }
+    .hero { padding: 36px 0 48px; border-radius: 0 0 18px 18px; }
+    .card, .opportunity-card { padding: 18px; }
+    .opp-head { flex-direction: column; align-items: stretch; }
+    .score-badge { align-self: flex-start; }
+    .meta { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-title">
+        <span class="hero-emoji">📈</span>
+        <h1>דוח שוק יומי</h1>
+      </div>
+      <p class="subtitle">סריקת מניות חריגות, חדשות וניקוד הזדמנויות</p>
+      <div class="meta">
+        <span class="meta-item"><strong>Generated:</strong> 2026-05-31 09:31 UTC</span>
+        <span class="meta-item"><strong>Coverage:</strong> 60 מניות נסרקו · 26 עברו סינון</span>
+      </div>
+    </div>
+  </header>
+<main class="container">
+
+  <section class="card mood-card">
+    <div class="card-head">
+      <h2><span class="emoji">🧠</span> מצב השוק</h2>
+      <div class="mood-tags"><span class="mood-tag">Risk-on</span></div>
+    </div>
+    <p class="mood-text">האווירה היומית **חיובית (Risk-on)**. מבין המניות שדורגו: 17 עולות (ממוצע 42.7%) מול 8 יורדות (ממוצע -14.3%).</p>
+  </section>
+
+  <section>
+    <h2 class="section-title"><span class="emoji">🎯</span> 3 ההזדמנויות המובילות</h2>
+    <div class="opportunities">
+    <article class="opportunity-card card strong">
+      <div class="opp-head">
+        <div class="opp-id">
+          <span class="rank">#1</span>
+          <div>
+            <h3 class="ticker">STG</h3>
+            <p class="company">Sunlands Technology Group</p>
+          </div>
+        </div>
+        <div class="score-badge strong">
+          <span class="score-num">8.3</span>
+          <span class="score-denom">/10</span>
+          <span class="score-tier">Strong</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">💰 מחיר</span>
+          <span class="metric-value">$6.10</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📊 שינוי יומי</span>
+          <span class="metric-value up">+124.26%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📈 מחזור</span>
+          <span class="metric-value">24,756,521 <span class="metric-sub">(24.8M)</span></span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">🏢 סקטור</span>
+          <span class="metric-value sm">EDUCATION &amp; TRAINING SERVICES · $82M</span>
+        </div>
+      </div>
+
+      <div class="opp-badges">
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+      </div>
+
+      <div class="opp-section">
+        <h4>למה המניה מעניינת?</h4>
+        <p>Sunlands Technology Group (STG) מסקטור EDUCATION &amp; TRAINING SERVICES בקטגוריית Micro-Cap רשמה עליה של 124.26% במחזור של כ-24.8M מניות. הזרז המרכזי הוא ככל הנראה זרם חדשות חיוביות (לדוגמה: &quot;STG Soars As Sunlands Technology Group Unveils $50M Buyback&quot;), מה שמחזק את התזה לטווח הקצר. החברה פועלת בענף טכנולוגיה/AI/סייבר – ענפים שמובילים את שוק הצמיחה בנאסד&quot;ק ומקבלים תשומת לב מוסדית גבוהה. כחברה קטנה, יש פוטנציאל תנודתיות חדה לכיוונים – פוזיציה דורשת מניהול סיכון הדוק.</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>סיכונים</h4>
+        <ul class="risks"><li>תנודתיות גבוהה (124.3% ביום) – סיכון מוגבר לתנועות הפוכות חדות.</li><li>שווי שוק נמוך (0.08B$) – נזילות מוגבלת וסיכון Slippage.</li></ul>
+      </div>
+    </article>
+
+    <article class="opportunity-card card strong">
+      <div class="opp-head">
+        <div class="opp-id">
+          <span class="rank">#2</span>
+          <div>
+            <h3 class="ticker">REPL</h3>
+            <p class="company">Replimune Group Inc</p>
+          </div>
+        </div>
+        <div class="score-badge strong">
+          <span class="score-num">8.3</span>
+          <span class="score-denom">/10</span>
+          <span class="score-tier">Strong</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">💰 מחיר</span>
+          <span class="metric-value">$8.69</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📊 שינוי יומי</span>
+          <span class="metric-value up">+85.68%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📈 מחזור</span>
+          <span class="metric-value">50,983,559 <span class="metric-sub">(51.0M)</span></span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">🏢 סקטור</span>
+          <span class="metric-value sm">BIOTECHNOLOGY · $718M</span>
+        </div>
+      </div>
+
+      <div class="opp-badges">
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+      </div>
+
+      <div class="opp-section">
+        <h4>למה המניה מעניינת?</h4>
+        <p>Replimune Group Inc (REPL) מסקטור BIOTECHNOLOGY בקטגוריית Small-Cap רשמה עליה של 85.68% במחזור של כ-51.0M מניות. התמונה החדשותית מעורבת – יש גם זרזים חיוביים וגם שליליים, מה שמסביר את התנודתיות הגבוהה. החברה אינה בליבת הטכנולוגיה, אך תנועה חזקה בסקטור BIOTECHNOLOGY יכולה להעיד על רוטציה בשוק. כחברה קטנה, יש פוטנציאל תנודתיות חדה לכיוונים – פוזיציה דורשת מניהול סיכון הדוק.</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>סיכונים</h4>
+        <ul class="risks"><li>תנודתיות גבוהה (85.7% ביום) – סיכון מוגבר לתנועות הפוכות חדות.</li><li>שווי שוק נמוך (0.72B$) – נזילות מוגבלת וסיכון Slippage.</li><li>אי-ודאות חדשותית (חדשות חיוביות ושליליות במקביל) – קשה לזהות מגמה ברורה.</li></ul>
+      </div>
+    </article>
+
+    <article class="opportunity-card card watchlist">
+      <div class="opp-head">
+        <div class="opp-id">
+          <span class="rank">#3</span>
+          <div>
+            <h3 class="ticker">OLOX</h3>
+            <p class="company">Olenox Industries Inc.</p>
+          </div>
+        </div>
+        <div class="score-badge watchlist">
+          <span class="score-num">6.2</span>
+          <span class="score-denom">/10</span>
+          <span class="score-tier">Watchlist</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">💰 מחיר</span>
+          <span class="metric-value">$8.77</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📊 שינוי יומי</span>
+          <span class="metric-value up">+78.25%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📈 מחזור</span>
+          <span class="metric-value">27,156,747 <span class="metric-sub">(27.2M)</span></span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">🏢 סקטור</span>
+          <span class="metric-value sm">METAL FABRICATION · $11M</span>
+        </div>
+      </div>
+
+      <div class="opp-badges">
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.3h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.3h</span>
+      </div>
+
+      <div class="opp-section">
+        <h4>למה המניה מעניינת?</h4>
+        <p>Olenox Industries Inc. (OLOX) מסקטור METAL FABRICATION בקטגוריית Micro-Cap רשמה עליה של 78.25% במחזור של כ-27.2M מניות. התמונה החדשותית מעורבת – יש גם זרזים חיוביים וגם שליליים, מה שמסביר את התנודתיות הגבוהה. החברה אינה בליבת הטכנולוגיה, אך תנועה חזקה בסקטור METAL FABRICATION יכולה להעיד על רוטציה בשוק. כחברה קטנה, יש פוטנציאל תנודתיות חדה לכיוונים – פוזיציה דורשת מניהול סיכון הדוק.</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>סיכונים</h4>
+        <ul class="risks"><li>תנודתיות גבוהה (78.3% ביום) – סיכון מוגבר לתנועות הפוכות חדות.</li><li>שווי שוק נמוך (0.01B$) – נזילות מוגבלת וסיכון Slippage.</li><li>אי-ודאות חדשותית (חדשות חיוביות ושליליות במקביל) – קשה לזהות מגמה ברורה.</li></ul>
+      </div>
+    </article></div>
+  </section>
+
+  <section>
+    <h2 class="section-title"><span class="emoji">🚀</span> המניות החזקות של היום</h2>
+    <div class="table-wrap card">
+      <table class="movers">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Change %</th>
+            <th>Volume</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td class="symbol">STG</td>
+          <td>$6.10</td>
+          <td class="up">+124.26%</td>
+          <td>24,756,521</td>
+          <td><span class="mini-score strong">8.3</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">REPL</td>
+          <td>$8.69</td>
+          <td class="up">+85.68%</td>
+          <td>50,983,559</td>
+          <td><span class="mini-score strong">8.3</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">OLOX</td>
+          <td>$8.77</td>
+          <td class="up">+78.25%</td>
+          <td>27,156,747</td>
+          <td><span class="mini-score watchlist">6.2</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">LCFYW</td>
+          <td>$5.93</td>
+          <td class="up">+69.43%</td>
+          <td>4,196</td>
+          <td><span class="mini-score cautious">5.6</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">ASTC</td>
+          <td>$49.80</td>
+          <td class="up">+69.22%</td>
+          <td>28,871,449</td>
+          <td><span class="mini-score watchlist">6.1</span></td>
+        </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title"><span class="emoji">📉</span> המניות החלשות של היום</h2>
+    <div class="table-wrap card">
+      <table class="movers">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Change %</th>
+            <th>Volume</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td class="symbol">OCSAW</td>
+          <td>$11.06</td>
+          <td class="down">-41.67%</td>
+          <td>14,158</td>
+          <td><span class="mini-score cautious">5.7</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">ASUP</td>
+          <td>$36.97</td>
+          <td class="down">-30.49%</td>
+          <td>67,216</td>
+          <td><span class="mini-score cautious">5.7</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">ASTX</td>
+          <td>$54.05</td>
+          <td class="down">-29.53%</td>
+          <td>15,998,572</td>
+          <td><span class="mini-score watchlist">6.1</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">INTC</td>
+          <td>$114.68</td>
+          <td class="down">-5.14%</td>
+          <td>187,774,535</td>
+          <td><span class="mini-score cautious">5.4</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">SNAP</td>
+          <td>$5.71</td>
+          <td class="down">-3.30%</td>
+          <td>100,152,878</td>
+          <td><span class="mini-score cautious">5.1</span></td>
+        </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title"><span class="emoji">🔥</span> המניות הפעילות ביותר</h2>
+    <div class="table-wrap card">
+      <table class="movers">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Change %</th>
+            <th>Volume</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td class="symbol">SOXS</td>
+          <td>$6.34</td>
+          <td class="up">+0.48%</td>
+          <td>303,605,539</td>
+          <td><span class="mini-score cautious">4.1</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">NVDA</td>
+          <td>$211.14</td>
+          <td class="down">-1.45%</td>
+          <td>280,794,172</td>
+          <td><span class="mini-score cautious">4.9</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">INTC</td>
+          <td>$114.68</td>
+          <td class="down">-5.14%</td>
+          <td>187,774,535</td>
+          <td><span class="mini-score cautious">5.4</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">SPCE</td>
+          <td>$6.21</td>
+          <td class="up">+37.09%</td>
+          <td>173,232,524</td>
+          <td><span class="mini-score watchlist">6.2</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">F</td>
+          <td>$17.45</td>
+          <td class="up">+4.80%</td>
+          <td>149,712,880</td>
+          <td><span class="mini-score cautious">4.7</span></td>
+        </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title"><span class="emoji">⚠️</span> איכות נתונים</h2>
+    <div class="quality-grid">
+      <div class="quality-stat live-bg">
+        <div class="quality-num">0</div>
+        <div class="quality-label">🟢 Live data</div>
+      </div>
+      <div class="quality-stat cached-bg">
+        <div class="quality-num">7</div>
+        <div class="quality-label">🟡 Cached data</div>
+      </div>
+      <div class="quality-stat unavailable-bg">
+        <div class="quality-num">0</div>
+        <div class="quality-label">🔴 Unavailable</div>
+      </div>
+    </div>
+    
+  </section>
+
+  <footer class="disclaimer card">
+    <h3>Disclaimer</h3>
+    <p><strong>Research only. Not investment advice.</strong></p>
+    <p>המידע בדוח זה הוא למטרות מחקר ולמידה בלבד ואינו מהווה ייעוץ השקעות, המלצה לקנייה
+    או מכירה של ניירות ערך, או תחליף לייעוץ פיננסי מקצועי. מסחר במניות כרוך בסיכון
+    לאובדן ההון – כל החלטה על אחריותך בלבד.</p>
+    <p class="generated">Generated by stock-agent · 2026-05-31T09:31:05.498Z</p>
+  </footer>
+</main>
+</body>
+</html>

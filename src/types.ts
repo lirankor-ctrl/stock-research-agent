@@ -81,4 +81,8 @@ export interface RunStatus {
   enriched: SourceInfo; // overall status of enrichment phase
   rateLimitHit: boolean;
   notes: string[];
+  // Per-call breakdown across the entire run (movers + all enrichment calls)
+  liveCount: number;
+  cachedCount: number;
+  missingCount: number;
 }
