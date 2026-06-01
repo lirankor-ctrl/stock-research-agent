@@ -33,6 +33,7 @@ jobs:
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_BCC: ${{ secrets.EMAIL_BCC }}
         run: npm run email-report
 
       - name: Upload report artifacts

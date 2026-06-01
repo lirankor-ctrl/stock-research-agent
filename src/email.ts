@@ -9,6 +9,16 @@ interface EmailConfig {
   pass: string;
   from: string;
   to: string;
+  bcc: string[];
+}
+
+// EMAIL_BCC is optional; supports multiple addresses separated by commas.
+function parseBcc(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((addr) => addr.trim())
+    .filter((addr) => addr.length > 0);
 }
 
 function loadEmailConfig(): EmailConfig {
@@ -33,6 +43,7 @@ function loadEmailConfig(): EmailConfig {
     pass: process.env.EMAIL_PASS!,
     from: process.env.EMAIL_FROM!,
     to: process.env.EMAIL_TO!,
+    bcc: parseBcc(process.env.EMAIL_BCC),
   };
 }
 
@@ -161,6 +172,7 @@ export async function sendDailyEmail(r: ReportResult): Promise<SendResult> {
   const info = await transporter.sendMail({
     from: cfg.from,
     to: cfg.to,
+    ...(cfg.bcc.length > 0 ? { bcc: cfg.bcc } : {}),
     subject,
     text: buildHebrewTextBody(r, today),
     html: buildHebrewHtmlBody(r, today),
@@ -178,9 +190,15 @@ export async function sendDailyEmail(r: ReportResult): Promise<SendResult> {
     ],
   });
 
+  // nodemailer reports BCC recipients in accepted/rejected too; drop them so
+  // hidden recipients are never surfaced to callers or logs.
+  const bccSet = new Set(cfg.bcc.map((a) => a.toLowerCase()));
+  const hideBcc = (list: unknown) =>
+    ((list as string[]) ?? []).filter((a) => !bccSet.has(String(a).toLowerCase()));
+
   return {
     messageId: info.messageId,
-    accepted: (info.accepted as string[]) ?? [],
-    rejected: (info.rejected as string[]) ?? [],
+    accepted: hideBcc(info.accepted),
+    rejected: hideBcc(info.rejected),
   };
 }

@@ -35,7 +35,19 @@ EMAIL_USER=you@gmail.com
 EMAIL_PASS=your_app_password
 EMAIL_FROM="Stock Agent <you@gmail.com>"
 EMAIL_TO=you@gmail.com
+# אופציונלי – נמענים מוסתרים (BCC):
+EMAIL_BCC=
 ```
+
+### נמענים: `EMAIL_TO` מול `EMAIL_BCC`
+
+- **`EMAIL_FROM`** – כתובת השולח (חשבון ה-Gmail שממנו נשלח הדוח).
+- **`EMAIL_TO`** – הנמען הראשי שמופיע גלוי במייל.
+- **`EMAIL_BCC`** – נמענים **מוסתרים** (BCC). הם מקבלים את המייל אך אינם נחשפים לשאר הנמענים.
+  - אופציונלי – אם ריק, המייל נשלח רק ל-`EMAIL_TO`.
+  - אפשר לציין **מספר כתובות מופרדות בפסיק**, למשל:
+    `EMAIL_BCC=a@example.com, b@example.com`
+  - כתובות ה-BCC אינן מודפסות ללוגים.
 
 > 🔒 הקובץ `.env` נמצא ב-`.gitignore` ולא יועלה ל-Git.
 > ב-Gmail: צריך להפעיל 2FA וליצור App Password ב-<https://myaccount.google.com/apppasswords>.
@@ -95,6 +107,7 @@ npm run email-report
 | `EMAIL_PASS` | App Password של Gmail |
 | `EMAIL_FROM` | `Stock Agent <you@gmail.com>` |
 | `EMAIL_TO` | `you@gmail.com` |
+| `EMAIL_BCC` *(אופציונלי)* | `a@example.com, b@example.com` |
 
 ### הרצה ידנית מ-GitHub
 
