@@ -146,6 +146,7 @@ export interface SendResult {
   messageId: string;
   accepted: string[];
   rejected: string[];
+  acceptedBccCount: number;
 }
 
 export async function sendDailyEmail(r: ReportResult): Promise<SendResult> {
@@ -165,6 +166,9 @@ export async function sendDailyEmail(r: ReportResult): Promise<SendResult> {
   } catch (err: any) {
     throw new Error(`SMTP connection failed (${cfg.host}:${cfg.port}): ${err.message}`);
   }
+
+  // Log count only — never the actual BCC addresses.
+  console.log(`   BCC recipients count: ${cfg.bcc.length}`);
 
   const today = new Date().toISOString().slice(0, 10);
   const subject = `דוח שוק יומי - ${today}`;
@@ -193,12 +197,16 @@ export async function sendDailyEmail(r: ReportResult): Promise<SendResult> {
   // nodemailer reports BCC recipients in accepted/rejected too; drop them so
   // hidden recipients are never surfaced to callers or logs.
   const bccSet = new Set(cfg.bcc.map((a) => a.toLowerCase()));
+  const isBcc = (a: unknown) => bccSet.has(String(a).toLowerCase());
   const hideBcc = (list: unknown) =>
-    ((list as string[]) ?? []).filter((a) => !bccSet.has(String(a).toLowerCase()));
+    ((list as string[]) ?? []).filter((a) => !isBcc(a));
+
+  const acceptedBccCount = ((info.accepted as string[]) ?? []).filter(isBcc).length;
 
   return {
     messageId: info.messageId,
     accepted: hideBcc(info.accepted),
     rejected: hideBcc(info.rejected),
+    acceptedBccCount,
   };
 }
