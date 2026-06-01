@@ -40,24 +40,29 @@ function fmtChange(pct: number): string {
   return pct >= 0 ? `+${pct.toFixed(2)}%` : `${pct.toFixed(2)}%`;
 }
 
-function buildHebrewTextBody(r: ReportResult, today: string): string {
-  const top = r.enrichedTop.slice(0, 3);
-  const topLines =
-    top.length > 0
-      ? top
-          .map(
-            (s, i) =>
-              `  ${i + 1}. ${s.ticker} – ${s.profile?.name ?? ""} (ציון ${s.finalScore.toFixed(1)}/10, ${fmtChange(s.changePercent)})`
-          )
-          .join("\n")
-      : "  לא נמצאו הזדמנויות מועשרות בריצה הזו.";
+function pickLines(stocks: ReportResult["core"]): string {
+  if (stocks.length === 0) return "  —";
+  return stocks
+    .map(
+      (s) =>
+        `  • ${s.ticker} – ${s.profile?.name ?? ""} (ציון ${s.finalScore.toFixed(1)}/10${s.price > 0 ? `, ${fmtChange(s.changePercent)}` : ""})`
+    )
+    .join("\n");
+}
 
+function buildHebrewTextBody(r: ReportResult, today: string): string {
   return `שלום,
 
 הדוח היומי לתאריך ${today} מצורף.
 
-🎯 3 ההזדמנויות המובילות:
-${topLines}
+🏛️ Core Opportunities (חברות גדולות ויציבות):
+${pickLines(r.core)}
+
+🌱 Growth Opportunities (חברות צמיחה):
+${pickLines(r.growth)}
+
+🎲 Speculative Opportunity:
+${pickLines(r.speculative)}
 
 📊 איכות נתונים:
   🟢 Live:        ${r.status.liveCount} קריאות API טריות
@@ -75,28 +80,31 @@ ${r.status.rateLimitHit ? "\n⚠️  הופעלה מגבלת ה-API בריצה �
 }
 
 function buildHebrewHtmlBody(r: ReportResult, today: string): string {
-  const top = r.enrichedTop.slice(0, 3);
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const topRows =
-    top.length > 0
-      ? top
+  const rows = (stocks: ReportResult["core"]) =>
+    stocks.length > 0
+      ? stocks
           .map(
-            (s, i) =>
+            (s) =>
               `<li><strong>${esc(s.ticker)}</strong> – ${esc(
                 s.profile?.name ?? ""
-              )} (ציון ${s.finalScore.toFixed(1)}/10, ${esc(fmtChange(s.changePercent))})</li>`
+              )} (ציון ${s.finalScore.toFixed(1)}/10${s.price > 0 ? `, ${esc(fmtChange(s.changePercent))}` : ""})</li>`
           )
           .join("")
-      : "<li>לא נמצאו הזדמנויות מועשרות בריצה הזו.</li>";
+      : "<li>—</li>";
 
   return `<div dir="rtl" lang="he" style="font-family:-apple-system,Segoe UI,Heebo,Arial,sans-serif;line-height:1.6;color:#0f172a;">
   <p>שלום,</p>
   <p>הדוח היומי לתאריך <strong>${esc(today)}</strong> מצורף.</p>
 
-  <h3 style="margin:18px 0 6px;color:#1e3a8a;">🎯 3 ההזדמנויות המובילות</h3>
-  <ol>${topRows}</ol>
+  <h3 style="margin:18px 0 6px;color:#1e3a8a;">🏛️ Core Opportunities</h3>
+  <ul>${rows(r.core)}</ul>
+  <h3 style="margin:18px 0 6px;color:#1e3a8a;">🌱 Growth Opportunities</h3>
+  <ul>${rows(r.growth)}</ul>
+  <h3 style="margin:18px 0 6px;color:#1e3a8a;">🎲 Speculative Opportunity</h3>
+  <ul>${rows(r.speculative)}</ul>
 
   <h3 style="margin:18px 0 6px;color:#1e3a8a;">📊 איכות נתונים</h3>
   <ul>

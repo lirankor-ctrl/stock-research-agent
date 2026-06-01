@@ -1,7 +1,9 @@
 import {
   fetchCompanyOverview,
   fetchNewsForTicker,
+  fetchQuote,
   fetchTopMovers,
+  Quote,
   RateLimitError,
 } from "./alphaVantage";
 import { readCache, TTL, writeCache } from "./cache";
@@ -20,11 +22,14 @@ export interface SourcedValue<T> {
 const STALE_FALLBACK_MS = 7 * 24 * 60 * 60 * 1000; // 7d – any cache is better than nothing
 
 // Generic helper: cache-first, then API, then stale-cache fallback.
+// When allowLive is false (live-call budget exhausted) the live step is
+// skipped entirely and we fall straight through to the stale-cache fallback.
 async function cacheFirst<T>(
   cacheKey: string,
   freshTtlMs: number,
   fetcher: () => Promise<T | null>,
-  onNote: (msg: string) => void
+  onNote: (msg: string) => void,
+  allowLive = true
 ): Promise<SourcedValue<T>> {
   // 1. Fresh cache hit
   const fresh = readCache<T>(cacheKey, freshTtlMs);
@@ -33,6 +38,17 @@ async function cacheFirst<T>(
       value: fresh.data,
       source: { source: "cached", ageHours: round1(fresh.ageHours) },
     };
+  }
+
+  if (!allowLive) {
+    const cached = readCache<T>(cacheKey, STALE_FALLBACK_MS);
+    if (cached) {
+      return {
+        value: cached.data,
+        source: { source: "cached", ageHours: round1(cached.ageHours) },
+      };
+    }
+    return { value: null, source: { source: "unavailable" } };
   }
 
   // 2. Try live API
@@ -83,25 +99,46 @@ export async function getTopMovers(
 export async function getOverview(
   symbol: string,
   apiKey: string,
-  onNote: (msg: string) => void = () => {}
+  onNote: (msg: string) => void = () => {},
+  allowLive = true
 ): Promise<SourcedValue<CompanyProfile>> {
   return cacheFirst<CompanyProfile>(
     `overview_${symbol}`,
     TTL.HOURS_24,
     () => fetchCompanyOverview(symbol, apiKey),
-    onNote
+    onNote,
+    allowLive
   );
 }
 
 export async function getNews(
   symbol: string,
   apiKey: string,
-  onNote: (msg: string) => void = () => {}
+  onNote: (msg: string) => void = () => {},
+  allowLive = true
 ): Promise<SourcedValue<NewsItem[]>> {
   return cacheFirst<NewsItem[]>(
     `news_${symbol}`,
     TTL.HOURS_24,
     () => fetchNewsForTicker(symbol, apiKey, 5),
-    onNote
+    onNote,
+    allowLive
+  );
+}
+
+export async function getQuote(
+  symbol: string,
+  apiKey: string,
+  onNote: (msg: string) => void = () => {},
+  allowLive = true
+): Promise<SourcedValue<Quote>> {
+  // Quotes go stale fast – keep the fresh window short so the daily report
+  // reflects the latest close.
+  return cacheFirst<Quote>(
+    `quote_${symbol}`,
+    TTL.HOURS_12,
+    () => fetchQuote(symbol, apiKey),
+    onNote,
+    allowLive
   );
 }

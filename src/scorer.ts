@@ -1,47 +1,14 @@
 import { CompanyProfile, NewsItem, ScoreBreakdown, Stock } from "./types";
 import { classifyProfile } from "./sectors";
+import { isNasdaq100, isSp500 } from "./universe";
 
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-// Each sub-score is on a 0..10 scale, then we weighted-average to 1..10.
+// Each sub-score is on a 0..10 scale, then weighted-averaged and penalized.
 
-function scorePriceMove(stock: Stock): number {
-  const abs = Math.abs(stock.changePercent);
-  // 0% -> 0, 5% -> 5, 10%+ -> ~8, 20%+ -> 10
-  return clamp(abs * 0.7, 0, 10);
-}
-
-function scoreVolume(stock: Stock): number {
-  // log10 mapping: 100k -> 5, 1M -> 6, 10M -> 7, 100M -> 8...
-  const v = Math.max(stock.volume, 1);
-  return clamp(Math.log10(v) - 0, 0, 10);
-}
-
-function scoreNewsQuality(news: NewsItem[]): number {
-  if (!news || news.length === 0) return 3; // unknown -> neutral-low
-  const relevant = news.filter((n) => (n.relevanceScore ?? 0) >= 0.3);
-  if (relevant.length === 0) return 4;
-
-  // Average abs sentiment, weighted by relevance
-  let weight = 0;
-  let acc = 0;
-  for (const n of relevant) {
-    const r = n.relevanceScore ?? 0.5;
-    const s = Math.abs(n.sentimentScore ?? 0);
-    acc += s * r;
-    weight += r;
-  }
-  const avgSentimentStrength = weight > 0 ? acc / weight : 0; // 0..~0.5
-
-  // Coverage bonus: more relevant stories = better
-  const coverage = Math.min(relevant.length / 5, 1); // 0..1
-
-  // Map: strength contributes up to ~7, coverage adds up to 3
-  return clamp(avgSentimentStrength * 15 + coverage * 3, 0, 10);
-}
-
+// 40% – the dominant factor for a long-term investor.
 function scoreCompanyQuality(
   profile: CompanyProfile | undefined,
   ticker: string
@@ -49,42 +16,101 @@ function scoreCompanyQuality(
   const cls = classifyProfile(profile, ticker);
   let s = 4; // baseline if unknown
 
-  if (cls.isTechGrowth) s += 3;
+  // Preferred index membership.
+  if (isNasdaq100(ticker)) s += 1.5;
+  if (isSp500(ticker)) s += 1;
+
+  // Large-cap technology is explicitly preferred.
+  if (cls.isTechGrowth) s += 1;
 
   if (profile?.marketCap) {
-    // Mid+ caps are generally higher quality / more researchable
-    if (profile.marketCap >= 10_000_000_000) s += 2; // large cap
-    else if (profile.marketCap >= 2_000_000_000) s += 1.5; // mid cap
-    else if (profile.marketCap >= 300_000_000) s += 0.5; // small cap
-    // micro caps: no bonus
+    if (profile.marketCap >= 200_000_000_000) s += 2.5; // mega cap
+    else if (profile.marketCap >= 50_000_000_000) s += 2; // large
+    else if (profile.marketCap >= 10_000_000_000) s += 1.5;
+    else if (profile.marketCap >= 2_000_000_000) s += 0.5; // mid
   }
 
-  if (profile?.peRatio && profile.peRatio > 0 && profile.peRatio < 80) {
-    s += 0.5; // sane profitability
-  }
+  // Established profitability.
+  if (profile?.eps !== undefined && profile.eps > 0) s += 0.5;
+  if (profile?.profitMargin !== undefined && profile.profitMargin > 0.1) s += 0.5;
+  if (profile?.peRatio && profile.peRatio > 0 && profile.peRatio < 60) s += 0.5;
 
   return clamp(s, 0, 10);
 }
 
-function scoreMarketCap(profile: CompanyProfile | undefined): number {
-  if (!profile?.marketCap) return 3;
-  const mc = profile.marketCap;
-  if (mc >= 200_000_000_000) return 10; // mega cap
-  if (mc >= 50_000_000_000) return 9;
-  if (mc >= 10_000_000_000) return 8; // large
-  if (mc >= 2_000_000_000) return 6; // mid
-  if (mc >= 500_000_000) return 4; // small
-  if (mc >= 100_000_000) return 2; // micro
-  return 1;
+// 20% – for a long-term investor moderate, steady momentum beats wild swings.
+function scoreMomentum(stock: Stock): number {
+  const move = stock.changePercent;
+  const abs = Math.abs(move);
+
+  // Reward modest positive momentum, taper hard past ~15%.
+  let s: number;
+  if (move >= 0) {
+    s = move <= 15 ? 5 + move * 0.27 : 9 - (move - 15) * 0.15;
+  } else {
+    // Pullbacks aren't fatal but score below flat.
+    s = 5 + move * 0.2; // move is negative
+  }
+  return clamp(s, 0, 10);
 }
 
-// Weights sum to 1.0
+// 20% – liquidity / institutional participation.
+function scoreVolume(stock: Stock): number {
+  const v = Math.max(stock.volume, 1);
+  return clamp(Math.log10(v), 0, 10);
+}
+
+// 20% – relevance + sentiment strength of recent coverage.
+function scoreNewsQuality(news: NewsItem[]): number {
+  if (!news || news.length === 0) return 4; // unknown -> neutral
+  const relevant = news.filter((n) => (n.relevanceScore ?? 0) >= 0.3);
+  if (relevant.length === 0) return 4;
+
+  let weight = 0;
+  let acc = 0;
+  for (const n of relevant) {
+    const r = n.relevanceScore ?? 0.5;
+    const s = n.sentimentScore ?? 0;
+    acc += s * r; // signed: positive coverage helps, negative hurts
+    weight += r;
+  }
+  const avgSentiment = weight > 0 ? acc / weight : 0; // ~ -0.5..0.5
+  const coverage = Math.min(relevant.length / 5, 1); // 0..1
+
+  // Centre at 5 (neutral), shift by sentiment, small coverage bonus.
+  return clamp(5 + avgSentiment * 10 + coverage * 2, 0, 10);
+}
+
+// Multiplicative penalty (0..1) for traits a long-term investor should avoid.
+function computePenalty(
+  stock: Stock,
+  profile: CompanyProfile | undefined
+): number {
+  let p = 1;
+
+  // Negative earnings.
+  if (profile?.eps !== undefined && profile.eps < 0) p *= 0.8;
+  else if (profile?.profitMargin !== undefined && profile.profitMargin < 0) p *= 0.85;
+
+  // Micro / small caps.
+  if (profile?.marketCap !== undefined) {
+    if (profile.marketCap < 300_000_000) p *= 0.7; // micro
+    else if (profile.marketCap < 2_000_000_000) p *= 0.85; // small
+  }
+
+  // Extreme volatility.
+  const abs = Math.abs(stock.changePercent);
+  if (abs > 25) p *= 0.8;
+  else if (abs > 15) p *= 0.92;
+
+  return p;
+}
+
 const WEIGHTS = {
-  priceMove: 0.25,
-  volume: 0.15,
-  newsQuality: 0.25,
-  companyQuality: 0.25,
-  marketCap: 0.10,
+  companyQuality: 0.4,
+  momentum: 0.2,
+  volume: 0.2,
+  newsQuality: 0.2,
 };
 
 export function scoreStock(
@@ -92,21 +118,22 @@ export function scoreStock(
   profile: CompanyProfile | undefined,
   news: NewsItem[]
 ): ScoreBreakdown {
-  const priceMove = scorePriceMove(stock);
+  const companyQuality = scoreCompanyQuality(profile, stock.ticker);
+  const momentum = scoreMomentum(stock);
   const volume = scoreVolume(stock);
   const newsQuality = scoreNewsQuality(news);
-  const companyQuality = scoreCompanyQuality(profile, stock.ticker);
-  const marketCap = scoreMarketCap(profile);
+  const penalty = computePenalty(stock, profile);
 
-  const raw =
-    priceMove * WEIGHTS.priceMove +
-    volume * WEIGHTS.volume +
-    newsQuality * WEIGHTS.newsQuality +
+  const weighted =
     companyQuality * WEIGHTS.companyQuality +
-    marketCap * WEIGHTS.marketCap;
+    momentum * WEIGHTS.momentum +
+    volume * WEIGHTS.volume +
+    newsQuality * WEIGHTS.newsQuality;
 
-  // Map 0..10 -> 1..10 (never show a hard 0)
-  const total = clamp(Math.round((1 + raw * 0.9) * 10) / 10, 1, 10);
+  const penalized = weighted * penalty;
 
-  return { priceMove, volume, newsQuality, companyQuality, marketCap, total };
+  // Map 0..10 -> 1..10 (never show a hard 0).
+  const total = clamp(Math.round((1 + penalized * 0.9) * 10) / 10, 1, 10);
+
+  return { companyQuality, momentum, volume, newsQuality, penalty, total };
 }

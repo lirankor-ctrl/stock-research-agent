@@ -10,15 +10,20 @@ function describeSource(s: SourceInfo): string {
 async function main() {
   const result = await runReport();
 
-  if (result.enrichedTop.length > 0) {
-    console.log("\n🏆 Top opportunities:");
-    for (const s of result.enrichedTop) {
+  const summarize = (label: string, stocks: typeof result.core) => {
+    if (stocks.length === 0) return;
+    console.log(`\n${label}:`);
+    for (const s of stocks) {
       console.log(
         `  ${s.ticker.padEnd(6)} score=${s.finalScore.toFixed(1)}/10  ` +
           `profile=${describeSource(s.profileSource)} news=${describeSource(s.newsSource)}`
       );
     }
-  }
+  };
+
+  summarize("🏛️  Core", result.core);
+  summarize("🌱  Growth", result.growth);
+  summarize("🎲  Speculative", result.speculative);
 }
 
 main().catch((err) => {

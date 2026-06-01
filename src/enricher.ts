@@ -1,8 +1,10 @@
 import { sleep } from "./alphaVantage";
-import { getNews, getOverview } from "./dataSources";
-import { explainWhyHebrew } from "./explainer";
-import { passesProfileFilter } from "./filters";
+import { classifyTier } from "./categorizer";
+import { getNews, getOverview, getQuote } from "./dataSources";
+import { explainLongTermWhyHebrew, explainWhyHebrew } from "./explainer";
+import { passesLongTermFilter } from "./filters";
 import { scoreStock } from "./scorer";
+import { WATCHLIST, watchlistName } from "./universe";
 import {
   CompanyProfile,
   EnrichedStock,
@@ -11,13 +13,30 @@ import {
   Stock,
 } from "./types";
 
-// Conservative gap between live API calls so we don't trip the 5/min limit.
+// Conservative gap between LIVE API calls so we don't trip the 5/min limit.
 // Cached hits skip the sleep – they're free.
-const REQUEST_DELAY_MS = 13_000;
+export const REQUEST_DELAY_MS = 13_000;
 
-// Free tier is 25 calls/day. We use 1 for movers, leaving 24.
-// Enriching 3 tickers × 2 calls = 6 live calls (worst case) – well within budget.
-export const DEFAULT_ENRICH_TOP_N = 3;
+// Default cap on fresh API calls per run (free tier is 25/day; movers spends 1).
+export const DEFAULT_LIVE_BUDGET = 22;
+
+// Tracks how many fresh (non-cached) API calls we may still make this run.
+export class LiveBudget {
+  constructor(public remaining: number) {}
+  get allow(): boolean {
+    return this.remaining > 0;
+  }
+  note(src: SourceInfo): void {
+    if (src.source === "live") this.remaining = Math.max(0, this.remaining - 1);
+  }
+}
+
+export interface EnrichOptions {
+  apiKey: string;
+  budget: LiveBudget;
+  delayMs?: number;
+  onProgress?: (msg: string) => void;
+}
 
 export interface EnrichResult {
   stocks: EnrichedStock[];
@@ -26,14 +45,7 @@ export interface EnrichResult {
   unavailableCalls: number;
 }
 
-export interface EnrichOptions {
-  apiKey: string;
-  topN?: number;
-  delayMs?: number;
-  onProgress?: (msg: string) => void;
-}
-
-function buildLightEnriched(
+function buildEnriched(
   s: Stock,
   profile: CompanyProfile | undefined,
   news: NewsItem[],
@@ -41,93 +53,135 @@ function buildLightEnriched(
   newsSource: SourceInfo
 ): EnrichedStock {
   const score = scoreStock(s, profile, news);
-  return {
+  const enriched: EnrichedStock = {
     ...s,
     profile,
     news,
     whyHebrew: explainWhyHebrew(s, profile, news),
+    longTermWhyHebrew: explainLongTermWhyHebrew(s, profile, news),
+    tier: "none",
     score,
     finalScore: score.total,
     profileSource,
     newsSource,
   };
+  enriched.tier = classifyTier(enriched);
+  return enriched;
 }
+
+// ===== Watchlist: needs a quote first (these names aren't in the movers list) =====
+
+export async function buildWatchlistStocks(
+  opts: EnrichOptions
+): Promise<{ stocks: Stock[]; tally: Tally }> {
+  const { apiKey, budget, delayMs = REQUEST_DELAY_MS, onProgress = () => {} } = opts;
+  const tally = newTally();
+  const stocks: Stock[] = [];
+
+  for (const w of WATCHLIST) {
+    const res = await getQuote(
+      w.ticker,
+      apiKey,
+      (m) => onProgress(`     ${m}`),
+      budget.allow
+    );
+    recordTally(tally, res.source);
+    budget.note(res.source);
+    if (res.source.source === "live") await sleep(delayMs);
+
+    stocks.push({
+      ticker: w.ticker,
+      price: res.value?.price ?? 0,
+      changePercent: res.value?.changePercent ?? 0,
+      volume: res.value?.volume ?? 0,
+      category: "active",
+      origin: "watchlist",
+      preScore: 0,
+    });
+  }
+
+  return { stocks, tally };
+}
+
+// ===== Generic enrichment (overview + news) for any Stock list =====
 
 export async function enrichStocks(
   candidates: Stock[],
   opts: EnrichOptions
 ): Promise<EnrichResult> {
-  const {
-    apiKey,
-    topN = DEFAULT_ENRICH_TOP_N,
-    delayMs = REQUEST_DELAY_MS,
-    onProgress = () => {},
-  } = opts;
-
-  const subset = candidates.slice(0, topN);
+  const { apiKey, budget, delayMs = REQUEST_DELAY_MS, onProgress = () => {} } = opts;
+  const tally = newTally();
   const enriched: EnrichedStock[] = [];
 
-  let liveCalls = 0;
-  let cachedCalls = 0;
-  let unavailableCalls = 0;
+  for (let i = 0; i < candidates.length; i++) {
+    const s = candidates[i];
+    onProgress(`  [${i + 1}/${candidates.length}] enriching ${s.ticker} ...`);
 
-  const tally = (src: SourceInfo) => {
-    if (src.source === "live") liveCalls++;
-    else if (src.source === "cached") cachedCalls++;
-    else unavailableCalls++;
-  };
-
-  for (let i = 0; i < subset.length; i++) {
-    const s = subset[i];
-    onProgress(`  [${i + 1}/${subset.length}] enriching ${s.ticker} ...`);
-
-    const profileRes = await getOverview(s.ticker, apiKey, (m) =>
-      onProgress(`     ${m}`)
+    const profileRes = await getOverview(
+      s.ticker,
+      apiKey,
+      (m) => onProgress(`     ${m}`),
+      budget.allow
     );
-    tally(profileRes.source);
+    recordTally(tally, profileRes.source);
+    budget.note(profileRes.source);
     if (profileRes.source.source === "live") await sleep(delayMs);
 
-    const newsRes = await getNews(s.ticker, apiKey, (m) =>
-      onProgress(`     ${m}`)
+    const newsRes = await getNews(
+      s.ticker,
+      apiKey,
+      (m) => onProgress(`     ${m}`),
+      budget.allow
     );
-    tally(newsRes.source);
-    if (
-      newsRes.source.source === "live" &&
-      i < subset.length - 1 // don't sleep after the very last call
-    ) {
+    recordTally(tally, newsRes.source);
+    budget.note(newsRes.source);
+    if (newsRes.source.source === "live" && i < candidates.length - 1) {
       await sleep(delayMs);
     }
 
     const profile = profileRes.value ?? undefined;
     const news = newsRes.value ?? [];
 
-    if (!passesProfileFilter(s, profile)) {
-      onProgress(`     ⛔  filtered out (exchange/price): ${s.ticker}`);
+    if (!passesLongTermFilter(s, profile)) {
+      onProgress(`     ⛔  filtered out (long-term rules): ${s.ticker}`);
       continue;
     }
 
-    enriched.push(
-      buildLightEnriched(s, profile, news, profileRes.source, newsRes.source)
-    );
+    enriched.push(buildEnriched(s, profile, news, profileRes.source, newsRes.source));
   }
 
   enriched.sort((a, b) => b.finalScore - a.finalScore);
-
-  return { stocks: enriched, liveCalls, cachedCalls, unavailableCalls };
+  return {
+    stocks: enriched,
+    liveCalls: tally.live,
+    cachedCalls: tally.cached,
+    unavailableCalls: tally.unavailable,
+  };
 }
 
-// Build a minimal EnrichedStock for candidates that didn't go through API enrichment.
-// Used so Top Movers / Negative / Most Active sections still have rows.
+// Skeleton for watchlist names we couldn't enrich (so the table still renders).
 export function buildSkeletonEnriched(s: Stock): EnrichedStock {
-  const score = scoreStock(s, undefined, []);
-  return {
-    ...s,
-    profile: undefined,
-    news: [],
-    whyHebrew: explainWhyHebrew(s, undefined, []),
-    score,
-    finalScore: score.total,
-    profileSource: { source: "unavailable" },
-    newsSource: { source: "unavailable" },
-  };
+  return buildEnriched(
+    s,
+    undefined,
+    [],
+    { source: "unavailable" },
+    { source: "unavailable" }
+  );
+}
+
+// ===== tally helpers =====
+
+interface Tally {
+  live: number;
+  cached: number;
+  unavailable: number;
+}
+function newTally(): Tally {
+  return { live: 0, cached: 0, unavailable: 0 };
+}
+function recordTally(t: Tally, src: SourceInfo): void {
+  if (src.source === "live") t.live++;
+  else if (src.source === "cached") t.cached++;
+  else t.unavailable++;
 }

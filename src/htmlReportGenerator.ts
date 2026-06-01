@@ -1,11 +1,8 @@
 import fs from "fs";
 import path from "path";
-import {
-  explainOpportunityHebrew,
-  listRisksHebrew,
-} from "./explainer";
-import { detectMarketMood } from "./marketMood";
-import { EnrichedStock, RunStatus, SourceInfo } from "./types";
+import { listRisksHebrew } from "./explainer";
+import { watchlistName } from "./universe";
+import { EnrichedStock, ReportData, RunStatus, SourceInfo } from "./types";
 
 // ===== helpers =====
 
@@ -40,6 +37,10 @@ function fmtMarketCap(mc?: number): string {
   return `$${mc}`;
 }
 
+function fmtPrice(p: number): string {
+  return p > 0 ? `$${p.toFixed(2)}` : "—";
+}
+
 function fmtDateTime(d: Date): string {
   const iso = d.toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
@@ -68,57 +69,38 @@ function sectorOrDash(s: EnrichedStock): string {
 
 // ===== sections =====
 
-function renderHeader(now: Date, totalRaw: number, filteredCount: number): string {
+function renderHeader(now: Date, scanned: number, qualified: number): string {
   return `
   <header class="hero">
     <div class="hero-inner">
       <div class="hero-title">
         <span class="hero-emoji">📈</span>
-        <h1>דוח שוק יומי</h1>
+        <h1>דוח מניות למשקיע לטווח ארוך</h1>
       </div>
-      <p class="subtitle">סריקת מניות חריגות, חדשות וניקוד הזדמנויות</p>
+      <p class="subtitle">פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים</p>
       <div class="meta">
         <span class="meta-item"><strong>Generated:</strong> ${esc(fmtDateTime(now))}</span>
-        <span class="meta-item"><strong>Coverage:</strong> ${totalRaw} מניות נסרקו · ${filteredCount} עברו סינון</span>
+        <span class="meta-item"><strong>Coverage:</strong> ${scanned} מניות נסרקו · ${qualified} עברו סינון איכות</span>
       </div>
     </div>
   </header>`;
 }
 
-function renderMoodCard(all: EnrichedStock[]): string {
-  const mood = detectMarketMood(all);
-  const tagsHtml = mood.tags
-    .map((t) => `<span class="mood-tag">${esc(t)}</span>`)
-    .join("");
-
-  return `
-  <section class="card mood-card">
-    <div class="card-head">
-      <h2><span class="emoji">🧠</span> מצב השוק</h2>
-      <div class="mood-tags">${tagsHtml || '<span class="mood-tag muted">ללא תגיות</span>'}</div>
-    </div>
-    <p class="mood-text">${esc(mood.summaryHebrew)}</p>
-  </section>`;
-}
-
-function renderOpportunityCard(s: EnrichedStock, rank: number): string {
+function renderOpportunityCard(s: EnrichedStock): string {
   const tier = scoreTier(s.finalScore);
-  const name = s.profile?.name ?? s.ticker;
+  const name = s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
   const sector = sectorOrDash(s);
   const cap = fmtMarketCap(s.profile?.marketCap);
   const volM = (s.volume / 1_000_000).toFixed(1);
-  const why = explainOpportunityHebrew(s, s.profile, s.news);
+  const why = s.longTermWhyHebrew;
   const risks = listRisksHebrew(s, s.profile, s.news);
 
-  const risksHtml = risks
-    .map((r) => `<li>${esc(r)}</li>`)
-    .join("");
+  const risksHtml = risks.map((r) => `<li>${esc(r)}</li>`).join("");
 
   return `
     <article class="opportunity-card card ${tier.cls}">
       <div class="opp-head">
         <div class="opp-id">
-          <span class="rank">#${rank}</span>
           <div>
             <h3 class="ticker">${esc(s.ticker)}</h3>
             <p class="company">${esc(name)}</p>
@@ -134,11 +116,11 @@ function renderOpportunityCard(s: EnrichedStock, rank: number): string {
       <div class="metrics">
         <div class="metric">
           <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">$${s.price.toFixed(2)}</span>
+          <span class="metric-value">${esc(fmtPrice(s.price))}</span>
         </div>
         <div class="metric">
           <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value ${changeClass(s.changePercent)}">${esc(fmtChange(s.changePercent))}</span>
+          <span class="metric-value ${changeClass(s.changePercent)}">${esc(s.price > 0 ? fmtChange(s.changePercent) : "—")}</span>
         </div>
         <div class="metric">
           <span class="metric-label">📈 מחזור</span>
@@ -156,7 +138,7 @@ function renderOpportunityCard(s: EnrichedStock, rank: number): string {
       </div>
 
       <div class="opp-section">
-        <h4>למה המניה מעניינת?</h4>
+        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
         <p>${esc(why)}</p>
       </div>
 
@@ -167,31 +149,29 @@ function renderOpportunityCard(s: EnrichedStock, rank: number): string {
     </article>`;
 }
 
-function renderOpportunitiesSection(top: EnrichedStock[]): string {
-  if (top.length === 0) {
-    return `
-  <section>
-    <h2 class="section-title"><span class="emoji">🎯</span> 3 ההזדמנויות המובילות</h2>
-    <p class="empty">לא נמצאו הזדמנויות מועשרות בריצה הזו.</p>
-  </section>`;
-  }
-  const cards = top.map((s, i) => renderOpportunityCard(s, i + 1)).join("\n");
+function renderCategory(
+  title: string,
+  emoji: string,
+  subtitle: string,
+  stocks: EnrichedStock[]
+): string {
+  const inner =
+    stocks.length > 0
+      ? `<div class="opportunities">${stocks.map(renderOpportunityCard).join("\n")}</div>`
+      : `<p class="empty">אין מועמדות מתאימות בקטגוריה זו בריצה הזו.</p>`;
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">🎯</span> 3 ההזדמנויות המובילות</h2>
-    <div class="opportunities">${cards}</div>
+    <h2 class="section-title"><span class="emoji">${emoji}</span> ${esc(title)}</h2>
+    <p class="section-subtitle">${esc(subtitle)}</p>
+    ${inner}
   </section>`;
 }
 
-function renderTable(
-  title: string,
-  emoji: string,
-  stocks: EnrichedStock[]
-): string {
+function renderWatchlistTable(stocks: EnrichedStock[]): string {
   if (stocks.length === 0) {
     return `
   <section>
-    <h2 class="section-title"><span class="emoji">${emoji}</span> ${esc(title)}</h2>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist</h2>
     <p class="empty">אין נתונים להצגה.</p>
   </section>`;
   }
@@ -199,12 +179,12 @@ function renderTable(
   const rows = stocks
     .map((s) => {
       const tier = scoreTier(s.finalScore);
+      const chg = s.price > 0 ? fmtChange(s.changePercent) : "—";
       return `
         <tr>
           <td class="symbol">${esc(s.ticker)}</td>
-          <td>$${s.price.toFixed(2)}</td>
-          <td class="${changeClass(s.changePercent)}">${esc(fmtChange(s.changePercent))}</td>
-          <td>${esc(fmtNum(s.volume))}</td>
+          <td>${esc(fmtPrice(s.price))}</td>
+          <td class="${s.price > 0 ? changeClass(s.changePercent) : "flat"}">${esc(chg)}</td>
           <td><span class="mini-score ${tier.cls}">${s.finalScore.toFixed(1)}</span></td>
         </tr>`;
     })
@@ -212,15 +192,15 @@ function renderTable(
 
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">${emoji}</span> ${esc(title)}</h2>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist</h2>
+    <p class="section-subtitle">מעקב קבוע אחר מניות איכות מובילות</p>
     <div class="table-wrap card">
       <table class="movers">
         <thead>
           <tr>
             <th>Symbol</th>
             <th>Price</th>
-            <th>Change %</th>
-            <th>Volume</th>
+            <th>Daily Change</th>
             <th>Score</th>
           </tr>
         </thead>
@@ -379,6 +359,11 @@ const CSS = `
     gap: 8px;
   }
   .emoji { font-size: 1.1em; line-height: 1; }
+  .section-subtitle {
+    margin: -6px 0 14px;
+    color: var(--muted);
+    font-size: 14px;
+  }
   .empty {
     color: var(--muted);
     background: var(--bg-soft);
@@ -678,38 +663,22 @@ const CSS = `
 
 // ===== top-level renderer =====
 
-export function generateHtmlReport(
-  enrichedTop: EnrichedStock[],
-  skeletonRest: EnrichedStock[],
-  rawCounts: { gainers: number; losers: number; active: number },
-  status: RunStatus
-): string {
+export function generateHtmlReport(data: ReportData): string {
   const now = new Date();
-  const combined = [...enrichedTop, ...skeletonRest];
-  const totalRaw =
-    rawCounts.gainers + rawCounts.losers + rawCounts.active;
-
-  const topMovers = combined
-    .filter((s) => s.changePercent > 0)
-    .sort((a, b) => b.changePercent - a.changePercent)
-    .slice(0, 5);
-  const negativeMovers = combined
-    .filter((s) => s.changePercent < 0)
-    .sort((a, b) => a.changePercent - b.changePercent)
-    .slice(0, 5);
-  const mostActive = combined
-    .slice()
-    .sort((a, b) => b.volume - a.volume)
-    .slice(0, 5);
+  const { core, growth, speculative, watchlist, status, scanned, qualified } = data;
 
   const body = [
-    renderHeader(now, totalRaw, combined.length),
+    renderHeader(now, scanned, qualified),
     `<main class="container">`,
-    renderMoodCard(combined),
-    renderOpportunitiesSection(enrichedTop.slice(0, 3)),
-    renderTable("המניות החזקות של היום", "🚀", topMovers),
-    renderTable("המניות החלשות של היום", "📉", negativeMovers),
-    renderTable("המניות הפעילות ביותר", "🔥", mostActive),
+    renderCategory("Core Opportunities", "🏛️", "חברות גדולות ויציבות", core),
+    renderCategory("Growth Opportunities", "🌱", "חברות צמיחה בינוניות", growth),
+    renderCategory(
+      "Speculative Opportunity",
+      "🎲",
+      "רעיון ספקולטיבי אחד בלבד – לחלק קטן מהתיק",
+      speculative
+    ),
+    renderWatchlistTable(watchlist),
     renderDataQuality(status),
     renderDisclaimer(),
     `</main>`,
@@ -720,7 +689,7 @@ export function generateHtmlReport(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📈 דוח שוק יומי – ${esc(fmtDateTime(now))}</title>
+  <title>📈 דוח מניות למשקיע לטווח ארוך – ${esc(fmtDateTime(now))}</title>
   <style>${CSS}</style>
 </head>
 <body>

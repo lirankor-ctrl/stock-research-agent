@@ -1,5 +1,6 @@
 import { passesPreFilter } from "./filters";
 import { classifyByTicker } from "./sectors";
+import { isIndexMember } from "./universe";
 import {
   AlphaVantageMoversResponse,
   RawMover,
@@ -26,20 +27,29 @@ function parseMover(raw: RawMover, category: StockCategory): Stock | null {
     changePercent,
     volume,
     category,
+    origin: "mover",
     preScore: 0,
   };
 }
 
+// Pre-score decides which movers are worth spending an API call to enrich.
+// For a long-term report we prioritise liquid, established, index-member names
+// with moderate moves – and actively deprioritise extreme daily swings.
 function preScore(stock: Stock): number {
   const absMove = Math.abs(stock.changePercent);
   const volumeScore = Math.log10(Math.max(stock.volume, 1));
-  let score = absMove * 1.0 + volumeScore * 5;
 
-  if (stock.category === "gainer") score *= 1.15;
-  if (stock.category === "active") score *= 1.05;
-  if (stock.category === "loser") score *= 0.95;
+  let score = volumeScore * 6;
 
-  if (classifyByTicker(stock.ticker)) score *= 1.4;
+  // Moderate moves are fine; extreme moves are a red flag, not a feature.
+  if (absMove <= 15) score += absMove * 0.5;
+  else if (absMove <= 40) score += 7.5 - (absMove - 15) * 0.2;
+  else score -= (absMove - 40) * 0.5;
+
+  if (isIndexMember(stock.ticker)) score *= 1.6;
+  else if (classifyByTicker(stock.ticker)) score *= 1.3;
+
+  if (stock.category === "active") score *= 1.1; // liquidity signal
 
   return score;
 }

@@ -1,4 +1,5 @@
 import { CompanyProfile, NewsItem, Stock } from "./types";
+import { isNasdaq100, isSp500, watchlistName } from "./universe";
 
 const POSITIVE_KEYWORDS = [
   "beat", "beats", "exceeds", "raises guidance", "record",
@@ -108,6 +109,75 @@ export function explainWhyHebrew(
     case "none":
       return `${headline} לא זוהו חדשות חזקות – ייתכן תנועה טכנית, מומנטום סקטוריאלי או זרימת כסף.`;
   }
+}
+
+// Hebrew rationale tailored to a long-term investor:
+// "למה משקיע ארוך טווח צריך להתעניין במניה"
+export function explainLongTermWhyHebrew(
+  stock: Stock,
+  profile: CompanyProfile | undefined,
+  news: NewsItem[]
+): string {
+  const name = profile?.name ?? watchlistName(stock.ticker) ?? stock.ticker;
+  const parts: string[] = [];
+
+  // Index membership / blue-chip status.
+  const indexLabels: string[] = [];
+  if (isNasdaq100(stock.ticker)) indexLabels.push('נאסד"ק 100');
+  if (isSp500(stock.ticker)) indexLabels.push("S&P 500");
+  if (indexLabels.length > 0) {
+    parts.push(
+      `${name} נמנית עם מדדי ${indexLabels.join(" ו-")}, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח.`
+    );
+  } else {
+    parts.push(
+      `${name} עברה את סינון האיכות (מחיר, שווי שוק ובורסה ראשית) ולכן מתאימה לבחינה כאחזקה ארוכת טווח.`
+    );
+  }
+
+  // Size / stability.
+  const cap = profile?.marketCap;
+  if (cap !== undefined) {
+    if (cap >= 200_000_000_000) {
+      parts.push(
+        `שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות.`
+      );
+    } else if (cap >= 50_000_000_000) {
+      parts.push(
+        `שווי שוק גדול (Large-Cap) משלב ביסוס עסקי עם פוטנציאל צמיחה מתמשך.`
+      );
+    } else if (cap >= 10_000_000_000) {
+      parts.push(
+        `שווי שוק של עשרות מיליארדי דולרים – חברה מבוססת שעדיין בשלב צמיחה.`
+      );
+    } else {
+      parts.push(
+        `כחברת Mid-Cap היא מציעה פוטנציאל צמיחה גבוה יותר, אך עם תנודתיות גדולה יותר – יש לאזן את גודל הפוזיציה.`
+      );
+    }
+  }
+
+  // Profitability.
+  if (profile?.eps !== undefined) {
+    if (profile.eps > 0) {
+      parts.push(
+        `החברה רווחית (EPS חיובי)${profile.profitMargin !== undefined && profile.profitMargin > 0 ? ` עם שולי רווח של כ-${(profile.profitMargin * 100).toFixed(0)}%` : ""} – יסוד פיננסי שתומך בצמיחה בת-קיימא.`
+      );
+    } else {
+      parts.push(
+        `שימו לב: החברה עדיין אינה רווחית (EPS שלילי) – פרופיל צמיחה/סיכון גבוה יותר שמתאים רק לחלק ספקולטיבי קטן בתיק.`
+      );
+    }
+  }
+
+  // Sector leadership.
+  if (isTechIndustry(profile)) {
+    parts.push(
+      `פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.`
+    );
+  }
+
+  return parts.slice(0, 4).join(" ");
 }
 
 // 2–4 sentence "why is this interesting?" briefing for the Top 3 opportunities

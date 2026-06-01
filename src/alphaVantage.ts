@@ -57,8 +57,10 @@ export async function fetchCompanyOverview(
 
   if (!data || !data.Symbol) return null;
 
-  const marketCapRaw = data.MarketCapitalization;
-  const peRaw = data.PERatio;
+  const num = (raw: any): number | undefined =>
+    raw !== undefined && raw !== null && raw !== "None" && raw !== ""
+      ? Number(raw)
+      : undefined;
 
   return {
     symbol: data.Symbol,
@@ -66,13 +68,48 @@ export async function fetchCompanyOverview(
     exchange: data.Exchange,
     sector: data.Sector,
     industry: data.Industry,
-    marketCap:
-      marketCapRaw && marketCapRaw !== "None"
-        ? Number(marketCapRaw)
-        : undefined,
+    marketCap: num(data.MarketCapitalization),
     description: data.Description,
     country: data.Country,
-    peRatio: peRaw && peRaw !== "None" ? Number(peRaw) : undefined,
+    peRatio: num(data.PERatio),
+    eps: num(data.EPS),
+    profitMargin: num(data.ProfitMargin),
+  };
+}
+
+// Lightweight current-price + daily-change lookup for tickers that aren't in
+// the movers list (e.g. stable watchlist names). One API call per ticker.
+export interface Quote {
+  price: number;
+  changePercent: number;
+  volume: number;
+}
+
+export async function fetchQuote(
+  symbol: string,
+  apiKey: string
+): Promise<Quote | null> {
+  const { data } = await axios.get(BASE_URL, {
+    params: { function: "GLOBAL_QUOTE", symbol, apikey: apiKey },
+    timeout: 15000,
+  });
+  checkApiError(data, `GLOBAL_QUOTE ${symbol}`);
+
+  const q = data?.["Global Quote"];
+  if (!q || !q["05. price"]) return null;
+
+  const price = parseFloat(q["05. price"]);
+  const changePercent = parseFloat(
+    String(q["10. change percent"] ?? "").replace("%", "")
+  );
+  const volume = parseInt(q["06. volume"] ?? "0", 10);
+
+  if (Number.isNaN(price)) return null;
+
+  return {
+    price,
+    changePercent: Number.isNaN(changePercent) ? 0 : changePercent,
+    volume: Number.isNaN(volume) ? 0 : volume,
   };
 }
 

@@ -1,5 +1,11 @@
 export type StockCategory = "gainer" | "loser" | "active";
 
+// Where a candidate entered the pipeline from.
+export type StockOrigin = "watchlist" | "mover";
+
+// Long-term opportunity bucket assigned after enrichment + scoring.
+export type OpportunityTier = "core" | "growth" | "speculative" | "none";
+
 export interface RawMover {
   ticker: string;
   price: string;
@@ -28,6 +34,8 @@ export interface CompanyProfile {
   description?: string;
   country?: string;
   peRatio?: number;
+  eps?: number;           // trailing EPS – used to detect negative earnings
+  profitMargin?: number;  // net profit margin (e.g. 0.21 = 21%)
 }
 
 export interface NewsItem {
@@ -47,16 +55,17 @@ export interface Stock {
   changePercent: number;
   volume: number;
   category: StockCategory;
+  origin: StockOrigin;
   preScore: number;
 }
 
 export interface ScoreBreakdown {
-  priceMove: number;
-  volume: number;
-  newsQuality: number;
-  companyQuality: number;
-  marketCap: number;
-  total: number;
+  companyQuality: number; // 0..10 – 40% weight
+  momentum: number;       // 0..10 – 20% weight
+  volume: number;         // 0..10 – 20% weight
+  newsQuality: number;    // 0..10 – 20% weight
+  penalty: number;        // 0..1 multiplier applied to the weighted score
+  total: number;          // 1..10 final
 }
 
 export type DataSource = "live" | "cached" | "unavailable";
@@ -70,10 +79,23 @@ export interface EnrichedStock extends Stock {
   profile?: CompanyProfile;
   news: NewsItem[];
   whyHebrew: string;
+  longTermWhyHebrew: string; // "למה משקיע ארוך טווח צריך להתעניין במניה"
+  tier: OpportunityTier;
   score: ScoreBreakdown;
   finalScore: number;
   profileSource: SourceInfo;
   newsSource: SourceInfo;
+}
+
+// Everything the report renderers need, already filtered & categorized.
+export interface ReportData {
+  core: EnrichedStock[];
+  growth: EnrichedStock[];
+  speculative: EnrichedStock[]; // max 1
+  watchlist: EnrichedStock[];   // fixed list, in WATCHLIST order
+  status: RunStatus;
+  scanned: number;   // total raw movers scanned from Alpha Vantage
+  qualified: number; // candidates that passed the long-term filter
 }
 
 export interface RunStatus {
