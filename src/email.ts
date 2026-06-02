@@ -61,10 +61,21 @@ function pickLines(stocks: ReportResult["core"]): string {
     .join("\n");
 }
 
+function fearGreedTextLines(r: ReportResult): string {
+  const fg = r.fearGreed;
+  if (!fg) return "🌎 Market Sentiment:\n  Fear & Greed Index unavailable";
+  return `🌎 Market Sentiment:
+  Fear & Greed Index: ${fg.score}
+  Classification: ${fg.classification}
+  ${fg.hebrew}`;
+}
+
 function buildHebrewTextBody(r: ReportResult, today: string): string {
   return `שלום,
 
 הדוח היומי לתאריך ${today} מצורף.
+
+${fearGreedTextLines(r)}
 
 🏛️ Core Opportunities (חברות גדולות ויציבות):
 ${pickLines(r.core)}
@@ -106,9 +117,21 @@ function buildHebrewHtmlBody(r: ReportResult, today: string): string {
           .join("")
       : "<li>—</li>";
 
+  const fg = r.fearGreed;
+  const sentimentHtml = fg
+    ? `<ul>
+    <li><strong>Fear &amp; Greed Index:</strong> ${fg.score}</li>
+    <li><strong>Classification:</strong> ${esc(fg.classification)}</li>
+    <li>${esc(fg.hebrew)}</li>
+  </ul>`
+    : `<p>Fear &amp; Greed Index unavailable</p>`;
+
   return `<div dir="rtl" lang="he" style="font-family:-apple-system,Segoe UI,Heebo,Arial,sans-serif;line-height:1.6;color:#0f172a;">
   <p>שלום,</p>
   <p>הדוח היומי לתאריך <strong>${esc(today)}</strong> מצורף.</p>
+
+  <h3 style="margin:18px 0 6px;color:#1e3a8a;">🌎 Market Sentiment</h3>
+  ${sentimentHtml}
 
   <h3 style="margin:18px 0 6px;color:#1e3a8a;">🏛️ Core Opportunities</h3>
   <ul>${rows(r.core)}</ul>

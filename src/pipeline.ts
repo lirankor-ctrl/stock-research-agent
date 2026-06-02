@@ -9,11 +9,12 @@ import {
   LiveBudget,
   REQUEST_DELAY_MS,
 } from "./enricher";
+import { getFearGreed } from "./fearGreed";
 import { generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
 import { preRank } from "./ranker";
 import { generateReport, writeReport } from "./reportGenerator";
 import { WATCHLIST } from "./universe";
-import { EnrichedStock, ReportData, RunStatus, SourceInfo, Stock } from "./types";
+import { EnrichedStock, FearGreed, ReportData, RunStatus, SourceInfo, Stock } from "./types";
 
 const LIVE_BUDGET = Number(process.env.STOCK_AGENT_LIVE_BUDGET ?? DEFAULT_LIVE_BUDGET);
 const ENRICH_DELAY_MS = Number(process.env.STOCK_AGENT_DELAY_MS ?? REQUEST_DELAY_MS);
@@ -28,6 +29,7 @@ export interface ReportResult {
   growth: EnrichedStock[];
   speculative: EnrichedStock[];
   watchlist: EnrichedStock[];
+  fearGreed: FearGreed | null;
   hasData: boolean;
 }
 
@@ -150,6 +152,18 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   status.enriched =
     universe.length === 0 ? { source: "unavailable" } : { source: "live" };
 
+  // Market sentiment (CNN Fear & Greed) – cache-first, independent of Alpha Vantage.
+  log("🌎 Fetching CNN Fear & Greed Index (cache-first)...");
+  const fearGreed = await getFearGreed((m) => {
+    log(`   ${m}`);
+    status.notes.push(m);
+  });
+  log(
+    fearGreed
+      ? `   Fear & Greed: ${fearGreed.score} (${fearGreed.classification})`
+      : "   Fear & Greed: unavailable"
+  );
+
   log("📝 [4/4] Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
     core: cats.core,
@@ -159,6 +173,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     status,
     scanned,
     qualified,
+    fearGreed,
   };
 
   const mdPath = writeReport(generateReport(data));
@@ -174,6 +189,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     growth: cats.growth,
     speculative: cats.speculative,
     watchlist,
+    fearGreed,
     hasData: universe.length > 0 || watchlist.some((s) => s.price > 0),
   };
 }

@@ -87,6 +87,21 @@ export interface EnrichedStock extends Stock {
   newsSource: SourceInfo;
 }
 
+// CNN Fear & Greed Index – overall market sentiment.
+export type FearGreedRating =
+  | "extreme fear"
+  | "fear"
+  | "neutral"
+  | "greed"
+  | "extreme greed";
+
+export interface FearGreed {
+  score: number;          // 0..100
+  rating: string;         // raw CNN rating (lower-case)
+  classification: string; // display label, e.g. "Extreme Fear"
+  hebrew: string;         // short Hebrew explanation, e.g. "שוק במצב פחד"
+}
+
 // Everything the report renderers need, already filtered & categorized.
 export interface ReportData {
   core: EnrichedStock[];
@@ -96,6 +111,7 @@ export interface ReportData {
   status: RunStatus;
   scanned: number;   // total raw movers scanned from Alpha Vantage
   qualified: number; // candidates that passed the long-term filter
+  fearGreed: FearGreed | null; // null when CNN data is unavailable
 }
 
 export interface RunStatus {

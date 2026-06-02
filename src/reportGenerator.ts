@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { listRisksHebrew } from "./explainer";
 import { watchlistName } from "./universe";
-import { EnrichedStock, ReportData } from "./types";
+import { EnrichedStock, FearGreed, ReportData } from "./types";
 
 function displayName(s: EnrichedStock): string {
   return s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
@@ -47,6 +47,22 @@ function newsStatusHebrew(s: EnrichedStock): string {
     return `🟡 ${s.news.length} חדשות מהמטמון${ageText}`;
   }
   return "🔴 חדשות לא זמינות";
+}
+
+// ---------- market sentiment (Fear & Greed) ----------
+
+function marketSentimentSection(fg: FearGreed | null): string {
+  if (!fg) {
+    return `## 🌎 Market Sentiment
+
+_Fear & Greed Index unavailable_`;
+  }
+  return `## 🌎 Market Sentiment
+
+- **Fear & Greed Index:** ${fg.score}
+- **Classification:** ${fg.classification}
+
+${fg.hebrew}`;
 }
 
 // ---------- opportunity block ----------
@@ -115,7 +131,7 @@ function watchlistTable(stocks: EnrichedStock[]): string {
 
 export function generateReport(data: ReportData): string {
   const now = new Date();
-  const { core, growth, speculative, watchlist, status, scanned, qualified } = data;
+  const { core, growth, speculative, watchlist, status, scanned, qualified, fearGreed } = data;
 
   const rateLimitBanner = status.rateLimitHit
     ? "> ⚠️ **הופעלה מגבלת ה-API במהלך הריצה.** חלק מהנתונים נטענו מהמטמון או מסומנים כלא זמינים.\n\n"
@@ -128,6 +144,10 @@ export function generateReport(data: ReportData): string {
 > **גישה:** פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים.
 
 ${rateLimitBanner}---
+
+${marketSentimentSection(fearGreed)}
+
+---
 
 ${categorySection("Core Opportunities", "🏛️", "חברות גדולות ויציבות", core)}
 

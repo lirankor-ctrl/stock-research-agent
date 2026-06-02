@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { listRisksHebrew } from "./explainer";
 import { watchlistName } from "./universe";
-import { EnrichedStock, ReportData, RunStatus, SourceInfo } from "./types";
+import { EnrichedStock, FearGreed, ReportData, RunStatus, SourceInfo } from "./types";
 
 // ===== helpers =====
 
@@ -84,6 +84,46 @@ function renderHeader(now: Date, scanned: number, qualified: number): string {
       </div>
     </div>
   </header>`;
+}
+
+// Map the index into a colour bucket for the score badge.
+function fgTone(score: number): string {
+  if (score < 25) return "extreme-fear";
+  if (score < 45) return "fear";
+  if (score <= 55) return "neutral";
+  if (score < 75) return "greed";
+  return "extreme-greed";
+}
+
+function renderMarketSentiment(fg: FearGreed | null): string {
+  if (!fg) {
+    return `
+  <section>
+    <article class="card sentiment-card">
+      <div class="card-head">
+        <h2><span class="emoji">🌎</span> Market Sentiment</h2>
+      </div>
+      <p class="empty">Fear &amp; Greed Index unavailable</p>
+    </article>
+  </section>`;
+  }
+
+  const tone = fgTone(fg.score);
+  return `
+  <section>
+    <article class="card sentiment-card">
+      <div class="card-head">
+        <h2><span class="emoji">🌎</span> Market Sentiment</h2>
+        <div class="fg-gauge ${tone}">
+          <span class="fg-score">${fg.score}</span>
+          <span class="fg-denom">/100</span>
+        </div>
+      </div>
+      <p class="mood-text"><strong>Fear &amp; Greed Index:</strong> ${fg.score} ·
+        <strong>Classification:</strong> ${esc(fg.classification)}</p>
+      <p class="mood-text">${esc(fg.hebrew)}</p>
+    </article>
+  </section>`;
 }
 
 function renderOpportunityCard(s: EnrichedStock): string {
@@ -405,6 +445,26 @@ const CSS = `
     font-size: 15px;
   }
 
+  /* ===== Fear & Greed gauge ===== */
+  .sentiment-card { border-right: 4px solid var(--blue); }
+  .fg-gauge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 2px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-weight: 800;
+    background: var(--slate-soft);
+    color: var(--muted);
+  }
+  .fg-score { font-size: 26px; line-height: 1; }
+  .fg-denom { font-size: 13px; opacity: .75; }
+  .fg-gauge.extreme-fear { background: var(--red-soft); color: #991b1b; }
+  .fg-gauge.fear { background: var(--amber-soft); color: #92400e; }
+  .fg-gauge.neutral { background: var(--slate-soft); color: var(--muted); }
+  .fg-gauge.greed { background: var(--green-soft); color: #065f46; }
+  .fg-gauge.extreme-greed { background: var(--green-soft); color: #064e3b; }
+
   /* ===== Opportunity cards ===== */
   .opportunities {
     display: grid;
@@ -665,11 +725,12 @@ const CSS = `
 
 export function generateHtmlReport(data: ReportData): string {
   const now = new Date();
-  const { core, growth, speculative, watchlist, status, scanned, qualified } = data;
+  const { core, growth, speculative, watchlist, status, scanned, qualified, fearGreed } = data;
 
   const body = [
     renderHeader(now, scanned, qualified),
     `<main class="container">`,
+    renderMarketSentiment(fearGreed),
     renderCategory("Core Opportunities", "🏛️", "חברות גדולות ויציבות", core),
     renderCategory("Growth Opportunities", "🌱", "חברות צמיחה בינוניות", growth),
     renderCategory(
