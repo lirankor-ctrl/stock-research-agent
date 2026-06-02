@@ -2,9 +2,9 @@ name: Daily Stock Report
 
 on:
   schedule:
-    # 12:00 UTC, Monday–Friday = 14:00 IST (winter) / 15:00 IDT (summer).
+    # 12:10 UTC, Monday–Friday = 14:10 Israel winter time / 15:10 Israel summer time.
     # GitHub may delay scheduled runs by several minutes during high load.
-    - cron: '0 12 * * 1-5'
+    - cron: '10 12 * * 1-5'
   workflow_dispatch:
 
 jobs:
