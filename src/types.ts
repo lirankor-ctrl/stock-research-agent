@@ -102,12 +102,30 @@ export interface FearGreed {
   hebrew: string;         // short Hebrew explanation, e.g. "שוק במצב פחד"
 }
 
+// ===== Technical alerts (Bollinger Bands + RSI) =====
+
+// A single stock that closed outside its Bollinger Bands.
+export interface TechnicalAlert {
+  ticker: string;
+  name: string;
+  price: number;       // latest close
+  band: number;        // the breached band value (upper or lower)
+  pctFromBand: number; // magnitude away from the band, in %, always positive
+  rsi14: number;
+}
+
+export interface TechnicalAlerts {
+  aboveUpper: TechnicalAlert[]; // price above the upper band (possibly overbought)
+  belowLower: TechnicalAlert[]; // price below the lower band (possibly oversold)
+}
+
 // Everything the report renderers need, already filtered & categorized.
 export interface ReportData {
   core: EnrichedStock[];
   growth: EnrichedStock[];
   speculative: EnrichedStock[]; // max 1
   watchlist: EnrichedStock[];   // fixed list, in WATCHLIST order
+  technicalAlerts: TechnicalAlerts;
   status: RunStatus;
   scanned: number;   // total raw movers scanned from Alpha Vantage
   qualified: number; // candidates that passed the long-term filter

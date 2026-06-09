@@ -1,6 +1,8 @@
 import nodemailer from "nodemailer";
 import path from "path";
 import { ReportResult } from "./pipeline";
+import { rsiInterpretation } from "./technicals";
+import { TechnicalAlert } from "./types";
 
 interface EmailConfig {
   host: string;
@@ -70,12 +72,39 @@ function fearGreedTextLines(r: ReportResult): string {
   ${fg.hebrew}`;
 }
 
+function alertTextLines(alerts: TechnicalAlert[], kind: "above" | "below"): string {
+  if (alerts.length === 0) return "  No Bollinger Band alerts today.";
+  const bandLabel = kind === "above" ? "Upper Band" : "Lower Band";
+  const distLabel = kind === "above" ? "Above" : "Below";
+  return alerts
+    .map((a) => {
+      const rsi = rsiInterpretation(a.rsi14);
+      return `  • ${a.ticker} – ${a.name}
+      Price: $${a.price.toFixed(2)} · ${bandLabel}: $${a.band.toFixed(2)} · ${distLabel}: +${a.pctFromBand.toFixed(1)}% · RSI: ${Math.round(a.rsi14)} (${rsi.label})`;
+    })
+    .join("\n");
+}
+
+function technicalAlertsTextLines(r: ReportResult): string {
+  const { aboveUpper, belowLower } = r.technicalAlerts;
+  return `📊 Technical Alerts:
+רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.
+
+🔴 Above Upper Bollinger Band:
+${alertTextLines(aboveUpper, "above")}
+
+🟢 Below Lower Bollinger Band:
+${alertTextLines(belowLower, "below")}`;
+}
+
 function buildHebrewTextBody(r: ReportResult, today: string): string {
   return `שלום,
 
 הדוח היומי לתאריך ${today} מצורף.
 
 ${fearGreedTextLines(r)}
+
+${technicalAlertsTextLines(r)}
 
 🏛️ Core Opportunities (חברות גדולות ויציבות):
 ${pickLines(r.core)}
@@ -117,6 +146,19 @@ function buildHebrewHtmlBody(r: ReportResult, today: string): string {
           .join("")
       : "<li>—</li>";
 
+  const alertRows = (alerts: TechnicalAlert[], kind: "above" | "below") => {
+    if (alerts.length === 0) return "<li>No Bollinger Band alerts today.</li>";
+    const bandLabel = kind === "above" ? "Upper Band" : "Lower Band";
+    const distLabel = kind === "above" ? "Above" : "Below";
+    return alerts
+      .map((a) => {
+        const rsi = rsiInterpretation(a.rsi14);
+        return `<li><strong>${esc(a.ticker)}</strong> – ${esc(a.name)}<br>
+        <span style="color:#64748b;font-size:13px;">Price: $${a.price.toFixed(2)} · ${bandLabel}: $${a.band.toFixed(2)} · ${distLabel}: +${a.pctFromBand.toFixed(1)}% · RSI: ${Math.round(a.rsi14)} (${esc(rsi.label)})</span></li>`;
+      })
+      .join("");
+  };
+
   const fg = r.fearGreed;
   const sentimentHtml = fg
     ? `<ul>
@@ -132,6 +174,13 @@ function buildHebrewHtmlBody(r: ReportResult, today: string): string {
 
   <h3 style="margin:18px 0 6px;color:#1e3a8a;">🌎 Market Sentiment</h3>
   ${sentimentHtml}
+
+  <h3 style="margin:18px 0 6px;color:#1e3a8a;">📊 Technical Alerts</h3>
+  <p style="font-size:13px;color:#475569;">רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.</p>
+  <p style="margin:4px 0;font-weight:600;">🔴 Above Upper Bollinger Band</p>
+  <ul>${alertRows(r.technicalAlerts.aboveUpper, "above")}</ul>
+  <p style="margin:4px 0;font-weight:600;">🟢 Below Lower Bollinger Band</p>
+  <ul>${alertRows(r.technicalAlerts.belowLower, "below")}</ul>
 
   <h3 style="margin:18px 0 6px;color:#1e3a8a;">🏛️ Core Opportunities</h3>
   <ul>${rows(r.core)}</ul>

@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { listRisksHebrew } from "./explainer";
+import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
-import { EnrichedStock, FearGreed, ReportData } from "./types";
+import { EnrichedStock, FearGreed, ReportData, TechnicalAlert, TechnicalAlerts } from "./types";
 
 function displayName(s: EnrichedStock): string {
   return s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
@@ -63,6 +64,46 @@ _Fear & Greed Index unavailable_`;
 - **Classification:** ${fg.classification}
 
 ${fg.hebrew}`;
+}
+
+// ---------- technical alerts (Bollinger Bands + RSI) ----------
+
+function alertBlock(a: TechnicalAlert, kind: "above" | "below"): string {
+  const rsi = rsiInterpretation(a.rsi14);
+  const bandLabel = kind === "above" ? "Upper Band" : "Lower Band";
+  const distLabel = kind === "above" ? "Above Band" : "Below Band";
+  return `**${a.ticker}** — ${a.name}
+- Price: ${fmtPrice(a.price)}
+- ${bandLabel}: ${fmtPrice(a.band)}
+- ${distLabel}: +${a.pctFromBand.toFixed(1)}%
+- RSI: ${Math.round(a.rsi14)} (${rsi.label} · ${rsi.hebrew})`;
+}
+
+function technicalAlertsSection(alerts: TechnicalAlerts): string {
+  const { aboveUpper, belowLower } = alerts;
+
+  const above =
+    aboveUpper.length > 0
+      ? aboveUpper.map((a) => alertBlock(a, "above")).join("\n\n")
+      : "No Bollinger Band alerts today.";
+  const below =
+    belowLower.length > 0
+      ? belowLower.map((a) => alertBlock(a, "below")).join("\n\n")
+      : "No Bollinger Band alerts today.";
+
+  return `## 📊 Technical Alerts
+
+רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.
+
+**פירוש RSI:** RSI > 70 = Overbought · 60–70 = Strong Momentum · 40–60 = Neutral · 30–40 = Weak · < 30 = Oversold
+
+### 🔴 Above Upper Bollinger Band
+
+${above}
+
+### 🟢 Below Lower Bollinger Band
+
+${below}`;
 }
 
 // ---------- opportunity block ----------
@@ -131,7 +172,7 @@ function watchlistTable(stocks: EnrichedStock[]): string {
 
 export function generateReport(data: ReportData): string {
   const now = new Date();
-  const { core, growth, speculative, watchlist, status, scanned, qualified, fearGreed } = data;
+  const { core, growth, speculative, watchlist, technicalAlerts, status, scanned, qualified, fearGreed } = data;
 
   const rateLimitBanner = status.rateLimitHit
     ? "> ⚠️ **הופעלה מגבלת ה-API במהלך הריצה.** חלק מהנתונים נטענו מהמטמון או מסומנים כלא זמינים.\n\n"
@@ -146,6 +187,10 @@ export function generateReport(data: ReportData): string {
 ${rateLimitBanner}---
 
 ${marketSentimentSection(fearGreed)}
+
+---
+
+${technicalAlertsSection(technicalAlerts)}
 
 ---
 

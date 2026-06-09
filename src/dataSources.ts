@@ -1,5 +1,6 @@
 import {
   fetchCompanyOverview,
+  fetchDailyCloses,
   fetchNewsForTicker,
   fetchQuote,
   fetchTopMovers,
@@ -121,6 +122,23 @@ export async function getNews(
     `news_${symbol}`,
     TTL.HOURS_24,
     () => fetchNewsForTicker(symbol, apiKey, 5),
+    onNote,
+    allowLive
+  );
+}
+
+// Daily close history (for Bollinger Bands / RSI). Shares the short fresh
+// window with quotes so technicals reflect the latest close.
+export async function getDailyCloses(
+  symbol: string,
+  apiKey: string,
+  onNote: (msg: string) => void = () => {},
+  allowLive = true
+): Promise<SourcedValue<number[]>> {
+  return cacheFirst<number[]>(
+    `daily_${symbol}`,
+    TTL.HOURS_12,
+    () => fetchDailyCloses(symbol, apiKey),
     onNote,
     allowLive
   );

@@ -113,6 +113,34 @@ export async function fetchQuote(
   };
 }
 
+// Last ~100 daily closes (chronological, oldest first) for a ticker. One API
+// call returns enough history for 20-day Bollinger Bands and RSI(14).
+export async function fetchDailyCloses(
+  symbol: string,
+  apiKey: string
+): Promise<number[] | null> {
+  const { data } = await axios.get(BASE_URL, {
+    params: {
+      function: "TIME_SERIES_DAILY",
+      symbol,
+      outputsize: "compact",
+      apikey: apiKey,
+    },
+    timeout: 15000,
+  });
+  checkApiError(data, `TIME_SERIES_DAILY ${symbol}`);
+
+  const series = data?.["Time Series (Daily)"];
+  if (!series || typeof series !== "object") return null;
+
+  const closes = Object.keys(series)
+    .sort() // ISO dates sort chronologically (oldest -> newest)
+    .map((date) => parseFloat(series[date]?.["4. close"]))
+    .filter((n) => !Number.isNaN(n));
+
+  return closes.length > 0 ? closes : null;
+}
+
 export async function fetchNewsForTicker(
   symbol: string,
   apiKey: string,

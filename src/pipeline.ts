@@ -13,8 +13,17 @@ import { getFearGreed } from "./fearGreed";
 import { generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
 import { preRank } from "./ranker";
 import { generateReport, writeReport } from "./reportGenerator";
+import { buildTechnicalAlerts } from "./technicalAlerts";
 import { WATCHLIST } from "./universe";
-import { EnrichedStock, FearGreed, ReportData, RunStatus, SourceInfo, Stock } from "./types";
+import {
+  EnrichedStock,
+  FearGreed,
+  ReportData,
+  RunStatus,
+  SourceInfo,
+  Stock,
+  TechnicalAlerts,
+} from "./types";
 
 const LIVE_BUDGET = Number(process.env.STOCK_AGENT_LIVE_BUDGET ?? DEFAULT_LIVE_BUDGET);
 const ENRICH_DELAY_MS = Number(process.env.STOCK_AGENT_DELAY_MS ?? REQUEST_DELAY_MS);
@@ -29,6 +38,7 @@ export interface ReportResult {
   growth: EnrichedStock[];
   speculative: EnrichedStock[];
   watchlist: EnrichedStock[];
+  technicalAlerts: TechnicalAlerts;
   fearGreed: FearGreed | null;
   hasData: boolean;
 }
@@ -164,12 +174,35 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
       : "   Fear & Greed: unavailable"
   );
 
+  // Technical alerts (Bollinger Bands + RSI) for watchlist + every stock that
+  // made it into the report. Cache-first and budget-aware like the rest.
+  log("📊 Computing technical alerts (Bollinger Bands + RSI)...");
+  const technicalUniverse = [
+    ...watchlist,
+    ...cats.core,
+    ...cats.growth,
+    ...cats.speculative,
+  ];
+  const technicalAlerts = await buildTechnicalAlerts(technicalUniverse, {
+    apiKey,
+    budget,
+    delayMs: ENRICH_DELAY_MS,
+    onProgress: (m) => {
+      log(m);
+      if (m.toLowerCase().includes("rate limit")) status.rateLimitHit = true;
+    },
+  });
+  log(
+    `   alerts: ${technicalAlerts.aboveUpper.length} above upper band · ${technicalAlerts.belowLower.length} below lower band`
+  );
+
   log("📝 [4/4] Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
     core: cats.core,
     growth: cats.growth,
     speculative: cats.speculative,
     watchlist,
+    technicalAlerts,
     status,
     scanned,
     qualified,
@@ -189,6 +222,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     growth: cats.growth,
     speculative: cats.speculative,
     watchlist,
+    technicalAlerts,
     fearGreed,
     hasData: universe.length > 0 || watchlist.some((s) => s.price > 0),
   };

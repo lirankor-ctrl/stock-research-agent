@@ -1,8 +1,17 @@
 import fs from "fs";
 import path from "path";
 import { listRisksHebrew } from "./explainer";
+import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
-import { EnrichedStock, FearGreed, ReportData, RunStatus, SourceInfo } from "./types";
+import {
+  EnrichedStock,
+  FearGreed,
+  ReportData,
+  RunStatus,
+  SourceInfo,
+  TechnicalAlert,
+  TechnicalAlerts,
+} from "./types";
 
 // ===== helpers =====
 
@@ -123,6 +132,69 @@ function renderMarketSentiment(fg: FearGreed | null): string {
         <strong>Classification:</strong> ${esc(fg.classification)}</p>
       <p class="mood-text">${esc(fg.hebrew)}</p>
     </article>
+  </section>`;
+}
+
+// RSI badge colour bucket.
+function rsiTone(rsi: number): string {
+  if (rsi > 70) return "overbought";
+  if (rsi >= 60) return "strong";
+  if (rsi >= 40) return "neutral";
+  if (rsi >= 30) return "weak";
+  return "oversold";
+}
+
+function renderAlertRow(a: TechnicalAlert, kind: "above" | "below"): string {
+  const rsi = rsiInterpretation(a.rsi14);
+  const bandLabel = kind === "above" ? "Upper Band" : "Lower Band";
+  const distLabel = kind === "above" ? "Above Band" : "Below Band";
+  return `
+        <tr>
+          <td class="symbol">${esc(a.ticker)}<span class="alert-name">${esc(a.name)}</span></td>
+          <td>${esc(fmtPrice(a.price))}</td>
+          <td>${esc(fmtPrice(a.band))} <span class="metric-sub">(${esc(bandLabel)})</span></td>
+          <td class="${kind === "above" ? "down" : "up"}">+${a.pctFromBand.toFixed(1)}% <span class="metric-sub">${esc(distLabel)}</span></td>
+          <td><span class="rsi-badge ${rsiTone(a.rsi14)}">${Math.round(a.rsi14)}</span> <span class="metric-sub">${esc(rsi.label)} · ${esc(rsi.hebrew)}</span></td>
+        </tr>`;
+}
+
+function renderAlertTable(
+  alerts: TechnicalAlert[],
+  kind: "above" | "below"
+): string {
+  if (alerts.length === 0) {
+    return `<p class="empty">No Bollinger Band alerts today.</p>`;
+  }
+  const rows = alerts.map((a) => renderAlertRow(a, kind)).join("");
+  return `
+      <div class="table-wrap card">
+        <table class="movers">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Price</th>
+              <th>${kind === "above" ? "Upper" : "Lower"} Band</th>
+              <th>Distance</th>
+              <th>RSI(14)</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+}
+
+function renderTechnicalAlerts(alerts: TechnicalAlerts): string {
+  return `
+  <section>
+    <h2 class="section-title"><span class="emoji">📊</span> Technical Alerts</h2>
+    <p class="section-subtitle">רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.</p>
+    <p class="rsi-legend">RSI &gt; 70 = Overbought · 60–70 = Strong Momentum · 40–60 = Neutral · 30–40 = Weak · &lt; 30 = Oversold</p>
+
+    <h3 class="alert-subtitle">🔴 Above Upper Bollinger Band</h3>
+    ${renderAlertTable(alerts.aboveUpper, "above")}
+
+    <h3 class="alert-subtitle">🟢 Below Lower Bollinger Band</h3>
+    ${renderAlertTable(alerts.belowLower, "below")}
   </section>`;
 }
 
@@ -650,6 +722,43 @@ const CSS = `
   .mini-score.strong { background: var(--green-soft); color: #065f46; }
   .mini-score.watchlist { background: var(--amber-soft); color: #92400e; }
 
+  /* ===== Technical alerts ===== */
+  .rsi-legend {
+    margin: -6px 0 14px;
+    color: var(--muted);
+    font-size: 13px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+  }
+  .alert-subtitle {
+    margin: 18px 0 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .alert-name {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .rsi-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--slate-soft);
+    color: var(--muted);
+  }
+  .rsi-badge.overbought { background: var(--red-soft); color: #991b1b; }
+  .rsi-badge.strong { background: var(--green-soft); color: #065f46; }
+  .rsi-badge.neutral { background: var(--slate-soft); color: var(--muted); }
+  .rsi-badge.weak { background: var(--amber-soft); color: #92400e; }
+  .rsi-badge.oversold { background: var(--blue-soft); color: var(--navy-2); }
+
   /* ===== Data quality ===== */
   .quality-grid {
     display: grid;
@@ -725,12 +834,13 @@ const CSS = `
 
 export function generateHtmlReport(data: ReportData): string {
   const now = new Date();
-  const { core, growth, speculative, watchlist, status, scanned, qualified, fearGreed } = data;
+  const { core, growth, speculative, watchlist, technicalAlerts, status, scanned, qualified, fearGreed } = data;
 
   const body = [
     renderHeader(now, scanned, qualified),
     `<main class="container">`,
     renderMarketSentiment(fearGreed),
+    renderTechnicalAlerts(technicalAlerts),
     renderCategory("Core Opportunities", "🏛️", "חברות גדולות ויציבות", core),
     renderCategory("Growth Opportunities", "🌱", "חברות צמיחה בינוניות", growth),
     renderCategory(
