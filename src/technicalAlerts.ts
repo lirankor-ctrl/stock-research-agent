@@ -2,8 +2,17 @@ import { sleep } from "./alphaVantage";
 import { getDailyCloses } from "./dataSources";
 import { computeTechnicals } from "./technicals";
 import { watchlistName } from "./universe";
-import { EnrichedStock, TechnicalAlert, TechnicalAlerts } from "./types";
+import {
+  BandProximity,
+  EnrichedStock,
+  ExpansionItem,
+  TechnicalAlert,
+  TechnicalAlerts,
+} from "./types";
 import { LiveBudget } from "./enricher";
+
+// How many names to surface in each fallback / expansion list.
+const TOP_N = 3;
 
 export interface TechnicalOptions {
   apiKey: string;
@@ -50,6 +59,19 @@ export async function buildTechnicalAlerts(
   const available = new Set<string>();
   const rateLimited = new Set<string>();
 
+  // Every computable stock, retained so we can build the proximity / expansion
+  // fallbacks after the breach alerts.
+  interface Record {
+    ticker: string;
+    name: string;
+    price: number;
+    upper: number;
+    lower: number;
+    rsi14: number;
+    widthChangePct: number | null;
+  }
+  const records: Record[] = [];
+
   for (let i = 0; i < candidates.length; i++) {
     const s = candidates[i];
     onProgress(`  [${i + 1}/${candidates.length}] technicals ${s.ticker} ...`);
@@ -78,6 +100,16 @@ export async function buildTechnicalAlerts(
     available.add(s.ticker);
     const name = displayName(s);
 
+    records.push({
+      ticker: s.ticker,
+      name,
+      price: tech.price,
+      upper: tech.bands.upper,
+      lower: tech.bands.lower,
+      rsi14: tech.rsi14,
+      widthChangePct: tech.widthChangePct,
+    });
+
     if (tech.price > tech.bands.upper) {
       aboveUpper.push({
         ticker: s.ticker,
@@ -103,5 +135,47 @@ export async function buildTechnicalAlerts(
   aboveUpper.sort((a, b) => b.pctFromBand - a.pctFromBand);
   belowLower.sort((a, b) => b.pctFromBand - a.pctFromBand);
 
-  return { alerts: { aboveUpper, belowLower }, available, rateLimited };
+  // Closest to the UPPER band = smallest positive gap below it.
+  const closestToUpper: BandProximity[] = records
+    .filter((r) => r.price <= r.upper && r.upper > 0)
+    .map((r) => ({
+      ticker: r.ticker,
+      name: r.name,
+      price: r.price,
+      distancePct: ((r.upper - r.price) / r.upper) * 100,
+      rsi14: r.rsi14,
+    }))
+    .sort((a, b) => a.distancePct - b.distancePct)
+    .slice(0, TOP_N);
+
+  // Closest to the LOWER band = smallest positive gap above it.
+  const closestToLower: BandProximity[] = records
+    .filter((r) => r.price >= r.lower && r.lower > 0)
+    .map((r) => ({
+      ticker: r.ticker,
+      name: r.name,
+      price: r.price,
+      distancePct: ((r.price - r.lower) / r.lower) * 100,
+      rsi14: r.rsi14,
+    }))
+    .sort((a, b) => a.distancePct - b.distancePct)
+    .slice(0, TOP_N);
+
+  // Largest recent band-width increase first (volatility expanding).
+  const expansion: ExpansionItem[] = records
+    .filter((r) => r.widthChangePct !== null)
+    .map((r) => ({
+      ticker: r.ticker,
+      name: r.name,
+      widthChangePct: r.widthChangePct as number,
+      rsi14: r.rsi14,
+    }))
+    .sort((a, b) => b.widthChangePct - a.widthChangePct)
+    .slice(0, TOP_N);
+
+  return {
+    alerts: { aboveUpper, belowLower, closestToUpper, closestToLower, expansion },
+    available,
+    rateLimited,
+  };
 }

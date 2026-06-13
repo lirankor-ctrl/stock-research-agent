@@ -11,6 +11,8 @@ export interface Technicals {
   price: number; // latest close
   bands: BollingerBands;
   rsi14: number;
+  bandWidth: number;             // current band width (upper − lower)
+  widthChangePct: number | null; // % change in width vs `lookback` days ago (null if too little history)
 }
 
 // Simple moving average of the last `period` values.
@@ -76,12 +78,29 @@ export function rsi(closes: number[], period = 14): number | null {
 }
 
 // Combined indicators from a close series. Null if either indicator can't be
-// computed (insufficient history).
-export function computeTechnicals(closes: number[]): Technicals | null {
+// computed (insufficient history). `lookback` is how many trading days back we
+// measure the Bollinger Band width against, to detect expansion/contraction.
+export function computeTechnicals(closes: number[], lookback = 5): Technicals | null {
   const bands = bollingerBands(closes);
   const r = rsi(closes);
   if (!bands || r === null || closes.length === 0) return null;
-  return { price: closes[closes.length - 1], bands, rsi14: r };
+
+  const bandWidth = bands.upper - bands.lower;
+
+  // Compare today's width to the width `lookback` days ago (same 20-day window,
+  // just ending earlier). Needs 20 + lookback closes to have a prior window.
+  let widthChangePct: number | null = null;
+  if (closes.length >= 20 + lookback) {
+    const prevBands = bollingerBands(closes.slice(0, closes.length - lookback));
+    if (prevBands) {
+      const prevWidth = prevBands.upper - prevBands.lower;
+      if (prevWidth > 0) {
+        widthChangePct = ((bandWidth - prevWidth) / prevWidth) * 100;
+      }
+    }
+  }
+
+  return { price: closes[closes.length - 1], bands, rsi14: r, bandWidth, widthChangePct };
 }
 
 // RSI interpretation buckets (English label + short Hebrew note).

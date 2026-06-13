@@ -148,9 +148,30 @@ export interface TechnicalAlert {
   rsi14: number;
 }
 
+// A stock approaching (but not yet breaching) a Bollinger Band.
+export interface BandProximity {
+  ticker: string;
+  name: string;
+  price: number;       // latest close
+  distancePct: number; // % distance to the band (smaller = closer to crossing)
+  rsi14: number;
+}
+
+// A stock whose Bollinger Band width has expanded the most recently.
+export interface ExpansionItem {
+  ticker: string;
+  name: string;
+  widthChangePct: number; // % change in band width vs the lookback window
+  rsi14: number;
+}
+
 export interface TechnicalAlerts {
   aboveUpper: TechnicalAlert[]; // price above the upper band (possibly overbought)
   belowLower: TechnicalAlert[]; // price below the lower band (possibly oversold)
+  // Fallbacks so the section is never empty:
+  closestToUpper: BandProximity[]; // top names nearing the upper band
+  closestToLower: BandProximity[]; // top names nearing the lower band
+  expansion: ExpansionItem[];      // top names by recent band-width increase
 }
 
 // ===== Market Story of the Day =====

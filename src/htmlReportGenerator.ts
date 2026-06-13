@@ -4,8 +4,10 @@ import { listRisksHebrew } from "./explainer";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
+  BandProximity,
   DataQualityLabel,
   EnrichedStock,
+  ExpansionItem,
   FearGreed,
   MarketStory,
   OpportunityTier,
@@ -272,18 +274,97 @@ function renderAlertTable(
       </div>`;
 }
 
+function renderProximityRow(p: BandProximity, kind: "upper" | "lower"): string {
+  const rsi = rsiInterpretation(p.rsi14);
+  return `
+        <tr>
+          <td class="symbol">${esc(p.ticker)}<span class="alert-name">${esc(p.name)}</span></td>
+          <td>${esc(fmtPrice(p.price))}</td>
+          <td class="${kind === "upper" ? "down" : "up"}">${p.distancePct.toFixed(1)}% <span class="metric-sub">${kind === "upper" ? "To Upper" : "To Lower"}</span></td>
+          <td><span class="rsi-badge ${rsiTone(p.rsi14)}">${Math.round(p.rsi14)}</span> <span class="metric-sub">${esc(rsi.label)} · ${esc(rsi.hebrew)}</span></td>
+        </tr>`;
+}
+
+function renderProximityTable(items: BandProximity[], kind: "upper" | "lower"): string {
+  if (items.length === 0) return `<p class="empty">אין נתונים זמינים.</p>`;
+  const rows = items.map((p) => renderProximityRow(p, kind)).join("");
+  return `
+      <div class="table-wrap card">
+        <table class="movers">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Price</th>
+              <th>Distance To ${kind === "upper" ? "Upper" : "Lower"}</th>
+              <th>RSI(14)</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+}
+
+function renderExpansionTable(items: ExpansionItem[]): string {
+  if (items.length === 0) return `<p class="empty">אין נתוני התרחבות זמינים.</p>`;
+  const rows = items
+    .map((e) => {
+      const rsi = rsiInterpretation(e.rsi14);
+      const sign = e.widthChangePct >= 0 ? "+" : "";
+      return `
+        <tr>
+          <td class="symbol">${esc(e.ticker)}<span class="alert-name">${esc(e.name)}</span></td>
+          <td class="${e.widthChangePct >= 0 ? "up" : "down"}">${sign}${e.widthChangePct.toFixed(1)}%</td>
+          <td><span class="rsi-badge ${rsiTone(e.rsi14)}">${Math.round(e.rsi14)}</span> <span class="metric-sub">${esc(rsi.label)} · ${esc(rsi.hebrew)}</span></td>
+        </tr>`;
+    })
+    .join("");
+  return `
+      <div class="table-wrap card">
+        <table class="movers">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Band Width Δ</th>
+              <th>RSI(14)</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+}
+
 function renderTechnicalAlerts(alerts: TechnicalAlerts): string {
+  // Above the upper band: show real breaches, else the closest names.
+  const aboveBlock =
+    alerts.aboveUpper.length > 0
+      ? `<h3 class="alert-subtitle">🔴 Above Upper Bollinger Band</h3>
+    ${renderAlertTable(alerts.aboveUpper, "above")}`
+      : `<h3 class="alert-subtitle">🔥 Closest To Upper Bollinger Band</h3>
+    <p class="alert-note">אף מניה לא פרצה את הרצועה העליונה. אלו הקרובות ביותר לפריצה (קניית-יתר אפשרית) – מרחק קטן יותר = קרובה יותר.</p>
+    ${renderProximityTable(alerts.closestToUpper, "upper")}`;
+
+  // Below the lower band: show real breaches, else the closest names.
+  const belowBlock =
+    alerts.belowLower.length > 0
+      ? `<h3 class="alert-subtitle">🟢 Below Lower Bollinger Band</h3>
+    ${renderAlertTable(alerts.belowLower, "below")}`
+      : `<h3 class="alert-subtitle">🟢 Closest To Lower Bollinger Band</h3>
+    <p class="alert-note">אף מניה לא שברה את הרצועה התחתונה. אלו הקרובות ביותר לשבירה (מכירת-יתר אפשרית) – מרחק קטן יותר = קרובה יותר.</p>
+    ${renderProximityTable(alerts.closestToLower, "lower")}`;
+
   return `
   <section>
     <h2 class="section-title"><span class="emoji">📊</span> Technical Alerts</h2>
     <p class="section-subtitle">רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.</p>
     <p class="rsi-legend">RSI &gt; 70 = Overbought · 60–70 = Strong Momentum · 40–60 = Neutral · 30–40 = Weak · &lt; 30 = Oversold</p>
 
-    <h3 class="alert-subtitle">🔴 Above Upper Bollinger Band</h3>
-    ${renderAlertTable(alerts.aboveUpper, "above")}
+    ${aboveBlock}
 
-    <h3 class="alert-subtitle">🟢 Below Lower Bollinger Band</h3>
-    ${renderAlertTable(alerts.belowLower, "below")}
+    ${belowBlock}
+
+    <h3 class="alert-subtitle">📈 Bollinger Expansion Watch</h3>
+    <p class="alert-note">מניות עם ההתרחבות הגדולה ביותר ברוחב רצועות בולינג'ר לאחרונה. התרחבות מעידה על עלייה בתנודתיות – לעיתים תחילתו של מהלך חזק.</p>
+    ${renderExpansionTable(alerts.expansion)}
   </section>`;
 }
 
@@ -1035,6 +1116,11 @@ const CSS = `
     font-size: 15px;
     font-weight: 700;
     color: var(--navy);
+  }
+  .alert-note {
+    margin: -4px 0 10px;
+    color: var(--muted);
+    font-size: 13px;
   }
   .alert-name {
     display: block;

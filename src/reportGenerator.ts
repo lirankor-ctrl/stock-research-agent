@@ -4,8 +4,10 @@ import { listRisksHebrew } from "./explainer";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
+  BandProximity,
   DataQualityLabel,
   EnrichedStock,
+  ExpansionItem,
   FearGreed,
   MarketStory,
   OpportunityTier,
@@ -146,17 +148,57 @@ function alertBlock(a: TechnicalAlert, kind: "above" | "below"): string {
 - RSI: ${Math.round(a.rsi14)} (${rsi.label} · ${rsi.hebrew})`;
 }
 
-function technicalAlertsSection(alerts: TechnicalAlerts): string {
-  const { aboveUpper, belowLower } = alerts;
+function proximityTable(items: BandProximity[], distHeader: string): string {
+  if (items.length === 0) return "_אין נתונים זמינים._";
+  const header =
+    `| Symbol | Price | ${distHeader} | RSI |\n` +
+    "| ------ | ----- | ------------- | --- |";
+  const rows = items.map((p) => {
+    const rsi = rsiInterpretation(p.rsi14);
+    return `| **${p.ticker}** | ${fmtPrice(p.price)} | ${p.distancePct.toFixed(1)}% | ${Math.round(p.rsi14)} (${rsi.label}) |`;
+  });
+  return [header, ...rows].join("\n");
+}
 
-  const above =
+function expansionTable(items: ExpansionItem[]): string {
+  if (items.length === 0) return "_אין נתוני התרחבות זמינים._";
+  const header =
+    "| Symbol | Band Width Δ | RSI |\n" +
+    "| ------ | ------------ | --- |";
+  const rows = items.map((e) => {
+    const rsi = rsiInterpretation(e.rsi14);
+    const sign = e.widthChangePct >= 0 ? "+" : "";
+    return `| **${e.ticker}** | ${sign}${e.widthChangePct.toFixed(1)}% | ${Math.round(e.rsi14)} (${rsi.label}) |`;
+  });
+  return [header, ...rows].join("\n");
+}
+
+function technicalAlertsSection(alerts: TechnicalAlerts): string {
+  const { aboveUpper, belowLower, closestToUpper, closestToLower, expansion } = alerts;
+
+  // Above the upper band: real breaches if any, otherwise the closest names.
+  const aboveBlock =
     aboveUpper.length > 0
-      ? aboveUpper.map((a) => alertBlock(a, "above")).join("\n\n")
-      : "No Bollinger Band alerts today.";
-  const below =
+      ? `### 🔴 Above Upper Bollinger Band
+
+${aboveUpper.map((a) => alertBlock(a, "above")).join("\n\n")}`
+      : `### 🔥 Closest To Upper Bollinger Band
+
+_אף מניה לא פרצה את הרצועה העליונה. אלו הקרובות ביותר לפריצה (קניית-יתר אפשרית) – מרחק קטן יותר = קרובה יותר:_
+
+${proximityTable(closestToUpper, "Distance To Upper")}`;
+
+  // Below the lower band: real breaches if any, otherwise the closest names.
+  const belowBlock =
     belowLower.length > 0
-      ? belowLower.map((a) => alertBlock(a, "below")).join("\n\n")
-      : "No Bollinger Band alerts today.";
+      ? `### 🟢 Below Lower Bollinger Band
+
+${belowLower.map((a) => alertBlock(a, "below")).join("\n\n")}`
+      : `### 🟢 Closest To Lower Bollinger Band
+
+_אף מניה לא שברה את הרצועה התחתונה. אלו הקרובות ביותר לשבירה (מכירת-יתר אפשרית) – מרחק קטן יותר = קרובה יותר:_
+
+${proximityTable(closestToLower, "Distance To Lower")}`;
 
   return `## 📊 Technical Alerts
 
@@ -164,13 +206,15 @@ function technicalAlertsSection(alerts: TechnicalAlerts): string {
 
 **פירוש RSI:** RSI > 70 = Overbought · 60–70 = Strong Momentum · 40–60 = Neutral · 30–40 = Weak · < 30 = Oversold
 
-### 🔴 Above Upper Bollinger Band
+${aboveBlock}
 
-${above}
+${belowBlock}
 
-### 🟢 Below Lower Bollinger Band
+### 📈 Bollinger Expansion Watch
 
-${below}`;
+_מניות עם ההתרחבות הגדולה ביותר ברוחב רצועות בולינג'ר לאחרונה. התרחבות מעידה על עלייה בתנודתיות – לעיתים תחילתו של מהלך חזק:_
+
+${expansionTable(expansion)}`;
 }
 
 // ---------- opportunity block ----------
