@@ -7,6 +7,7 @@ import {
   DataQualityLabel,
   EnrichedStock,
   FearGreed,
+  MarketStory,
   OpportunityTier,
   ReportData,
   TechnicalAlert,
@@ -78,6 +79,42 @@ function newsStatusHebrew(s: EnrichedStock): string {
     return `🟡 ${s.news.length} חדשות מהמטמון${ageText}`;
   }
   return "🔴 חדשות לא זמינות";
+}
+
+// ---------- market story of the day ----------
+
+function marketStorySection(story: MarketStory | null): string {
+  if (!story) {
+    return `## 📰 Market Story of the Day
+
+_לא נמצאה ידיעה חדשותית מהותית היום._`;
+  }
+
+  const moveLine =
+    story.priceMove && story.priceMove.price > 0
+      ? `\n- 📊 **תנועת מחיר:** ${fmtPrice(story.priceMove.price)} (${fmtChange(story.priceMove.changePercent)})`
+      : "";
+  // Image: only show a logo URL if one is safely available; otherwise the ticker
+  // itself stands in as the visual anchor (no copyrighted images are embedded).
+  const logoLine = story.logoUrl ? `\n- 🖼️ **לוגו:** ${story.logoUrl}` : "";
+  const original = story.originalSummary
+    ? `\n\n> _תקציר המקור (באנגלית):_ ${story.originalSummary}`
+    : "";
+
+  return `## 📰 Market Story of the Day
+
+### \`${story.ticker}\` — ${story.companyName}
+
+**${story.headline}**
+
+- 🗞️ **מקור:** ${story.source}
+- 🕒 **תאריך:** ${story.publishedDisplay}${moveLine}${logoLine}
+
+${story.summaryHebrew}
+
+**למה זה חשוב למשקיע לטווח ארוך:** ${story.whyMattersHebrew}
+
+🔗 [קריאת הידיעה המלאה במקור](${story.url})${original}`;
 }
 
 // ---------- market sentiment (Fear & Greed) ----------
@@ -235,6 +272,7 @@ ${[header, ...rows].join("\n")}`;
 export function generateReport(data: ReportData): string {
   const now = new Date();
   const {
+    marketStory,
     topOpportunities,
     watchlistHighlights,
     watchlist,
@@ -256,6 +294,10 @@ export function generateReport(data: ReportData): string {
 > **גישה:** פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים.
 
 ${rateLimitBanner}---
+
+${marketStorySection(marketStory)}
+
+---
 
 ${marketSentimentSection(fearGreed)}
 

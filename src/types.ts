@@ -153,8 +153,30 @@ export interface TechnicalAlerts {
   belowLower: TechnicalAlert[]; // price below the lower band (possibly oversold)
 }
 
+// ===== Market Story of the Day =====
+
+// One curated news story (real headline/source/url – never fabricated) used as
+// the newsletter hero. `logoUrl` is populated only from a safe/licensed source;
+// otherwise renderers fall back to a styled ticker placeholder.
+export interface MarketStory {
+  ticker: string;
+  companyName: string;
+  headline: string;
+  url: string;
+  source: string;
+  publishedAt: string;        // raw Alpha Vantage timestamp (YYYYMMDDTHHMMSS)
+  publishedDisplay: string;   // formatted "YYYY-MM-DD HH:MM"
+  sentimentLabel?: string;    // raw label from the feed (e.g. "Bullish")
+  summaryHebrew: string;      // 3–5 sentence Hebrew framing built from real facts
+  whyMattersHebrew: string;   // why a long-term investor should care
+  originalSummary?: string;   // the source's own (English) summary, verbatim
+  priceMove?: { price: number; changePercent: number };
+  logoUrl?: string;           // only when a safe public logo is available
+}
+
 // Everything the report renderers need, already filtered & categorized.
 export interface ReportData {
+  marketStory: MarketStory | null; // null when no meaningful recent news exists
   core: EnrichedStock[];
   growth: EnrichedStock[];
   speculative: EnrichedStock[]; // max 1

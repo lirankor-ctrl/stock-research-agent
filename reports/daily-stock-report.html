@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📈 דוח מניות למשקיע לטווח ארוך – 2026-06-13 14:35 UTC</title>
+  <title>📈 דוח מניות למשקיע לטווח ארוך – 2026-06-13 14:52 UTC</title>
   <style>
   :root {
     --navy: #0f172a;
@@ -93,6 +93,110 @@
     backdrop-filter: blur(4px);
   }
   .meta-item strong { color: #fff; font-weight: 600; }
+
+  /* ===== Market Story hero ===== */
+  .story-section { margin-top: -16px; }
+  .story-card {
+    display: flex;
+    gap: 22px;
+    align-items: stretch;
+    border-right: 5px solid var(--blue);
+    background: linear-gradient(180deg, var(--blue-soft) 0%, var(--bg) 55%);
+  }
+  .story-card.empty-story { display: block; }
+  .story-visual {
+    flex: 0 0 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .story-logo {
+    max-width: 180px;
+    max-height: 120px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    background: #fff;
+    padding: 8px;
+  }
+  .ticker-placeholder {
+    width: 180px;
+    height: 130px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: var(--shadow);
+  }
+  .ticker-symbol { font-size: 34px; font-weight: 800; letter-spacing: .02em; }
+  .ticker-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,.78);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .story-body { flex: 1 1 auto; min-width: 0; }
+  .story-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .story-ticker {
+    background: var(--navy);
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 3px 10px;
+    border-radius: 8px;
+  }
+  .story-company { color: var(--muted); font-size: 14px; font-weight: 600; }
+  .story-chip {
+    background: var(--slate-soft);
+    color: var(--navy-2);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .story-move { font-size: 13px; font-weight: 700; }
+  .story-move.up { color: var(--green); }
+  .story-move.down { color: var(--red); }
+  .story-move.flat { color: var(--muted); }
+  .story-headline {
+    margin: 4px 0 8px;
+    font-size: clamp(18px, 3vw, 23px);
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1.3;
+  }
+  .story-meta { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+  .story-summary { margin: 0 0 10px; font-size: 15px; color: var(--text); }
+  .story-why {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+  }
+  .story-original { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+  .story-link {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--navy-2);
+    text-decoration: none;
+    border-bottom: 2px solid var(--blue);
+    padding-bottom: 1px;
+  }
+  .story-link:hover { color: var(--blue); }
 
   /* ===== Generic card ===== */
   .card {
@@ -513,6 +617,9 @@
     .opp-head { flex-direction: column; align-items: stretch; }
     .score-badge { align-self: flex-start; }
     .meta { font-size: 12px; }
+    .story-card { flex-direction: column; }
+    .story-visual { flex-basis: auto; }
+    .ticker-placeholder { width: 100%; height: 110px; }
   }
 </style>
 </head>
@@ -526,12 +633,38 @@
       </div>
       <p class="subtitle">פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים</p>
       <div class="meta">
-        <span class="meta-item"><strong>Generated:</strong> 2026-06-13 14:35 UTC</span>
+        <span class="meta-item"><strong>Generated:</strong> 2026-06-13 14:52 UTC</span>
         <span class="meta-item"><strong>Coverage:</strong> 60 מניות נסרקו · 9 עברו סינון איכות</span>
       </div>
     </div>
   </header>
 <main class="container">
+
+  <section class="story-section">
+    <h2 class="section-title"><span class="emoji">📰</span> Market Story of the Day</h2>
+    <article class="card story-card">
+      <div class="story-visual">
+        <div class="ticker-placeholder" role="img" aria-label="NVDA">
+          <span class="ticker-symbol">NVDA</span>
+          <span class="ticker-tag">NASDAQ / NYSE</span>
+        </div>
+      </div>
+      <div class="story-body">
+        <div class="story-tags">
+          <span class="story-ticker">NVDA</span>
+          <span class="story-company">NVIDIA Corporation</span>
+          <span class="story-chip">Bullish</span>
+          <span class="story-move up">$205.19 · +0.16%</span>
+        </div>
+        <h3 class="story-headline">Howland Capital Management LLC Has $99.43 Million Stock Position in NVIDIA Corporation $NVDA</h3>
+        <p class="story-meta">🗞️ MarketBeat · 🕒 2026-06-13 07:43 UTC</p>
+        <p class="story-summary">NVIDIA Corporation (NVDA) מסקטור SEMICONDUCTORS בכותרות היום. הידיעה המרכזית: &quot;Howland Capital Management LLC Has $99.43 Million Stock Position in NVIDIA Corporation $NVDA&quot; (מקור: MarketBeat). הסנטימנט שזוהה בכתבה הוא חיובי. המניה עלתה ב-0.16% ונסחרת סביב $205.19. לפרטים המלאים יש לעיין במקור המקושר – אין לראות בכך ייעוץ השקעות.</p>
+        <p class="story-why"><strong>למה זה חשוב למשקיע לטווח ארוך:</strong> NVIDIA Corporation נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-63% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק. זרם חדשות חיובי עשוי לחזק את התזה ארוכת-הטווח, אך יש לאמת שהשיפור מבני ולא רעש קצר-טווח.</p>
+        <p class="story-original"><em>תקציר המקור (באנגלית):</em> Howland Capital Management LLC significantly increased its stake in NVIDIA Corporation (NVDA) by 8.3% in the fourth quarter, bringing its total holding to 533,121 shares valued at $99.43 million. This move comes as NVIDIA reported strong quarterly results, exceeding revenue and EPS expectations, and announced a substantial capital-return plan including a new dividend and an $80 billion share repurchase authorization. Analysts largely maintain a &quot;Buy&quot; rating for NVIDIA, with a consensus target price of $305.67.</p>
+        <a class="story-link" href="https://www.marketbeat.com/instant-alerts/filing-howland-capital-management-llc-has-9943-million-stock-position-in-nvidia-corporation-nvda-2026-06-13/" target="_blank" rel="noopener noreferrer">🔗 קריאת הידיעה המלאה במקור</a>
+      </div>
+    </article>
+  </section>
 
   <section>
     <article class="card sentiment-card">
@@ -603,8 +736,8 @@
       </div>
 
       <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.4h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.4h</span>
       </div>
 
       <div class="opp-section">
@@ -672,8 +805,8 @@
       </div>
 
       <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.4h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.4h</span>
       </div>
 
       <div class="opp-section">
@@ -741,8 +874,8 @@
       </div>
 
       <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.2h</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.2h</span>
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.4h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.5h</span>
       </div>
 
       <div class="opp-section">
@@ -912,11 +1045,11 @@
     <h2 class="section-title"><span class="emoji">⚠️</span> איכות נתונים</h2>
     <div class="quality-grid">
       <div class="quality-stat live-bg">
-        <div class="quality-num">2</div>
+        <div class="quality-num">0</div>
         <div class="quality-label">🟢 Live data</div>
       </div>
       <div class="quality-stat cached-bg">
-        <div class="quality-num">25</div>
+        <div class="quality-num">27</div>
         <div class="quality-label">🟡 Cached data</div>
       </div>
       <div class="quality-stat unavailable-bg">
@@ -934,7 +1067,7 @@
     <p>המידע בדוח זה הוא למטרות מחקר ולמידה בלבד ואינו מהווה ייעוץ השקעות, המלצה לקנייה
     או מכירה של ניירות ערך, או תחליף לייעוץ פיננסי מקצועי. מסחר במניות כרוך בסיכון
     לאובדן ההון – כל החלטה על אחריותך בלבד.</p>
-    <p class="generated">Generated by stock-agent · 2026-06-13T14:35:18.743Z</p>
+    <p class="generated">Generated by stock-agent · 2026-06-13T14:52:14.899Z</p>
   </footer>
 </main>
 </body>

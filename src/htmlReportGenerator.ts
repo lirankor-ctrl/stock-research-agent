@@ -7,6 +7,7 @@ import {
   DataQualityLabel,
   EnrichedStock,
   FearGreed,
+  MarketStory,
   OpportunityTier,
   ReportData,
   RunStatus,
@@ -116,6 +117,71 @@ function renderHeader(now: Date, scanned: number, qualified: number): string {
       </div>
     </div>
   </header>`;
+}
+
+// ===== Market Story of the Day (newsletter hero) =====
+
+// Visual anchor: a company logo only if one is safely available, otherwise a
+// styled ticker placeholder. We never hotlink copyrighted news/press images.
+function renderStoryVisual(story: MarketStory): string {
+  if (story.logoUrl) {
+    return `<div class="story-visual">
+        <img class="story-logo" src="${esc(story.logoUrl)}" alt="${esc(story.companyName)} logo" loading="lazy" referrerpolicy="no-referrer">
+      </div>`;
+  }
+  return `<div class="story-visual">
+        <div class="ticker-placeholder" role="img" aria-label="${esc(story.ticker)}">
+          <span class="ticker-symbol">${esc(story.ticker)}</span>
+          <span class="ticker-tag">NASDAQ / NYSE</span>
+        </div>
+      </div>`;
+}
+
+function renderMarketStory(story: MarketStory | null): string {
+  if (!story) {
+    return `
+  <section class="story-section">
+    <h2 class="section-title"><span class="emoji">📰</span> Market Story of the Day</h2>
+    <article class="card story-card empty-story">
+      <p class="empty">לא נמצאה ידיעה חדשותית מהותית היום.</p>
+    </article>
+  </section>`;
+  }
+
+  const moveHtml =
+    story.priceMove && story.priceMove.price > 0
+      ? `<span class="story-move ${changeClass(story.priceMove.changePercent)}">${esc(fmtPrice(story.priceMove.price))} · ${esc(fmtChange(story.priceMove.changePercent))}</span>`
+      : "";
+
+  const sentimentHtml = story.sentimentLabel
+    ? `<span class="story-chip">${esc(story.sentimentLabel)}</span>`
+    : "";
+
+  const originalHtml = story.originalSummary
+    ? `<p class="story-original"><em>תקציר המקור (באנגלית):</em> ${esc(story.originalSummary)}</p>`
+    : "";
+
+  return `
+  <section class="story-section">
+    <h2 class="section-title"><span class="emoji">📰</span> Market Story of the Day</h2>
+    <article class="card story-card">
+      ${renderStoryVisual(story)}
+      <div class="story-body">
+        <div class="story-tags">
+          <span class="story-ticker">${esc(story.ticker)}</span>
+          <span class="story-company">${esc(story.companyName)}</span>
+          ${sentimentHtml}
+          ${moveHtml}
+        </div>
+        <h3 class="story-headline">${esc(story.headline)}</h3>
+        <p class="story-meta">🗞️ ${esc(story.source)} · 🕒 ${esc(story.publishedDisplay)}</p>
+        <p class="story-summary">${esc(story.summaryHebrew)}</p>
+        <p class="story-why"><strong>למה זה חשוב למשקיע לטווח ארוך:</strong> ${esc(story.whyMattersHebrew)}</p>
+        ${originalHtml}
+        <a class="story-link" href="${esc(story.url)}" target="_blank" rel="noopener noreferrer">🔗 קריאת הידיעה המלאה במקור</a>
+      </div>
+    </article>
+  </section>`;
 }
 
 // Map the index into a colour bucket for the score badge.
@@ -546,6 +612,110 @@ const CSS = `
   }
   .meta-item strong { color: #fff; font-weight: 600; }
 
+  /* ===== Market Story hero ===== */
+  .story-section { margin-top: -16px; }
+  .story-card {
+    display: flex;
+    gap: 22px;
+    align-items: stretch;
+    border-right: 5px solid var(--blue);
+    background: linear-gradient(180deg, var(--blue-soft) 0%, var(--bg) 55%);
+  }
+  .story-card.empty-story { display: block; }
+  .story-visual {
+    flex: 0 0 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .story-logo {
+    max-width: 180px;
+    max-height: 120px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    background: #fff;
+    padding: 8px;
+  }
+  .ticker-placeholder {
+    width: 180px;
+    height: 130px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: var(--shadow);
+  }
+  .ticker-symbol { font-size: 34px; font-weight: 800; letter-spacing: .02em; }
+  .ticker-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,.78);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .story-body { flex: 1 1 auto; min-width: 0; }
+  .story-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .story-ticker {
+    background: var(--navy);
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 3px 10px;
+    border-radius: 8px;
+  }
+  .story-company { color: var(--muted); font-size: 14px; font-weight: 600; }
+  .story-chip {
+    background: var(--slate-soft);
+    color: var(--navy-2);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .story-move { font-size: 13px; font-weight: 700; }
+  .story-move.up { color: var(--green); }
+  .story-move.down { color: var(--red); }
+  .story-move.flat { color: var(--muted); }
+  .story-headline {
+    margin: 4px 0 8px;
+    font-size: clamp(18px, 3vw, 23px);
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1.3;
+  }
+  .story-meta { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+  .story-summary { margin: 0 0 10px; font-size: 15px; color: var(--text); }
+  .story-why {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+  }
+  .story-original { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+  .story-link {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--navy-2);
+    text-decoration: none;
+    border-bottom: 2px solid var(--blue);
+    padding-bottom: 1px;
+  }
+  .story-link:hover { color: var(--blue); }
+
   /* ===== Generic card ===== */
   .card {
     background: var(--bg);
@@ -965,6 +1135,9 @@ const CSS = `
     .opp-head { flex-direction: column; align-items: stretch; }
     .score-badge { align-self: flex-start; }
     .meta { font-size: 12px; }
+    .story-card { flex-direction: column; }
+    .story-visual { flex-basis: auto; }
+    .ticker-placeholder { width: 100%; height: 110px; }
   }
 `;
 
@@ -986,6 +1159,7 @@ export function generateHtmlReport(data: ReportData): string {
   const body = [
     renderHeader(now, scanned, qualified),
     `<main class="container">`,
+    renderMarketStory(data.marketStory),
     renderMarketSentiment(fearGreed),
     renderTechnicalAlerts(technicalAlerts),
     renderTopOpportunities(topOpportunities),

@@ -12,6 +12,7 @@ import {
 } from "./enricher";
 import { getFearGreed } from "./fearGreed";
 import { generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
+import { selectMarketStory } from "./marketStory";
 import { preRank } from "./ranker";
 import { generateReport, writeReport } from "./reportGenerator";
 import { buildTechnicalAlerts } from "./technicalAlerts";
@@ -19,6 +20,7 @@ import { WATCHLIST } from "./universe";
 import {
   EnrichedStock,
   FearGreed,
+  MarketStory,
   ReportData,
   RunStatus,
   SourceInfo,
@@ -41,6 +43,7 @@ export interface ReportResult {
   watchlist: EnrichedStock[];
   technicalAlerts: TechnicalAlerts;
   fearGreed: FearGreed | null;
+  marketStory: MarketStory | null;
   hasData: boolean;
 }
 
@@ -233,6 +236,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
 
   log("📝 [4/4] Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
+    marketStory: null, // filled in below, once the report stocks are known
     core: cats.core,
     growth: cats.growth,
     speculative: cats.speculative,
@@ -245,6 +249,14 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     qualified,
     fearGreed,
   };
+
+  // 📰 Market Story of the Day – the single most meaningful recent news item.
+  data.marketStory = selectMarketStory(data, Date.now());
+  log(
+    data.marketStory
+      ? `   market story: ${data.marketStory.ticker} – "${data.marketStory.headline}"`
+      : "   market story: none meaningful today"
+  );
 
   const mdPath = writeReport(generateReport(data));
   const htmlPath = writeHtmlReport(generateHtmlReport(data));
@@ -261,6 +273,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     watchlist,
     technicalAlerts,
     fearGreed,
+    marketStory: data.marketStory,
     hasData: universe.length > 0 || watchlist.some((s) => s.price > 0),
   };
 }

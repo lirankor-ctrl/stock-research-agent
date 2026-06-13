@@ -97,10 +97,26 @@ ${alertTextLines(aboveUpper, "above")}
 ${alertTextLines(belowLower, "below")}`;
 }
 
+function marketStoryTextLines(r: ReportResult): string {
+  const s = r.marketStory;
+  if (!s) return "📰 Market Story of the Day:\n  לא נמצאה ידיעה חדשותית מהותית היום.";
+  const move =
+    s.priceMove && s.priceMove.price > 0 ? ` · ${fmtChange(s.priceMove.changePercent)}` : "";
+  return `📰 Market Story of the Day:
+  ${s.ticker} – ${s.companyName}${move}
+  "${s.headline}"
+  🗞️ ${s.source} · 🕒 ${s.publishedDisplay}
+  ${s.summaryHebrew}
+  למה זה חשוב למשקיע לטווח ארוך: ${s.whyMattersHebrew}
+  🔗 ${s.url}`;
+}
+
 function buildHebrewTextBody(r: ReportResult, today: string): string {
   return `שלום,
 
 הדוח היומי לתאריך ${today} מצורף.
+
+${marketStoryTextLines(r)}
 
 ${fearGreedTextLines(r)}
 
@@ -159,6 +175,32 @@ function buildHebrewHtmlBody(r: ReportResult, today: string): string {
       .join("");
   };
 
+  const story = r.marketStory;
+  // Email-safe (inline styles, table layout) version of the Market Story hero.
+  const storyHtml = !story
+    ? `<h3 style="margin:18px 0 6px;color:#1e3a8a;">📰 Market Story of the Day</h3>
+  <p style="color:#64748b;">לא נמצאה ידיעה חדשותית מהותית היום.</p>`
+    : `<h3 style="margin:18px 0 6px;color:#1e3a8a;">📰 Market Story of the Day</h3>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#dbeafe;border-radius:12px;border:1px solid #bfdbfe;">
+    <tr>
+      <td width="140" valign="middle" align="center" style="padding:16px;">
+        <div style="width:108px;height:84px;border-radius:10px;background:#1e3a8a;color:#fff;font-weight:800;font-size:24px;line-height:84px;text-align:center;">${esc(story.ticker)}</div>
+      </td>
+      <td valign="top" style="padding:16px 16px 16px 0;">
+        <div style="font-size:13px;color:#64748b;font-weight:600;">${esc(story.ticker)} · ${esc(story.companyName)}${
+          story.priceMove && story.priceMove.price > 0
+            ? ` · ${esc(fmtChange(story.priceMove.changePercent))}`
+            : ""
+        }</div>
+        <div style="font-size:18px;font-weight:800;color:#0f172a;margin:4px 0 6px;">${esc(story.headline)}</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:8px;">🗞️ ${esc(story.source)} · 🕒 ${esc(story.publishedDisplay)}</div>
+        <div style="font-size:14px;color:#0f172a;margin-bottom:8px;">${esc(story.summaryHebrew)}</div>
+        <div style="font-size:13px;color:#0f172a;margin-bottom:10px;"><strong>למה זה חשוב למשקיע לטווח ארוך:</strong> ${esc(story.whyMattersHebrew)}</div>
+        <a href="${esc(story.url)}" target="_blank" rel="noopener noreferrer" style="font-weight:700;color:#1e3a8a;">🔗 קריאת הידיעה המלאה במקור</a>
+      </td>
+    </tr>
+  </table>`;
+
   const fg = r.fearGreed;
   const sentimentHtml = fg
     ? `<ul>
@@ -171,6 +213,8 @@ function buildHebrewHtmlBody(r: ReportResult, today: string): string {
   return `<div dir="rtl" lang="he" style="font-family:-apple-system,Segoe UI,Heebo,Arial,sans-serif;line-height:1.6;color:#0f172a;">
   <p>שלום,</p>
   <p>הדוח היומי לתאריך <strong>${esc(today)}</strong> מצורף.</p>
+
+  ${storyHtml}
 
   <h3 style="margin:18px 0 6px;color:#1e3a8a;">🌎 Market Sentiment</h3>
   ${sentimentHtml}
