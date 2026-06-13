@@ -176,6 +176,15 @@ function expansionTable(items: ExpansionItem[]): string {
 function technicalAlertsSection(alerts: TechnicalAlerts): string {
   const { aboveUpper, belowLower, closestToUpper, closestToLower, expansion } = alerts;
 
+  // No daily data at all (rate-limited, no cache) – show a clear notice.
+  if (alerts.dataUnavailable) {
+    return `## 📊 Technical Alerts
+
+> ⚠️ **Technical data unavailable today due to API rate limit.**
+>
+> הנתונים הטכניים (Bollinger Bands / RSI) אינם זמינים היום עקב מגבלת ה-API ואין נתונים שמורים במטמון. הסעיף יתעדכן בריצה הבאה. אין לכך השפעה על ציון איכות הנתונים של המניות.`;
+  }
+
   // Above the upper band: real breaches if any, otherwise the closest names.
   const aboveBlock =
     aboveUpper.length > 0

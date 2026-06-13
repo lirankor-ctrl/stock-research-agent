@@ -173,8 +173,20 @@ export async function buildTechnicalAlerts(
     .sort((a, b) => b.widthChangePct - a.widthChangePct)
     .slice(0, TOP_N);
 
+  // No usable daily data at all AND we were blocked by the budget/API → the
+  // section should say so clearly rather than render empty tables. If cache
+  // supplied closes, `records` is non-empty and this stays false.
+  const dataUnavailable = records.length === 0 && rateLimited.size > 0;
+
   return {
-    alerts: { aboveUpper, belowLower, closestToUpper, closestToLower, expansion },
+    alerts: {
+      aboveUpper,
+      belowLower,
+      closestToUpper,
+      closestToLower,
+      expansion,
+      dataUnavailable,
+    },
     available,
     rateLimited,
   };

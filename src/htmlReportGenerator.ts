@@ -334,6 +334,18 @@ function renderExpansionTable(items: ExpansionItem[]): string {
 }
 
 function renderTechnicalAlerts(alerts: TechnicalAlerts): string {
+  // No daily data at all (rate-limited, no cache) – show a clear notice.
+  if (alerts.dataUnavailable) {
+    return `
+  <section>
+    <h2 class="section-title"><span class="emoji">📊</span> Technical Alerts</h2>
+    <div class="card warn-card">
+      <p class="warn-title">⚠️ Technical data unavailable today due to API rate limit.</p>
+      <p class="warn-sub">הנתונים הטכניים (Bollinger Bands / RSI) אינם זמינים היום עקב מגבלת ה-API ואין נתונים שמורים במטמון. הסעיף יתעדכן בריצה הבאה. אין לכך השפעה על ציון איכות הנתונים של המניות.</p>
+    </div>
+  </section>`;
+  }
+
   // Above the upper band: show real breaches, else the closest names.
   const aboveBlock =
     alerts.aboveUpper.length > 0
@@ -1121,6 +1133,21 @@ const CSS = `
     margin: -4px 0 10px;
     color: var(--muted);
     font-size: 13px;
+  }
+  .warn-card {
+    background: var(--amber-soft);
+    border-color: #fde68a;
+  }
+  .warn-card .warn-title {
+    margin: 0 0 6px;
+    font-weight: 700;
+    color: #92400e;
+    font-size: 15px;
+  }
+  .warn-card .warn-sub {
+    margin: 0;
+    color: #92400e;
+    font-size: 14px;
   }
   .alert-name {
     display: block;

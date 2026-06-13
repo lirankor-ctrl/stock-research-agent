@@ -172,6 +172,9 @@ export interface TechnicalAlerts {
   closestToUpper: BandProximity[]; // top names nearing the upper band
   closestToLower: BandProximity[]; // top names nearing the lower band
   expansion: ExpansionItem[];      // top names by recent band-width increase
+  // True when NO usable daily data could be obtained (rate-limited and no cache).
+  // Renderers show a clear notice instead of empty tables. Not a data-quality fault.
+  dataUnavailable: boolean;
 }
 
 // ===== Market Story of the Day =====
