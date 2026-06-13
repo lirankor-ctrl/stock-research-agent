@@ -97,6 +97,7 @@ export async function buildWatchlistStocks(
       category: "active",
       origin: "watchlist",
       preScore: 0,
+      quoteSource: res.source,
     });
   }
 

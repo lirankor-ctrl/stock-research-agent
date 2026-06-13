@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📈 דוח מניות למשקיע לטווח ארוך – 2026-06-09 11:48 UTC</title>
+  <title>📈 דוח מניות למשקיע לטווח ארוך – 2026-06-13 14:35 UTC</title>
   <style>
   :root {
     --navy: #0f172a;
@@ -318,6 +318,40 @@
   .badge.cached { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
   .badge.unavailable { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
 
+  /* ===== Data-quality badge + tier chip ===== */
+  .opp-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .tier-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--slate-soft);
+    color: var(--navy-2);
+  }
+  .dq-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--slate-soft);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .dq-badge.dq-high { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
+  .dq-badge.dq-medium { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+  .dq-badge.dq-low { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+  .dq-badge.dq-excluded { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
+  .dq-badge.dq-ratelimit { background: var(--blue-soft); color: var(--navy-2); border-color: #bfdbfe; }
+
   /* ===== Tables ===== */
   .table-wrap {
     padding: 0;
@@ -438,6 +472,16 @@
     font-weight: 600;
     border: 1px solid #fde68a;
   }
+  .dq-legend {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    line-height: 2;
+  }
 
   /* ===== Disclaimer ===== */
   .disclaimer {
@@ -482,7 +526,7 @@
       </div>
       <p class="subtitle">פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים</p>
       <div class="meta">
-        <span class="meta-item"><strong>Generated:</strong> 2026-06-09 11:48 UTC</span>
+        <span class="meta-item"><strong>Generated:</strong> 2026-06-13 14:35 UTC</span>
         <span class="meta-item"><strong>Coverage:</strong> 60 מניות נסרקו · 9 עברו סינון איכות</span>
       </div>
     </div>
@@ -494,11 +538,11 @@
       <div class="card-head">
         <h2><span class="emoji">🌎</span> Market Sentiment</h2>
         <div class="fg-gauge fear">
-          <span class="fg-score">39</span>
+          <span class="fg-score">34</span>
           <span class="fg-denom">/100</span>
         </div>
       </div>
-      <p class="mood-text"><strong>Fear &amp; Greed Index:</strong> 39 ·
+      <p class="mood-text"><strong>Fear &amp; Greed Index:</strong> 34 ·
         <strong>Classification:</strong> Fear</p>
       <p class="mood-text">שוק במצב פחד</p>
     </article>
@@ -517,15 +561,88 @@
   </section>
 
   <section>
-    <h2 class="section-title"><span class="emoji">🏛️</span> Core Opportunities</h2>
-    <p class="section-subtitle">חברות גדולות ויציבות</p>
+    <h2 class="section-title"><span class="emoji">🎯</span> Top Opportunities (3/3)</h2>
+    <p class="section-subtitle">עד 3 הזדמנויות מובילות בלבד – אחרי דירוג וסינון לפי איכות נתונים (רק High/Medium).</p>
     <div class="opportunities">
+    <article class="opportunity-card card strong">
+      <div class="opp-head">
+        <div class="opp-id">
+          <div>
+            <h3 class="ticker">NVDA</h3>
+            <p class="company">NVIDIA Corporation</p>
+            <div class="opp-tags">
+              <span class="tier-chip">🏛️ Core · ליבה</span>
+              <span class="dq-badge dq-high">High · 100/100</span>
+            </div>
+          </div>
+        </div>
+        <div class="score-badge strong">
+          <span class="score-num">8.7</span>
+          <span class="score-denom">/10</span>
+          <span class="score-tier">Strong</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">💰 מחיר</span>
+          <span class="metric-value">$205.19</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📊 שינוי יומי</span>
+          <span class="metric-value up">+0.16%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">📈 מחזור</span>
+          <span class="metric-value">112,345,314 <span class="metric-sub">(112.3M)</span></span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">🏢 סקטור</span>
+          <span class="metric-value sm">SEMICONDUCTORS · $4.97T</span>
+        </div>
+      </div>
+
+      <div class="opp-badges">
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+      </div>
+
+      <div class="opp-section">
+        <h4>למה המניה מופיעה כאן</h4>
+        <p>NVIDIA Corporation נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-63% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>מה חסר בנתונים</h4>
+        <p>אין – כל הנתונים שנאספו מלאים</p>
+      </div>
+      
+      <div class="opp-section">
+        <h4>סטטוס API (לא נספר באיכות)</h4>
+        <p>נתונים טכניים (Bollinger/RSI) — <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span></p>
+      </div>
+
+      <div class="opp-section">
+        <h4>עד כמה האות אמין</h4>
+        <p>אמינות גבוהה – כל הנתונים שנאספו זמינים ומלאים. נתונים שלא נשלפו עקב מגבלת API (אינם פוגעים בציון): נתונים טכניים (Bollinger/RSI).</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>סיכונים</h4>
+        <ul class="risks"><li>סיכון שוק כללי – אף מניה אינה חסינה מתנודות מאקרו, ריבית או חדשות גיאופוליטיות.</li></ul>
+      </div>
+    </article>
+
     <article class="opportunity-card card strong">
       <div class="opp-head">
         <div class="opp-id">
           <div>
             <h3 class="ticker">GOOGL</h3>
             <p class="company">Alphabet Inc Class A</p>
+            <div class="opp-tags">
+              <span class="tier-chip">🏛️ Core · ליבה</span>
+              <span class="dq-badge dq-high">High · 100/100</span>
+            </div>
           </div>
         </div>
         <div class="score-badge strong">
@@ -538,30 +655,45 @@
       <div class="metrics">
         <div class="metric">
           <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">$363.31</span>
+          <span class="metric-value">$359.68</span>
         </div>
         <div class="metric">
           <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value down">-1.36%</span>
+          <span class="metric-value up">+0.53%</span>
         </div>
         <div class="metric">
           <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">27,942,464 <span class="metric-sub">(27.9M)</span></span>
+          <span class="metric-value">24,731,019 <span class="metric-sub">(24.7M)</span></span>
         </div>
         <div class="metric">
           <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">INTERNET CONTENT &amp; INFORMATION · $4.43T</span>
+          <span class="metric-value sm">INTERNET CONTENT &amp; INFORMATION · $4.39T</span>
         </div>
       </div>
 
       <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.1h</span>
       </div>
 
       <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
+        <h4>למה המניה מופיעה כאן</h4>
         <p>Alphabet Inc Class A נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-38% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>מה חסר בנתונים</h4>
+        <p>אין – כל הנתונים שנאספו מלאים</p>
+      </div>
+      
+      <div class="opp-section">
+        <h4>סטטוס API (לא נספר באיכות)</h4>
+        <p>נתונים טכניים (Bollinger/RSI) — <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span></p>
+      </div>
+
+      <div class="opp-section">
+        <h4>עד כמה האות אמין</h4>
+        <p>אמינות גבוהה – כל הנתונים שנאספו זמינים ומלאים. נתונים שלא נשלפו עקב מגבלת API (אינם פוגעים בציון): נתונים טכניים (Bollinger/RSI).</p>
       </div>
 
       <div class="opp-section">
@@ -574,8 +706,12 @@
       <div class="opp-head">
         <div class="opp-id">
           <div>
-            <h3 class="ticker">PANW</h3>
-            <p class="company">Palo Alto Networks Inc</p>
+            <h3 class="ticker">AMZN</h3>
+            <p class="company">Amazon.com Inc</p>
+            <div class="opp-tags">
+              <span class="tier-chip">🏛️ Core · ליבה</span>
+              <span class="dq-badge dq-high">High · 100/100</span>
+            </div>
           </div>
         </div>
         <div class="score-badge strong">
@@ -588,335 +724,45 @@
       <div class="metrics">
         <div class="metric">
           <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">$266.33</span>
+          <span class="metric-value">$238.55</span>
         </div>
         <div class="metric">
           <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value down">-2.10%</span>
+          <span class="metric-value down">-1.23%</span>
         </div>
         <div class="metric">
           <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">7,009,759 <span class="metric-sub">(7.0M)</span></span>
+          <span class="metric-value">51,251,141 <span class="metric-sub">(51.3M)</span></span>
         </div>
         <div class="metric">
           <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">SOFTWARE - INFRASTRUCTURE · $217.06B</span>
+          <span class="metric-value sm">INTERNET RETAIL · $2.57T</span>
         </div>
       </div>
 
       <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
+        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~0.2h</span>
+        <span class="badge-label">📋 פרופיל:</span> <span class="badge cached">🟡 Cached · ~0.2h</span>
       </div>
 
       <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
-        <p>Palo Alto Networks Inc נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-8% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks"><li>יחס PE גבוה במיוחד (234) – תמחור יקר, רגיש לכל אכזבה ברווחיות.</li></ul>
-      </div>
-    </article>
-
-    <article class="opportunity-card card strong">
-      <div class="opp-head">
-        <div class="opp-id">
-          <div>
-            <h3 class="ticker">PLTR</h3>
-            <p class="company">Palantir Technologies Inc.</p>
-          </div>
-        </div>
-        <div class="score-badge strong">
-          <span class="score-num">8.0</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">Strong</span>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">$136.47</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value up">+0.69%</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">26,978,870 <span class="metric-sub">(27.0M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">SOFTWARE - INFRASTRUCTURE · $324.91B</span>
-        </div>
-      </div>
-
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge cached">🟡 Cached · ~120.2h</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
-      </div>
-
-      <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
-        <p>Palantir Technologies Inc. נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-44% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks"><li>אי-ודאות חדשותית (חדשות חיוביות ושליליות במקביל) – קשה לזהות מגמה ברורה.</li><li>יחס PE גבוה במיוחד (152) – תמחור יקר, רגיש לכל אכזבה ברווחיות.</li></ul>
-      </div>
-    </article>
-
-    <article class="opportunity-card card watchlist">
-      <div class="opp-head">
-        <div class="opp-id">
-          <div>
-            <h3 class="ticker">AMZN</h3>
-            <p class="company">Amazon.com Inc</p>
-          </div>
-        </div>
-        <div class="score-badge watchlist">
-          <span class="score-num">7.3</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">Watchlist</span>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value flat">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">0 <span class="metric-sub">(0.0M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">INTERNET RETAIL · $2.64T</span>
-        </div>
-      </div>
-
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
-      </div>
-
-      <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
+        <h4>למה המניה מופיעה כאן</h4>
         <p>Amazon.com Inc נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-12% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
       </div>
 
       <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks"><li>סיכון שוק כללי – אף מניה אינה חסינה מתנודות מאקרו, ריבית או חדשות גיאופוליטיות.</li></ul>
+        <h4>מה חסר בנתונים</h4>
+        <p>אין – כל הנתונים שנאספו מלאים</p>
       </div>
-    </article></div>
-  </section>
-
-  <section>
-    <h2 class="section-title"><span class="emoji">🌱</span> Growth Opportunities</h2>
-    <p class="section-subtitle">חברות צמיחה בינוניות</p>
-    <div class="opportunities">
-    <article class="opportunity-card card watchlist">
-      <div class="opp-head">
-        <div class="opp-id">
-          <div>
-            <h3 class="ticker">MSFT</h3>
-            <p class="company">Microsoft Corporation</p>
-          </div>
-        </div>
-        <div class="score-badge watchlist">
-          <span class="score-num">7.3</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">Watchlist</span>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value flat">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">0 <span class="metric-sub">(0.0M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">SOFTWARE - INFRASTRUCTURE · $3.06T</span>
-        </div>
-      </div>
-
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
+      
+      <div class="opp-section">
+        <h4>סטטוס API (לא נספר באיכות)</h4>
+        <p>נתונים טכניים (Bollinger/RSI) — <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span></p>
       </div>
 
       <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
-        <p>Microsoft Corporation נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-39% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks"><li>סיכון שוק כללי – אף מניה אינה חסינה מתנודות מאקרו, ריבית או חדשות גיאופוליטיות.</li></ul>
-      </div>
-    </article>
-
-    <article class="opportunity-card card watchlist">
-      <div class="opp-head">
-        <div class="opp-id">
-          <div>
-            <h3 class="ticker">NVDA</h3>
-            <p class="company">NVIDIA Corporation</p>
-          </div>
-        </div>
-        <div class="score-badge watchlist">
-          <span class="score-num">7.3</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">Watchlist</span>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value flat">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">0 <span class="metric-sub">(0.0M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">SEMICONDUCTORS · $5.05T</span>
-        </div>
-      </div>
-
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
-      </div>
-
-      <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
-        <p>NVIDIA Corporation נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-63% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks"><li>סיכון שוק כללי – אף מניה אינה חסינה מתנודות מאקרו, ריבית או חדשות גיאופוליטיות.</li></ul>
-      </div>
-    </article>
-
-    <article class="opportunity-card card watchlist">
-      <div class="opp-head">
-        <div class="opp-id">
-          <div>
-            <h3 class="ticker">META</h3>
-            <p class="company">Meta Platforms Inc.</p>
-          </div>
-        </div>
-        <div class="score-badge watchlist">
-          <span class="score-num">6.8</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">Watchlist</span>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value flat">—</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">0 <span class="metric-sub">(0.0M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">INTERNET CONTENT &amp; INFORMATION · $1.49T</span>
-        </div>
-      </div>
-
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
-      </div>
-
-      <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
-        <p>Meta Platforms Inc. נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק של מעל $200B מעניק יציבות, גישה להון זול ועמידות יחסית בתקופות תנודתיות. החברה רווחית (EPS חיובי) עם שולי רווח של כ-33% – יסוד פיננסי שתומך בצמיחה בת-קיימא. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks"><li>אי-ודאות חדשותית (חדשות חיוביות ושליליות במקביל) – קשה לזהות מגמה ברורה.</li></ul>
-      </div>
-    </article>
-
-    <article class="opportunity-card card watchlist">
-      <div class="opp-head">
-        <div class="opp-id">
-          <div>
-            <h3 class="ticker">CRWD</h3>
-            <p class="company">Crowdstrike Holdings Inc</p>
-          </div>
-        </div>
-        <div class="score-badge watchlist">
-          <span class="score-num">6.7</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">Watchlist</span>
-        </div>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">$658.79</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value down">-1.82%</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">3,337,378 <span class="metric-sub">(3.3M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">SOFTWARE - INFRASTRUCTURE · $170.82B</span>
-        </div>
-      </div>
-
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> <span class="badge live">🟢 Live</span>
-        <span class="badge-label">📋 פרופיל:</span> <span class="badge live">🟢 Live</span>
-      </div>
-
-      <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
-        <p>Crowdstrike Holdings Inc נמנית עם מדדי נאסד&quot;ק 100 ו-S&amp;P 500, כלומר חברה מובילה עם נזילות גבוהה ותשומת לב מוסדית – בסיס טוב לאחזקה ארוכת טווח. שווי שוק גדול (Large-Cap) משלב ביסוס עסקי עם פוטנציאל צמיחה מתמשך. שימו לב: החברה עדיין אינה רווחית (EPS שלילי) – פרופיל צמיחה/סיכון גבוה יותר שמתאים רק לחלק ספקולטיבי קטן בתיק. פעילות בליבת הטכנולוגיה/AI/סייבר ממצבת אותה במגמות צמיחה ארוכות-טווח מובילות בשוק.</p>
+        <h4>עד כמה האות אמין</h4>
+        <p>אמינות גבוהה – כל הנתונים שנאספו זמינים ומלאים. נתונים שלא נשלפו עקב מגבלת API (אינם פוגעים בציון): נתונים טכניים (Bollinger/RSI).</p>
       </div>
 
       <div class="opp-section">
@@ -927,14 +773,62 @@
   </section>
 
   <section>
-    <h2 class="section-title"><span class="emoji">🎲</span> Speculative Opportunity</h2>
-    <p class="section-subtitle">רעיון ספקולטיבי אחד בלבד – לחלק קטן מהתיק</p>
-    <p class="empty">אין מועמדות מתאימות בקטגוריה זו בריצה הזו.</p>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist Highlights (5/5)</h2>
+    <p class="section-subtitle">עד 5 מניות המעקב האיכותיות ביותר בריצה הזו (לפי ניקוד ואיכות נתונים).</p>
+    <div class="table-wrap card">
+      <table class="movers">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Score</th>
+            <th>Data Quality</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td class="symbol">NVDA</td>
+          <td>NVIDIA Corporation</td>
+          <td>$205.19</td>
+          <td><span class="mini-score strong">8.7</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">GOOGL</td>
+          <td>Alphabet Inc Class A</td>
+          <td>$359.68</td>
+          <td><span class="mini-score strong">8.6</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">AMZN</td>
+          <td>Amazon.com Inc</td>
+          <td>$238.55</td>
+          <td><span class="mini-score strong">8.5</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">META</td>
+          <td>Meta Platforms Inc.</td>
+          <td>$566.98</td>
+          <td><span class="mini-score strong">8.5</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
+        </tr>
+        <tr>
+          <td class="symbol">PANW</td>
+          <td>Palo Alto Networks Inc</td>
+          <td>$279.62</td>
+          <td><span class="mini-score strong">8.0</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
+        </tr></tbody>
+      </table>
+    </div>
   </section>
 
   <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist</h2>
-    <p class="section-subtitle">מעקב קבוע אחר מניות איכות מובילות</p>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist (all)</h2>
+    <p class="section-subtitle">מעקב קבוע אחר כל מניות האיכות ברשימה – כולל איכות נתונים לכל אחת</p>
     <div class="table-wrap card">
       <table class="movers">
         <thead>
@@ -943,62 +837,72 @@
             <th>Price</th>
             <th>Daily Change</th>
             <th>Score</th>
+            <th>Data Quality</th>
           </tr>
         </thead>
         <tbody>
         <tr>
           <td class="symbol">SOFI</td>
-          <td>—</td>
-          <td class="flat">—</td>
-          <td><span class="mini-score watchlist">6.3</span></td>
+          <td>$16.58</td>
+          <td class="down">-0.54%</td>
+          <td><span class="mini-score watchlist">7.5</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">AMZN</td>
-          <td>—</td>
-          <td class="flat">—</td>
-          <td><span class="mini-score watchlist">7.3</span></td>
+          <td>$238.55</td>
+          <td class="down">-1.23%</td>
+          <td><span class="mini-score strong">8.5</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">MSFT</td>
-          <td>—</td>
-          <td class="flat">—</td>
-          <td><span class="mini-score watchlist">7.3</span></td>
+          <td>$390.74</td>
+          <td class="up">+0.10%</td>
+          <td><span class="mini-score watchlist">7.9</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">NVDA</td>
-          <td>—</td>
-          <td class="flat">—</td>
-          <td><span class="mini-score watchlist">7.3</span></td>
+          <td>$205.19</td>
+          <td class="up">+0.16%</td>
+          <td><span class="mini-score strong">8.7</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">META</td>
-          <td>—</td>
-          <td class="flat">—</td>
-          <td><span class="mini-score watchlist">6.8</span></td>
+          <td>$566.98</td>
+          <td class="down">-0.26%</td>
+          <td><span class="mini-score strong">8.5</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">GOOGL</td>
-          <td>$363.31</td>
-          <td class="down">-1.36%</td>
+          <td>$359.68</td>
+          <td class="up">+0.53%</td>
           <td><span class="mini-score strong">8.6</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">PANW</td>
-          <td>$266.33</td>
-          <td class="down">-2.10%</td>
-          <td><span class="mini-score strong">8.5</span></td>
+          <td>$279.62</td>
+          <td class="up">+0.03%</td>
+          <td><span class="mini-score strong">8.0</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">CRWD</td>
-          <td>$658.79</td>
-          <td class="down">-1.82%</td>
+          <td>$682.80</td>
+          <td class="down">-1.26%</td>
           <td><span class="mini-score watchlist">6.7</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr>
         <tr>
           <td class="symbol">PLTR</td>
-          <td>$136.47</td>
-          <td class="up">+0.69%</td>
-          <td><span class="mini-score strong">8.0</span></td>
+          <td>$127.99</td>
+          <td class="down">-2.36%</td>
+          <td><span class="mini-score watchlist">7.5</span></td>
+          <td><span class="dq-badge dq-high">High · 100/100</span></td>
         </tr></tbody>
       </table>
     </div>
@@ -1008,18 +912,19 @@
     <h2 class="section-title"><span class="emoji">⚠️</span> איכות נתונים</h2>
     <div class="quality-grid">
       <div class="quality-stat live-bg">
-        <div class="quality-num">22</div>
+        <div class="quality-num">2</div>
         <div class="quality-label">🟢 Live data</div>
       </div>
       <div class="quality-stat cached-bg">
-        <div class="quality-num">1</div>
+        <div class="quality-num">25</div>
         <div class="quality-label">🟡 Cached data</div>
       </div>
       <div class="quality-stat unavailable-bg">
-        <div class="quality-num">21</div>
+        <div class="quality-num">17</div>
         <div class="quality-label">🔴 Unavailable</div>
       </div>
     </div>
+    <p class="dq-legend">🧪 <strong>Data Quality</strong> – מודד את שלמות הנתונים שנאספו בפועל, לא את זמינות ה-API. ציון 0–100 לפי מחיר (30), פרופיל (20), שווי שוק (20), מחזור (15), חדשות (10) וטכני (5). נתון שלא נשלף עקב מגבלת API מסומן <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span> ו<strong>אינו</strong> מפחית את הציון – רק נתון שחסר באמת מפחית אותו. תוויות: <span class="dq-badge dq-high">High ≥80</span> <span class="dq-badge dq-medium">Medium ≥60</span> <span class="dq-badge dq-low">Low ≥40</span> <span class="dq-badge dq-excluded">Excluded</span> (חוסר נתונים קריטי אמיתי בלבד).</p>
     <p class="warn">⚠️ הופעלה מגבלת ה-API של Alpha Vantage בריצה זו – חלק מהנתונים נטענו מהמטמון.</p>
   </section>
 
@@ -1029,7 +934,7 @@
     <p>המידע בדוח זה הוא למטרות מחקר ולמידה בלבד ואינו מהווה ייעוץ השקעות, המלצה לקנייה
     או מכירה של ניירות ערך, או תחליף לייעוץ פיננסי מקצועי. מסחר במניות כרוך בסיכון
     לאובדן ההון – כל החלטה על אחריותך בלבד.</p>
-    <p class="generated">Generated by stock-agent · 2026-06-09T11:48:54.035Z</p>
+    <p class="generated">Generated by stock-agent · 2026-06-13T14:35:18.743Z</p>
   </footer>
 </main>
 </body>

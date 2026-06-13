@@ -4,8 +4,10 @@ import { listRisksHebrew } from "./explainer";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
+  DataQualityLabel,
   EnrichedStock,
   FearGreed,
+  OpportunityTier,
   ReportData,
   RunStatus,
   SourceInfo,
@@ -75,6 +77,27 @@ function sourceBadge(s: SourceInfo): string {
 function sectorOrDash(s: EnrichedStock): string {
   return s.profile?.industry || s.profile?.sector || "—";
 }
+
+// CSS class suffix per data-quality label (drives the badge colour).
+const DQ_CLASS: Record<DataQualityLabel, string> = {
+  High: "dq-high",
+  Medium: "dq-medium",
+  Low: "dq-low",
+  Excluded: "dq-excluded",
+};
+
+function dqBadge(s: EnrichedStock): string {
+  const dq = s.dataQuality;
+  if (!dq) return `<span class="dq-badge">—</span>`;
+  return `<span class="dq-badge ${DQ_CLASS[dq.label]}">${esc(dq.label)} · ${dq.score}/100</span>`;
+}
+
+const TIER_HEBREW: Record<OpportunityTier, string> = {
+  core: "🏛️ Core · ליבה",
+  growth: "🌱 Growth · צמיחה",
+  speculative: "🎲 Speculative · ספקולטיבי",
+  none: "—",
+};
 
 // ===== sections =====
 
@@ -209,6 +232,19 @@ function renderOpportunityCard(s: EnrichedStock): string {
 
   const risksHtml = risks.map((r) => `<li>${esc(r)}</li>`).join("");
 
+  const dq = s.dataQuality;
+  const missingText =
+    dq && dq.missing.length > 0 ? dq.missing.join(", ") : "אין – כל הנתונים שנאספו מלאים";
+  const rateLimitedHtml =
+    dq && dq.rateLimited.length > 0
+      ? `
+      <div class="opp-section">
+        <h4>סטטוס API (לא נספר באיכות)</h4>
+        <p>${esc(dq.rateLimited.join(", "))} — <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span></p>
+      </div>`
+      : "";
+  const reliability = dq?.reliabilityHebrew ?? "—";
+
   return `
     <article class="opportunity-card card ${tier.cls}">
       <div class="opp-head">
@@ -216,6 +252,10 @@ function renderOpportunityCard(s: EnrichedStock): string {
           <div>
             <h3 class="ticker">${esc(s.ticker)}</h3>
             <p class="company">${esc(name)}</p>
+            <div class="opp-tags">
+              <span class="tier-chip">${esc(TIER_HEBREW[s.tier])}</span>
+              ${dqBadge(s)}
+            </div>
           </div>
         </div>
         <div class="score-badge ${tier.cls}">
@@ -250,8 +290,19 @@ function renderOpportunityCard(s: EnrichedStock): string {
       </div>
 
       <div class="opp-section">
-        <h4>למה משקיע ארוך טווח צריך להתעניין במניה</h4>
+        <h4>למה המניה מופיעה כאן</h4>
         <p>${esc(why)}</p>
+      </div>
+
+      <div class="opp-section">
+        <h4>מה חסר בנתונים</h4>
+        <p>${esc(missingText)}</p>
+      </div>
+      ${rateLimitedHtml}
+
+      <div class="opp-section">
+        <h4>עד כמה האות אמין</h4>
+        <p>${esc(reliability)}</p>
       </div>
 
       <div class="opp-section">
@@ -261,21 +312,61 @@ function renderOpportunityCard(s: EnrichedStock): string {
     </article>`;
 }
 
-function renderCategory(
-  title: string,
-  emoji: string,
-  subtitle: string,
-  stocks: EnrichedStock[]
-): string {
+function renderTopOpportunities(stocks: EnrichedStock[]): string {
   const inner =
     stocks.length > 0
       ? `<div class="opportunities">${stocks.map(renderOpportunityCard).join("\n")}</div>`
-      : `<p class="empty">אין מועמדות מתאימות בקטגוריה זו בריצה הזו.</p>`;
+      : `<p class="empty">אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו.</p>`;
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">${emoji}</span> ${esc(title)}</h2>
-    <p class="section-subtitle">${esc(subtitle)}</p>
+    <h2 class="section-title"><span class="emoji">🎯</span> Top Opportunities (${stocks.length}/3)</h2>
+    <p class="section-subtitle">עד 3 הזדמנויות מובילות בלבד – אחרי דירוג וסינון לפי איכות נתונים (רק High/Medium).</p>
     ${inner}
+  </section>`;
+}
+
+function renderWatchlistHighlights(stocks: EnrichedStock[]): string {
+  if (stocks.length === 0) {
+    return `
+  <section>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist Highlights (0/5)</h2>
+    <p class="empty">אין מניות מעקב שעברו את סף איכות הנתונים בריצה הזו.</p>
+  </section>`;
+  }
+
+  const rows = stocks
+    .map((s) => {
+      const tier = scoreTier(s.finalScore);
+      const name = s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
+      return `
+        <tr>
+          <td class="symbol">${esc(s.ticker)}</td>
+          <td>${esc(name)}</td>
+          <td>${esc(fmtPrice(s.price))}</td>
+          <td><span class="mini-score ${tier.cls}">${s.finalScore.toFixed(1)}</span></td>
+          <td>${dqBadge(s)}</td>
+        </tr>`;
+    })
+    .join("");
+
+  return `
+  <section>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist Highlights (${stocks.length}/5)</h2>
+    <p class="section-subtitle">עד 5 מניות המעקב האיכותיות ביותר בריצה הזו (לפי ניקוד ואיכות נתונים).</p>
+    <div class="table-wrap card">
+      <table class="movers">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Score</th>
+            <th>Data Quality</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
   </section>`;
 }
 
@@ -283,7 +374,7 @@ function renderWatchlistTable(stocks: EnrichedStock[]): string {
   if (stocks.length === 0) {
     return `
   <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist</h2>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist (all)</h2>
     <p class="empty">אין נתונים להצגה.</p>
   </section>`;
   }
@@ -298,14 +389,15 @@ function renderWatchlistTable(stocks: EnrichedStock[]): string {
           <td>${esc(fmtPrice(s.price))}</td>
           <td class="${s.price > 0 ? changeClass(s.changePercent) : "flat"}">${esc(chg)}</td>
           <td><span class="mini-score ${tier.cls}">${s.finalScore.toFixed(1)}</span></td>
+          <td>${dqBadge(s)}</td>
         </tr>`;
     })
     .join("");
 
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist</h2>
-    <p class="section-subtitle">מעקב קבוע אחר מניות איכות מובילות</p>
+    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist (all)</h2>
+    <p class="section-subtitle">מעקב קבוע אחר כל מניות האיכות ברשימה – כולל איכות נתונים לכל אחת</p>
     <div class="table-wrap card">
       <table class="movers">
         <thead>
@@ -314,6 +406,7 @@ function renderWatchlistTable(stocks: EnrichedStock[]): string {
             <th>Price</th>
             <th>Daily Change</th>
             <th>Score</th>
+            <th>Data Quality</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -340,6 +433,7 @@ function renderDataQuality(status: RunStatus): string {
         <div class="quality-label">🔴 Unavailable</div>
       </div>
     </div>
+    <p class="dq-legend">🧪 <strong>Data Quality</strong> – מודד את שלמות הנתונים שנאספו בפועל, לא את זמינות ה-API. ציון 0–100 לפי מחיר (30), פרופיל (20), שווי שוק (20), מחזור (15), חדשות (10) וטכני (5). נתון שלא נשלף עקב מגבלת API מסומן <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span> ו<strong>אינו</strong> מפחית את הציון – רק נתון שחסר באמת מפחית אותו. תוויות: <span class="dq-badge dq-high">High ≥80</span> <span class="dq-badge dq-medium">Medium ≥60</span> <span class="dq-badge dq-low">Low ≥40</span> <span class="dq-badge dq-excluded">Excluded</span> (חוסר נתונים קריטי אמיתי בלבד).</p>
     ${
       status.rateLimitHit
         ? '<p class="warn">⚠️ הופעלה מגבלת ה-API של Alpha Vantage בריצה זו – חלק מהנתונים נטענו מהמטמון.</p>'
@@ -676,6 +770,40 @@ const CSS = `
   .badge.cached { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
   .badge.unavailable { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
 
+  /* ===== Data-quality badge + tier chip ===== */
+  .opp-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .tier-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--slate-soft);
+    color: var(--navy-2);
+  }
+  .dq-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--slate-soft);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .dq-badge.dq-high { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
+  .dq-badge.dq-medium { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+  .dq-badge.dq-low { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+  .dq-badge.dq-excluded { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
+  .dq-badge.dq-ratelimit { background: var(--blue-soft); color: var(--navy-2); border-color: #bfdbfe; }
+
   /* ===== Tables ===== */
   .table-wrap {
     padding: 0;
@@ -796,6 +924,16 @@ const CSS = `
     font-weight: 600;
     border: 1px solid #fde68a;
   }
+  .dq-legend {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    line-height: 2;
+  }
 
   /* ===== Disclaimer ===== */
   .disclaimer {
@@ -834,21 +972,24 @@ const CSS = `
 
 export function generateHtmlReport(data: ReportData): string {
   const now = new Date();
-  const { core, growth, speculative, watchlist, technicalAlerts, status, scanned, qualified, fearGreed } = data;
+  const {
+    topOpportunities,
+    watchlistHighlights,
+    watchlist,
+    technicalAlerts,
+    status,
+    scanned,
+    qualified,
+    fearGreed,
+  } = data;
 
   const body = [
     renderHeader(now, scanned, qualified),
     `<main class="container">`,
     renderMarketSentiment(fearGreed),
     renderTechnicalAlerts(technicalAlerts),
-    renderCategory("Core Opportunities", "🏛️", "חברות גדולות ויציבות", core),
-    renderCategory("Growth Opportunities", "🌱", "חברות צמיחה בינוניות", growth),
-    renderCategory(
-      "Speculative Opportunity",
-      "🎲",
-      "רעיון ספקולטיבי אחד בלבד – לחלק קטן מהתיק",
-      speculative
-    ),
+    renderTopOpportunities(topOpportunities),
+    renderWatchlistHighlights(watchlistHighlights),
     renderWatchlistTable(watchlist),
     renderDataQuality(status),
     renderDisclaimer(),

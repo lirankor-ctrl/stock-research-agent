@@ -3,11 +3,41 @@ import path from "path";
 import { listRisksHebrew } from "./explainer";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
-import { EnrichedStock, FearGreed, ReportData, TechnicalAlert, TechnicalAlerts } from "./types";
+import {
+  DataQualityLabel,
+  EnrichedStock,
+  FearGreed,
+  OpportunityTier,
+  ReportData,
+  TechnicalAlert,
+  TechnicalAlerts,
+} from "./types";
 
 function displayName(s: EnrichedStock): string {
   return s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
 }
+
+// ---------- data-quality helpers ----------
+
+const DQ_EMOJI: Record<DataQualityLabel, string> = {
+  High: "🟢",
+  Medium: "🟡",
+  Low: "🟠",
+  Excluded: "🔴",
+};
+
+function dqBadge(s: EnrichedStock): string {
+  const dq = s.dataQuality;
+  if (!dq) return "—";
+  return `${DQ_EMOJI[dq.label]} ${dq.label} (${dq.score}/100)`;
+}
+
+const TIER_HEBREW: Record<OpportunityTier, string> = {
+  core: "🏛️ Core · ליבה",
+  growth: "🌱 Growth · צמיחה",
+  speculative: "🎲 Speculative · ספקולטיבי",
+  none: "—",
+};
 
 // ---------- formatting helpers ----------
 
@@ -117,9 +147,18 @@ function opportunityBlock(s: EnrichedStock): string {
   const risks = listRisksHebrew(s, s.profile, s.news);
   const risksMd = risks.map((r) => `- ${r}`).join("\n");
 
+  const dq = s.dataQuality;
+  const missingMd =
+    dq && dq.missing.length > 0 ? dq.missing.join(", ") : "אין – כל הנתונים שנאספו מלאים";
+  const rateLimitedMd =
+    dq && dq.rateLimited.length > 0
+      ? `\n\n#### סטטוס API (לא נספר באיכות)\n\n${dq.rateLimited.join(", ")} — Missing (Rate Limit)`
+      : "";
+  const reliability = dq?.reliabilityHebrew ?? "—";
+
   return `### ${s.ticker} — ${name}
 
-> ⭐ **Score: ${s.finalScore.toFixed(1)}/10**
+> ⭐ **Score: ${s.finalScore.toFixed(1)}/10** · 🏷️ **${TIER_HEBREW[s.tier]}** · 🧪 **איכות נתונים: ${dqBadge(s)}**
 
 - 💰 **Price:** ${fmtPrice(s.price)}
 - 📊 **Daily Change:** ${fmtChange(s.changePercent)}
@@ -127,9 +166,17 @@ function opportunityBlock(s: EnrichedStock): string {
 - 📈 **Volume:** ${fmtNum(s.volume)} (${volM}M)
 - 📰 **News Status:** ${newsStatusHebrew(s)}
 
-#### למה משקיע ארוך טווח צריך להתעניין במניה
+#### למה המניה מופיעה כאן
 
 ${s.longTermWhyHebrew}
+
+#### מה חסר בנתונים
+
+${missingMd}${rateLimitedMd}
+
+#### עד כמה האות אמין
+
+${reliability}
 
 #### סיכונים
 
@@ -137,19 +184,14 @@ ${risksMd}
 `;
 }
 
-function categorySection(
-  title: string,
-  emoji: string,
-  subtitle: string,
-  stocks: EnrichedStock[]
-): string {
+function topOpportunitiesSection(stocks: EnrichedStock[]): string {
   const body =
     stocks.length > 0
       ? stocks.map(opportunityBlock).join("\n---\n\n")
-      : "_אין מועמדות מתאימות בקטגוריה זו בריצה הזו._";
-  return `## ${emoji} ${title}
+      : "_אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו._";
+  return `## 🎯 Top Opportunities (${stocks.length}/3)
 
-_${subtitle}_
+_עד 3 הזדמנויות מובילות בלבד – אחרי דירוג וסינון לפי איכות נתונים (רק High/Medium)._
 
 ${body}`;
 }
@@ -159,20 +201,49 @@ ${body}`;
 function watchlistTable(stocks: EnrichedStock[]): string {
   if (stocks.length === 0) return "_אין נתונים להצגה_";
   const header =
-    "| Symbol | Price | Daily Change | Score |\n" +
-    "| ------ | ----- | ------------ | ----- |";
+    "| Symbol | Price | Daily Change | Score | Data Quality |\n" +
+    "| ------ | ----- | ------------ | ----- | ------------ |";
   const rows = stocks.map(
     (s) =>
-      `| **${s.ticker}** | ${fmtPrice(s.price)} | ${s.price > 0 ? fmtChange(s.changePercent) : "—"} | ${s.finalScore.toFixed(1)}/10 |`
+      `| **${s.ticker}** | ${fmtPrice(s.price)} | ${s.price > 0 ? fmtChange(s.changePercent) : "—"} | ${s.finalScore.toFixed(1)}/10 | ${dqBadge(s)} |`
   );
   return [header, ...rows].join("\n");
+}
+
+function watchlistHighlightsSection(stocks: EnrichedStock[]): string {
+  if (stocks.length === 0) {
+    return `## ⭐ Watchlist Highlights (0/5)
+
+_אין מניות מעקב שעברו את סף איכות הנתונים בריצה הזו._`;
+  }
+  const header =
+    "| Symbol | Name | Price | Score | Data Quality |\n" +
+    "| ------ | ---- | ----- | ----- | ------------ |";
+  const rows = stocks.map(
+    (s) =>
+      `| **${s.ticker}** | ${displayName(s)} | ${fmtPrice(s.price)} | ${s.finalScore.toFixed(1)}/10 | ${dqBadge(s)} |`
+  );
+  return `## ⭐ Watchlist Highlights (${stocks.length}/5)
+
+_עד 5 מניות המעקב האיכותיות ביותר בריצה הזו (לפי ניקוד ואיכות נתונים)._
+
+${[header, ...rows].join("\n")}`;
 }
 
 // ---------- main report ----------
 
 export function generateReport(data: ReportData): string {
   const now = new Date();
-  const { core, growth, speculative, watchlist, technicalAlerts, status, scanned, qualified, fearGreed } = data;
+  const {
+    topOpportunities,
+    watchlistHighlights,
+    watchlist,
+    technicalAlerts,
+    status,
+    scanned,
+    qualified,
+    fearGreed,
+  } = data;
 
   const rateLimitBanner = status.rateLimitHit
     ? "> ⚠️ **הופעלה מגבלת ה-API במהלך הריצה.** חלק מהנתונים נטענו מהמטמון או מסומנים כלא זמינים.\n\n"
@@ -194,21 +265,17 @@ ${technicalAlertsSection(technicalAlerts)}
 
 ---
 
-${categorySection("Core Opportunities", "🏛️", "חברות גדולות ויציבות", core)}
+${topOpportunitiesSection(topOpportunities)}
 
 ---
 
-${categorySection("Growth Opportunities", "🌱", "חברות צמיחה בינוניות", growth)}
+${watchlistHighlightsSection(watchlistHighlights)}
 
 ---
 
-${categorySection("Speculative Opportunity", "🎲", "רעיון ספקולטיבי אחד בלבד – לחלק קטן מהתיק", speculative)}
+## ⭐ Watchlist (all)
 
----
-
-## ⭐ Watchlist
-
-_מעקב קבוע אחר מניות איכות מובילות:_
+_מעקב קבוע אחר כל מניות האיכות ברשימה (כולל איכות נתונים לכל אחת):_
 
 ${watchlistTable(watchlist)}
 
@@ -219,6 +286,7 @@ ${watchlistTable(watchlist)}
 - 🟢 **Live data:** ${status.liveCount} קריאות API טריות
 - 🟡 **Cached data:** ${status.cachedCount} ערכים מהמטמון המקומי
 - 🔴 **Missing data:** ${status.missingCount} ערכים לא זמינים
+- 🧪 **איכות נתונים (Data Quality):** מודד את שלמות הנתונים שנאספו בפועל – לא זמינות ה-API. ציון 0–100 לפי מחיר (30), פרופיל (20), שווי שוק (20), מחזור (15), חדשות (10) וטכני (5). נתון שלא נשלף עקב מגבלת API מסומן "Missing (Rate Limit)" ו**אינו** מפחית את הציון (מוסר מהחישוב). רק נתון שחסר באמת מפחית את הציון. תוויות: 🟢 High ≥80 · 🟡 Medium ≥60 · 🟠 Low ≥40 · 🔴 Excluded (חוסר נתונים קריטי אמיתי בלבד).
 - 🧹 **סינון:** מתחת ל-$10, שווי שוק מתחת ל-$2B, OTC, וורנטים, יחידות ושרידי SPAC הוסרו. תנועה יומית מעל 40% מותרת רק לחברות מעל $10B.
 - 🎯 **ניקוד:** 40% איכות החברה · 20% מומנטום · 20% מחזור · 20% איכות חדשות (עם קנס על הפסדים, מיקרו-קאפ ותנודתיות קיצונית).
 ${status.rateLimitHit ? "- ⚠️ **API rate limit** הופעל בריצה זו\n" : ""}---

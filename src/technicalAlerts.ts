@@ -28,18 +28,27 @@ function dedupeByTicker(stocks: EnrichedStock[]): EnrichedStock[] {
   return out;
 }
 
+export interface TechnicalResult {
+  alerts: TechnicalAlerts;
+  available: Set<string>;   // tickers for which Bollinger/RSI were computable
+  rateLimited: Set<string>; // tickers whose daily-closes couldn't be fetched (budget/API)
+}
+
 // Fetch daily closes (cache-first, budget-aware) for every watchlist + report
 // stock, compute Bollinger Bands + RSI, and split into above-upper / below-lower
 // alerts. Never throws – stocks without enough history are simply skipped.
+// Also reports which tickers yielded usable technical data (for data quality).
 export async function buildTechnicalAlerts(
   stocks: EnrichedStock[],
   opts: TechnicalOptions
-): Promise<TechnicalAlerts> {
+): Promise<TechnicalResult> {
   const { apiKey, budget, delayMs, onProgress = () => {} } = opts;
   const candidates = dedupeByTicker(stocks);
 
   const aboveUpper: TechnicalAlert[] = [];
   const belowLower: TechnicalAlert[] = [];
+  const available = new Set<string>();
+  const rateLimited = new Set<string>();
 
   for (let i = 0; i < candidates.length; i++) {
     const s = candidates[i];
@@ -57,11 +66,16 @@ export async function buildTechnicalAlerts(
     }
 
     const closes = res.value;
-    if (!closes) continue;
+    if (!closes) {
+      // Distinguish "couldn't fetch" (rate limit) from "no data at all".
+      if (res.source.source === "unavailable") rateLimited.add(s.ticker);
+      continue;
+    }
 
     const tech = computeTechnicals(closes);
     if (!tech) continue;
 
+    available.add(s.ticker);
     const name = displayName(s);
 
     if (tech.price > tech.bands.upper) {
@@ -89,5 +103,5 @@ export async function buildTechnicalAlerts(
   aboveUpper.sort((a, b) => b.pctFromBand - a.pctFromBand);
   belowLower.sort((a, b) => b.pctFromBand - a.pctFromBand);
 
-  return { aboveUpper, belowLower };
+  return { alerts: { aboveUpper, belowLower }, available, rateLimited };
 }

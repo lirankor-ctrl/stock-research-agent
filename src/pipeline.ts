@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { categorize } from "./categorizer";
+import { computeDataQuality, meetsRecommendationThreshold } from "./dataQuality";
 import { getTopMovers } from "./dataSources";
 import {
   buildSkeletonEnriched,
@@ -183,7 +184,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     ...cats.growth,
     ...cats.speculative,
   ];
-  const technicalAlerts = await buildTechnicalAlerts(technicalUniverse, {
+  const techResult = await buildTechnicalAlerts(technicalUniverse, {
     apiKey,
     budget,
     delayMs: ENRICH_DELAY_MS,
@@ -192,8 +193,42 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
       if (m.toLowerCase().includes("rate limit")) status.rateLimitHit = true;
     },
   });
+  const technicalAlerts = techResult.alerts;
   log(
     `   alerts: ${technicalAlerts.aboveUpper.length} above upper band · ${technicalAlerts.belowLower.length} below lower band`
+  );
+
+  // ===== Data quality: score every stock now that all data has been gathered =====
+  // Data Quality measures genuine data completeness, NOT API availability:
+  // a dimension we couldn't fetch (rate limit) is reported separately and does
+  // not lower the score.
+  log("🧪 Scoring data quality (price/volume/cap/profile/news/technical)...");
+  const technicalStatus = (ticker: string) =>
+    techResult.available.has(ticker)
+      ? "available"
+      : techResult.rateLimited.has(ticker)
+      ? "rateLimited"
+      : "missing";
+  for (const s of [...watchlist, ...universe]) {
+    s.dataQuality = computeDataQuality(s, technicalStatus(s.ticker));
+  }
+
+  // Top opportunities: ranked across tiers, only stocks that clear the quality
+  // threshold (no Excluded / Low), capped at 3 – quality over quantity.
+  // A displayable price is required (can't recommend without one).
+  const topOpportunities = [...cats.core, ...cats.growth, ...cats.speculative]
+    .filter((s) => s.price > 0 && meetsRecommendationThreshold(s.dataQuality))
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, 3);
+
+  // Watchlist highlights: best non-excluded watchlist names with a price, capped at 5.
+  const watchlistHighlights = [...watchlist]
+    .filter((s) => s.price > 0 && s.dataQuality && !s.dataQuality.excluded)
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, 5);
+
+  log(
+    `   recommendations: ${topOpportunities.length} top opportunities · ${watchlistHighlights.length} watchlist highlights`
   );
 
   log("📝 [4/4] Generating Hebrew reports (Markdown + HTML)...");
@@ -201,6 +236,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     core: cats.core,
     growth: cats.growth,
     speculative: cats.speculative,
+    topOpportunities,
+    watchlistHighlights,
     watchlist,
     technicalAlerts,
     status,

@@ -57,6 +57,7 @@ export interface Stock {
   category: StockCategory;
   origin: StockOrigin;
   preScore: number;
+  quoteSource?: SourceInfo; // where price/volume came from (movers list = always present)
 }
 
 export interface ScoreBreakdown {
@@ -75,6 +76,38 @@ export interface SourceInfo {
   ageHours?: number; // populated when source === "cached"
 }
 
+// ===== Data quality =====
+
+// Status of a single data dimension:
+// - "available":   the data was fetched and the field is populated.
+// - "missing":     we HAVE the data source but the value is genuinely absent
+//                  (e.g. the API returned a profile with no market cap).
+// - "rateLimited": we could NOT fetch the data (budget / API rate limit). This
+//                  is an availability issue, NOT a data-quality issue – it does
+//                  not lower the score; it's reported separately.
+export type DimensionStatus = "available" | "missing" | "rateLimited";
+
+export interface DataQualityStatuses {
+  price: DimensionStatus;
+  volume: DimensionStatus;
+  marketCap: DimensionStatus;
+  profile: DimensionStatus;
+  news: DimensionStatus;
+  technical: DimensionStatus;
+}
+
+export type DataQualityLabel = "High" | "Medium" | "Low" | "Excluded";
+
+export interface DataQuality {
+  statuses: DataQualityStatuses;
+  score: number;             // 0..100 – computed ONLY over assessable dimensions
+  label: DataQualityLabel;
+  excluded: boolean;         // true only when data is GENUINELY missing
+  missing: string[];         // Hebrew – genuinely missing dimensions (lower the score)
+  rateLimited: string[];     // Hebrew – unavailable due to rate limit (do NOT lower the score)
+  reliabilityHebrew: string; // Hebrew explanation of how reliable the signal is
+}
+
 export interface EnrichedStock extends Stock {
   profile?: CompanyProfile;
   news: NewsItem[];
@@ -85,6 +118,7 @@ export interface EnrichedStock extends Stock {
   finalScore: number;
   profileSource: SourceInfo;
   newsSource: SourceInfo;
+  dataQuality?: DataQuality; // attached after the technical phase in the pipeline
 }
 
 // CNN Fear & Greed Index – overall market sentiment.
@@ -124,6 +158,8 @@ export interface ReportData {
   core: EnrichedStock[];
   growth: EnrichedStock[];
   speculative: EnrichedStock[]; // max 1
+  topOpportunities: EnrichedStock[];   // max 3 – quality-gated, ranked across tiers
+  watchlistHighlights: EnrichedStock[]; // max 5 – best of the watchlist
   watchlist: EnrichedStock[];   // fixed list, in WATCHLIST order
   technicalAlerts: TechnicalAlerts;
   status: RunStatus;
