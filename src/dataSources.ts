@@ -1,6 +1,8 @@
 import {
+  EconomicIndicatorFn,
+  EconomicIndicatorPoint,
   fetchCompanyOverview,
-  fetchDailyCloses,
+  fetchEconomicIndicator,
   fetchNewsForTicker,
   fetchQuote,
   fetchTopMovers,
@@ -8,6 +10,8 @@ import {
   RateLimitError,
 } from "./alphaVantage";
 import { readCache, TTL, writeCache } from "./cache";
+import { fetchYahooDailyCloses, fetchYahooQuote, YahooQuote } from "./marketData";
+import { fetchNasdaqEarningsForDate, NasdaqEarningsRow } from "./nasdaqEarnings";
 import {
   AlphaVantageMoversResponse,
   CompanyProfile,
@@ -25,7 +29,7 @@ const STALE_FALLBACK_MS = 7 * 24 * 60 * 60 * 1000; // 7d – any cache is better
 // Generic helper: cache-first, then API, then stale-cache fallback.
 // When allowLive is false (live-call budget exhausted) the live step is
 // skipped entirely and we fall straight through to the stale-cache fallback.
-async function cacheFirst<T>(
+export async function cacheFirst<T>(
   cacheKey: string,
   freshTtlMs: number,
   fetcher: () => Promise<T | null>,
@@ -85,6 +89,8 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+// ===== Alpha Vantage (budget-gated via allowLive) =====
+
 export async function getTopMovers(
   apiKey: string,
   onNote: (msg: string) => void = () => {}
@@ -127,23 +133,6 @@ export async function getNews(
   );
 }
 
-// Daily close history (for Bollinger Bands / RSI). Shares the short fresh
-// window with quotes so technicals reflect the latest close.
-export async function getDailyCloses(
-  symbol: string,
-  apiKey: string,
-  onNote: (msg: string) => void = () => {},
-  allowLive = true
-): Promise<SourcedValue<number[]>> {
-  return cacheFirst<number[]>(
-    `daily_${symbol}`,
-    TTL.HOURS_12,
-    () => fetchDailyCloses(symbol, apiKey),
-    onNote,
-    allowLive
-  );
-}
-
 export async function getQuote(
   symbol: string,
   apiKey: string,
@@ -158,5 +147,66 @@ export async function getQuote(
     () => fetchQuote(symbol, apiKey),
     onNote,
     allowLive
+  );
+}
+
+// Latest released macro reading (CPI/unemployment/GDP/Fed funds rate) – not a
+// forward calendar. Treasury yield now comes from Yahoo (real ^TNX) instead,
+// see getYahooTreasuryYield below.
+export async function getEconomicIndicator(
+  fn: EconomicIndicatorFn,
+  apiKey: string,
+  onNote: (msg: string) => void = () => {},
+  allowLive = true
+): Promise<SourcedValue<EconomicIndicatorPoint>> {
+  return cacheFirst<EconomicIndicatorPoint>(
+    `econ_${fn}`,
+    TTL.HOURS_24,
+    () => fetchEconomicIndicator(fn, apiKey),
+    onNote,
+    allowLive
+  );
+}
+
+// ===== Yahoo Finance (independent of Alpha Vantage – no daily-budget gate,
+// slow-moving market data so a 12h fresh window keeps calls minimal) =====
+
+export async function getYahooQuote(
+  symbol: string,
+  onNote: (msg: string) => void = () => {}
+): Promise<SourcedValue<YahooQuote>> {
+  return cacheFirst<YahooQuote>(
+    `yahoo_quote_${symbol}`,
+    TTL.HOURS_12,
+    () => fetchYahooQuote(symbol),
+    onNote
+  );
+}
+
+export async function getYahooDailyCloses(
+  symbol: string,
+  onNote: (msg: string) => void = () => {}
+): Promise<SourcedValue<number[]>> {
+  return cacheFirst<number[]>(
+    `yahoo_daily_${symbol}`,
+    TTL.HOURS_12,
+    () => fetchYahooDailyCloses(symbol),
+    onNote
+  );
+}
+
+// ===== Nasdaq earnings calendar (independent of Alpha Vantage – one call per
+// calendar date, 24h cache so a run only re-fetches dates it hasn't already
+// seen today) =====
+
+export async function getNasdaqEarningsForDate(
+  dateIso: string,
+  onNote: (msg: string) => void = () => {}
+): Promise<SourcedValue<NasdaqEarningsRow[]>> {
+  return cacheFirst<NasdaqEarningsRow[]>(
+    `nasdaq_earnings_${dateIso}`,
+    TTL.HOURS_24,
+    () => fetchNasdaqEarningsForDate(dateIso),
+    onNote
   );
 }

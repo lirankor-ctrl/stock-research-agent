@@ -1,21 +1,37 @@
 import fs from "fs";
 import path from "path";
-import { listRisksHebrew } from "./explainer";
+import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
+import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
+import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
+import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
+import {
+  catalystWhyItMattersHebrew,
+  dataFreshnessLine,
+  daysRemainingLabelHebrew,
+  earningsDateBadgeTone,
+  formatOverviewValue,
+  ltr,
+  ltrTagged,
+  riskLevelHebrew,
+  sentimentTone,
+  weekAheadExtraEarnings,
+} from "./reportPresentation";
+import { fingerprintHtmlComment } from "./reportFingerprint";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
-  BandProximity,
-  DataQualityLabel,
+  DividendInfoItem,
+  EarningsCalendarEntry,
+  EarningsCalendarStatus,
+  EarningsFollowUpResult,
+  EarningsUrgency,
   EnrichedStock,
-  ExpansionItem,
-  FearGreed,
+  MarketCatalystResult,
+  MarketOverviewItem,
   MarketStory,
-  OpportunityTier,
+  OpportunityThesis,
   ReportData,
-  RunStatus,
-  SourceInfo,
-  TechnicalAlert,
-  TechnicalAlerts,
+  TechnicalWatchItem,
 } from "./types";
 
 // ===== helpers =====
@@ -29,10 +45,6 @@ function esc(s: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-function fmtNum(n: number): string {
-  return n.toLocaleString("en-US");
-}
-
 function fmtChange(pct: number): string {
   return pct >= 0 ? `+${pct.toFixed(2)}%` : `${pct.toFixed(2)}%`;
 }
@@ -43,16 +55,8 @@ function changeClass(pct: number): string {
   return "flat";
 }
 
-function fmtMarketCap(mc?: number): string {
-  if (!mc) return "—";
-  if (mc >= 1e12) return `$${(mc / 1e12).toFixed(2)}T`;
-  if (mc >= 1e9) return `$${(mc / 1e9).toFixed(2)}B`;
-  if (mc >= 1e6) return `$${(mc / 1e6).toFixed(0)}M`;
-  return `$${mc}`;
-}
-
 function fmtPrice(p: number): string {
-  return p > 0 ? `$${p.toFixed(2)}` : "—";
+  return p > 0 ? `$${p.toFixed(2)}` : "";
 }
 
 function fmtDateTime(d: Date): string {
@@ -60,71 +64,124 @@ function fmtDateTime(d: Date): string {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 }
 
-function scoreTier(score: number): { cls: string; label: string } {
-  if (score >= 8) return { cls: "strong", label: "Strong" };
-  if (score >= 6) return { cls: "watchlist", label: "Watchlist" };
-  return { cls: "cautious", label: "Cautious" };
+function fmtDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
-function sourceBadge(s: SourceInfo): string {
-  if (s.source === "live") {
-    return `<span class="badge live">🟢 Live</span>`;
+function displayName(s: EnrichedStock): string {
+  return s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
+}
+
+// ===== 0. Header =====
+
+function renderSentimentBadge(fearGreed: ReportData["fearGreed"]): string {
+  if (!fearGreed) {
+    return `<span class="badge badge-neutral">Sentiment: Unavailable</span>`;
   }
-  if (s.source === "cached") {
-    const age = s.ageHours !== undefined ? ` · ~${s.ageHours.toFixed(1)}h` : "";
-    return `<span class="badge cached">🟡 Cached${esc(age)}</span>`;
-  }
-  return `<span class="badge unavailable">🔴 Unavailable</span>`;
+  const tone = sentimentTone(fearGreed.score);
+  return `<span class="badge badge-${tone}">Sentiment: ${esc(fearGreed.classification)} (${fearGreed.score})</span>`;
 }
 
-function sectorOrDash(s: EnrichedStock): string {
-  return s.profile?.industry || s.profile?.sector || "—";
-}
-
-// CSS class suffix per data-quality label (drives the badge colour).
-const DQ_CLASS: Record<DataQualityLabel, string> = {
-  High: "dq-high",
-  Medium: "dq-medium",
-  Low: "dq-low",
-  Excluded: "dq-excluded",
-};
-
-function dqBadge(s: EnrichedStock): string {
-  const dq = s.dataQuality;
-  if (!dq) return `<span class="dq-badge">—</span>`;
-  return `<span class="dq-badge ${DQ_CLASS[dq.label]}">${esc(dq.label)} · ${dq.score}/100</span>`;
-}
-
-const TIER_HEBREW: Record<OpportunityTier, string> = {
-  core: "🏛️ Core · ליבה",
-  growth: "🌱 Growth · צמיחה",
-  speculative: "🎲 Speculative · ספקולטיבי",
-  none: "—",
-};
-
-// ===== sections =====
-
-function renderHeader(now: Date, scanned: number, qualified: number): string {
+function renderHeader(now: Date, data: ReportData): string {
   return `
-  <header class="hero">
-    <div class="hero-inner">
-      <div class="hero-title">
-        <span class="hero-emoji">📈</span>
-        <h1>דוח מניות למשקיע לטווח ארוך</h1>
-      </div>
-      <p class="subtitle">פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים</p>
-      <div class="meta">
-        <span class="meta-item"><strong>Generated:</strong> ${esc(fmtDateTime(now))}</span>
-        <span class="meta-item"><strong>Coverage:</strong> ${scanned} מניות נסרקו · ${qualified} עברו סינון איכות</span>
+  <header class="report-header">
+    <div class="report-header-inner">
+      <h1>Daily Market Report</h1>
+      <p class="report-date">${esc(fmtDate(now))}</p>
+      <div class="header-meta">
+        ${renderSentimentBadge(data.fearGreed)}
+        <span class="freshness-line">${esc(dataFreshnessLine(data.status))}</span>
       </div>
     </div>
   </header>`;
 }
 
-// ===== Market Story of the Day (newsletter hero) =====
+// ===== 1. Upcoming Earnings Calendar =====
 
-// Visual anchor: a company logo only if one is safely available, otherwise a
-// styled ticker placeholder. We never hotlink copyrighted news/press images.
+const URGENCY_EMOJI: Record<EarningsUrgency, string> = {
+  today: "🔴",
+  tomorrow: "🟠",
+  week: "🟡",
+  later: "⚪",
+};
+
+function renderEarningsCalendar(
+  entries: EarningsCalendarEntry[],
+  status: EarningsCalendarStatus
+): string {
+  if (entries.length === 0) {
+    return `
+  <section>
+    <h2 class="section-title">Upcoming Earnings Calendar</h2>
+    <p class="empty">${esc(earningsCalendarStatusMessageHebrew(status))}</p>
+  </section>`;
+  }
+
+  const rows = entries
+    .slice(0, 12)
+    .map((e) => {
+      const eps = e.estimatedEps !== undefined ? `$${e.estimatedEps.toFixed(2)}` : "Unavailable";
+      const bmoAmc =
+        e.timeOfDay === "pre-market" ? "Pre-Market" : e.timeOfDay === "post-market" ? "After Market" : "Unavailable";
+      const tone = earningsDateBadgeTone(e.daysRemaining);
+      return `
+        <tr class="earnings-row">
+          <td class="symbol">${ltr(esc(e.ticker))}<span class="alert-name">${esc(e.name)}</span></td>
+          <td>${ltr(esc(e.reportDate))}</td>
+          <td class="metric-sub">${esc(bmoAmc)}</td>
+          <td><span class="date-badge date-badge-${tone}">${esc(daysRemainingLabelHebrew(e.daysRemaining))}</span></td>
+          <td>${ltr(esc(eps))}</td>
+          <td class="why-cell">${esc(e.reasonsHebrew.join(" · "))}</td>
+        </tr>`;
+    })
+    .join("");
+
+  return `
+  <section>
+    <h2 class="section-title">Upcoming Earnings Calendar</h2>
+    <div class="table-wrap card">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Days Remaining</th>
+            <th>EPS Est.</th>
+            <th>למה זה חשוב</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </section>`;
+}
+
+// ===== 2. Next Major Market Catalyst =====
+
+function renderMarketCatalyst(catalyst: MarketCatalystResult): string {
+  if (!catalyst.catalyst) {
+    return `
+  <section>
+    <h2 class="section-title">Next Major Market Catalyst</h2>
+    <p class="empty">${esc(marketCatalystStatusMessageHebrew(catalyst.status))}</p>
+  </section>`;
+  }
+  const c = catalyst.catalyst;
+  return `
+  <section>
+    <h2 class="section-title">Next Major Market Catalyst</h2>
+    <article class="card catalyst-card">
+      <p class="catalyst-timing">${esc(c.timingHebrew)} · ${ltr(esc(c.reportDate))}</p>
+      <h3 class="catalyst-headline">${esc(c.headline)}</h3>
+      <p class="catalyst-meta">${ltr(esc(c.ticker))}</p>
+      <p class="catalyst-why">${esc(catalystWhyItMattersHebrew(c.ticker))}</p>
+    </article>
+  </section>`;
+}
+
+// ===== 3. Market Story of the Day =====
+
 function renderStoryVisual(story: MarketStory): string {
   if (story.logoUrl) {
     return `<div class="story-visual">
@@ -133,8 +190,7 @@ function renderStoryVisual(story: MarketStory): string {
   }
   return `<div class="story-visual">
         <div class="ticker-placeholder" role="img" aria-label="${esc(story.ticker)}">
-          <span class="ticker-symbol">${esc(story.ticker)}</span>
-          <span class="ticker-tag">NASDAQ / NYSE</span>
+          <span class="ticker-symbol">${ltr(esc(story.ticker))}</span>
         </div>
       </div>`;
 }
@@ -142,8 +198,8 @@ function renderStoryVisual(story: MarketStory): string {
 function renderMarketStory(story: MarketStory | null): string {
   if (!story) {
     return `
-  <section class="story-section">
-    <h2 class="section-title"><span class="emoji">📰</span> Market Story of the Day</h2>
+  <section>
+    <h2 class="section-title">Market Story of the Day</h2>
     <article class="card story-card empty-story">
       <p class="empty">לא נמצאה ידיעה חדשותית מהותית היום.</p>
     </article>
@@ -152,81 +208,106 @@ function renderMarketStory(story: MarketStory | null): string {
 
   const moveHtml =
     story.priceMove && story.priceMove.price > 0
-      ? `<span class="story-move ${changeClass(story.priceMove.changePercent)}">${esc(fmtPrice(story.priceMove.price))} · ${esc(fmtChange(story.priceMove.changePercent))}</span>`
+      ? `<span class="story-move ${changeClass(story.priceMove.changePercent)}">${ltr(esc(fmtPrice(story.priceMove.price)))} · ${ltr(esc(fmtChange(story.priceMove.changePercent)))}</span>`
       : "";
-
-  const sentimentHtml = story.sentimentLabel
-    ? `<span class="story-chip">${esc(story.sentimentLabel)}</span>`
-    : "";
-
-  const originalHtml = story.originalSummary
-    ? `<p class="story-original"><em>תקציר המקור (באנגלית):</em> ${esc(story.originalSummary)}</p>`
-    : "";
+  const sentimentHtml = story.sentimentLabel ? `<span class="story-chip">${esc(story.sentimentLabel)}</span>` : "";
 
   return `
-  <section class="story-section">
-    <h2 class="section-title"><span class="emoji">📰</span> Market Story of the Day</h2>
+  <section>
+    <h2 class="section-title">Market Story of the Day</h2>
     <article class="card story-card">
       ${renderStoryVisual(story)}
       <div class="story-body">
         <div class="story-tags">
-          <span class="story-ticker">${esc(story.ticker)}</span>
+          <span class="story-ticker">${ltr(esc(story.ticker))}</span>
           <span class="story-company">${esc(story.companyName)}</span>
           ${sentimentHtml}
           ${moveHtml}
         </div>
-        <h3 class="story-headline">${esc(story.headline)}</h3>
-        <p class="story-meta">🗞️ ${esc(story.source)} · 🕒 ${esc(story.publishedDisplay)}</p>
-        <p class="story-summary">${esc(story.summaryHebrew)}</p>
-        <p class="story-why"><strong>למה זה חשוב למשקיע לטווח ארוך:</strong> ${esc(story.whyMattersHebrew)}</p>
-        ${originalHtml}
-        <a class="story-link" href="${esc(story.url)}" target="_blank" rel="noopener noreferrer">🔗 קריאת הידיעה המלאה במקור</a>
+        <h3 class="story-headline">${ltr(esc(story.headline))}</h3>
+        <p class="story-meta">${esc(story.source)} · ${ltr(esc(story.publishedDisplay))}</p>
+        <div class="story-block">
+          <h4>מה קרה</h4>
+          <p>${esc(story.summaryHebrew)}</p>
+        </div>
+        <div class="story-block">
+          <h4>למה זה חשוב</h4>
+          <p>${esc(story.whyMattersHebrew)}</p>
+        </div>
+        <a class="btn-link" href="${esc(story.url)}" target="_blank" rel="noopener noreferrer">Read full article</a>
       </div>
     </article>
   </section>`;
 }
 
-// Map the index into a colour bucket for the score badge.
-function fgTone(score: number): string {
-  if (score < 25) return "extreme-fear";
-  if (score < 45) return "fear";
-  if (score <= 55) return "neutral";
-  if (score < 75) return "greed";
-  return "extreme-greed";
-}
+// ===== 4. Important Headlines =====
 
-function renderMarketSentiment(fg: FearGreed | null): string {
-  if (!fg) {
+function renderImportantHeadlines(items: MarketStory[]): string {
+  if (items.length === 0) {
     return `
   <section>
-    <article class="card sentiment-card">
-      <div class="card-head">
-        <h2><span class="emoji">🌎</span> Market Sentiment</h2>
-      </div>
-      <p class="empty">Fear &amp; Greed Index unavailable</p>
-    </article>
+    <h2 class="section-title">Important Headlines</h2>
+    <p class="empty">אין כותרות נוספות מהותיות היום מעבר לידיעה הראשית.</p>
+  </section>`;
+  }
+  const cards = items
+    .map(
+      (a) => `
+      <article class="card headline-card">
+        <div class="headline-top">
+          <span class="story-ticker">${ltr(esc(a.ticker))}</span>
+          <span class="story-company">${esc(a.companyName)}</span>
+        </div>
+        <p class="headline-text">${ltr(esc(a.headline))}</p>
+        <p class="metric-sub">${esc(a.source)}</p>
+      </article>`
+    )
+    .join("");
+  return `
+  <section>
+    <h2 class="section-title">Important Headlines</h2>
+    <div class="headline-grid">${cards}</div>
+  </section>`;
+}
+
+// ===== 5. Market Overview =====
+
+function renderMarketOverview(items: MarketOverviewItem[]): string {
+  const visible = visibleOverviewItems(items);
+
+  if (visible.length < MIN_VISIBLE_INDICATORS) {
+    return `
+  <section>
+    <h2 class="section-title">Market Overview</h2>
+    <p class="empty">נתוני שוק כלליים אינם זמינים מספיק כרגע (${visible.length}/${items.length} מדדים בלבד) – הסעיף יתעדכן כשהמקור יחזור להיות זמין.</p>
   </section>`;
   }
 
-  const tone = fgTone(fg.score);
+  const tiles = visible
+    .map((i) => {
+      const value = formatOverviewValue(i);
+      const change =
+        i.changePercent !== null
+          ? `<span class="tile-change ${changeClass(i.changePercent)}">${ltr(esc(fmtChange(i.changePercent)))}</span>`
+          : "";
+      return `
+        <div class="overview-tile" data-metric-key="${esc(i.key)}">
+          <span class="tile-label">${esc(i.label)}</span>
+          <span class="tile-value">${ltrTagged(esc(value), `data-metric-value-key="${esc(i.key)}"`)}</span>
+          ${change}
+        </div>`;
+    })
+    .join("");
+
   return `
   <section>
-    <article class="card sentiment-card">
-      <div class="card-head">
-        <h2><span class="emoji">🌎</span> Market Sentiment</h2>
-        <div class="fg-gauge ${tone}">
-          <span class="fg-score">${fg.score}</span>
-          <span class="fg-denom">/100</span>
-        </div>
-      </div>
-      <p class="mood-text"><strong>Fear &amp; Greed Index:</strong> ${fg.score} ·
-        <strong>Classification:</strong> ${esc(fg.classification)}</p>
-      <p class="mood-text">${esc(fg.hebrew)}</p>
-    </article>
+    <h2 class="section-title">Market Overview</h2>
+    <div class="overview-grid">${tiles}</div>
   </section>`;
 }
 
-// RSI badge colour bucket.
+// ===== 6. Technical Watch =====
+
 function rsiTone(rsi: number): string {
   if (rsi > 70) return "overbought";
   if (rsi >= 60) return "strong";
@@ -235,293 +316,197 @@ function rsiTone(rsi: number): string {
   return "oversold";
 }
 
-function renderAlertRow(a: TechnicalAlert, kind: "above" | "below"): string {
-  const rsi = rsiInterpretation(a.rsi14);
-  const bandLabel = kind === "above" ? "Upper Band" : "Lower Band";
-  const distLabel = kind === "above" ? "Above Band" : "Below Band";
-  return `
-        <tr>
-          <td class="symbol">${esc(a.ticker)}<span class="alert-name">${esc(a.name)}</span></td>
-          <td>${esc(fmtPrice(a.price))}</td>
-          <td>${esc(fmtPrice(a.band))} <span class="metric-sub">(${esc(bandLabel)})</span></td>
-          <td class="${kind === "above" ? "down" : "up"}">+${a.pctFromBand.toFixed(1)}% <span class="metric-sub">${esc(distLabel)}</span></td>
-          <td><span class="rsi-badge ${rsiTone(a.rsi14)}">${Math.round(a.rsi14)}</span> <span class="metric-sub">${esc(rsi.label)} · ${esc(rsi.hebrew)}</span></td>
-        </tr>`;
-}
-
-function renderAlertTable(
-  alerts: TechnicalAlert[],
-  kind: "above" | "below"
-): string {
-  if (alerts.length === 0) {
-    return `<p class="empty">No Bollinger Band alerts today.</p>`;
+function renderTechnicalWatch(items: TechnicalWatchItem[], dataUnavailable: boolean): string {
+  if (dataUnavailable || items.length === 0) {
+    return `
+  <section>
+    <h2 class="section-title">Technical Watch</h2>
+    <p class="empty">נתונים טכניים (RSI / Bollinger Bands, מחושבים מקומית) אינם זמינים כרגע.</p>
+  </section>`;
   }
-  const rows = alerts.map((a) => renderAlertRow(a, kind)).join("");
-  return `
-      <div class="table-wrap card">
-        <table class="movers">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Price</th>
-              <th>${kind === "above" ? "Upper" : "Lower"} Band</th>
-              <th>Distance</th>
-              <th>RSI(14)</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-}
 
-function renderProximityRow(p: BandProximity, kind: "upper" | "lower"): string {
-  const rsi = rsiInterpretation(p.rsi14);
-  return `
-        <tr>
-          <td class="symbol">${esc(p.ticker)}<span class="alert-name">${esc(p.name)}</span></td>
-          <td>${esc(fmtPrice(p.price))}</td>
-          <td class="${kind === "upper" ? "down" : "up"}">${p.distancePct.toFixed(1)}% <span class="metric-sub">${kind === "upper" ? "To Upper" : "To Lower"}</span></td>
-          <td><span class="rsi-badge ${rsiTone(p.rsi14)}">${Math.round(p.rsi14)}</span> <span class="metric-sub">${esc(rsi.label)} · ${esc(rsi.hebrew)}</span></td>
-        </tr>`;
-}
-
-function renderProximityTable(items: BandProximity[], kind: "upper" | "lower"): string {
-  if (items.length === 0) return `<p class="empty">אין נתונים זמינים.</p>`;
-  const rows = items.map((p) => renderProximityRow(p, kind)).join("");
-  return `
-      <div class="table-wrap card">
-        <table class="movers">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Price</th>
-              <th>Distance To ${kind === "upper" ? "Upper" : "Lower"}</th>
-              <th>RSI(14)</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-}
-
-function renderExpansionTable(items: ExpansionItem[]): string {
-  if (items.length === 0) return `<p class="empty">אין נתוני התרחבות זמינים.</p>`;
   const rows = items
-    .map((e) => {
-      const rsi = rsiInterpretation(e.rsi14);
-      const sign = e.widthChangePct >= 0 ? "+" : "";
+    .map((i) => {
+      const hasPrice = i.price > 0;
+      const rsiHtml =
+        i.rsi14 !== null
+          ? `<span class="rsi-badge ${rsiTone(i.rsi14)}">${Math.round(i.rsi14)}</span>`
+          : "—";
       return `
-        <tr>
-          <td class="symbol">${esc(e.ticker)}<span class="alert-name">${esc(e.name)}</span></td>
-          <td class="${e.widthChangePct >= 0 ? "up" : "down"}">${sign}${e.widthChangePct.toFixed(1)}%</td>
-          <td><span class="rsi-badge ${rsiTone(e.rsi14)}">${Math.round(e.rsi14)}</span> <span class="metric-sub">${esc(rsi.label)} · ${esc(rsi.hebrew)}</span></td>
+        <tr class="${hasPrice ? "" : "row-muted"}">
+          <td class="symbol">${ltr(esc(i.ticker))}<span class="alert-name">${esc(i.name)}</span></td>
+          <td>${hasPrice ? ltr(esc(fmtPrice(i.price))) : `<span class="muted-text">Price unavailable</span>`}</td>
+          <td>${rsiHtml}</td>
+          <td><span class="signal-badge">${esc(i.statusHebrew)}</span></td>
         </tr>`;
     })
     .join("");
+
   return `
-      <div class="table-wrap card">
-        <table class="movers">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Band Width Δ</th>
-              <th>RSI(14)</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
+  <section>
+    <h2 class="section-title">Technical Watch</h2>
+    <p class="section-subtitle">RSI ורצועות בולינג'ר מחושבים מקומית מנתוני מחיר יומיים (Yahoo Finance).</p>
+    <div class="table-wrap card">
+      <table class="report-table">
+        <thead>
+          <tr><th>Ticker</th><th>Price</th><th>RSI</th><th>Signal</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </section>`;
 }
 
-function renderTechnicalAlerts(alerts: TechnicalAlerts): string {
-  // No daily data at all (rate-limited, no cache) – show a clear notice.
-  if (alerts.dataUnavailable) {
+// ===== 7. Earnings Follow-up =====
+
+function fmtFollowUpMove(pct: number | null): string {
+  if (pct === null) return "Unavailable";
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function renderEarningsFollowUp(followUp: EarningsFollowUpResult): string {
+  if (followUp.entries.length === 0) {
     return `
   <section>
-    <h2 class="section-title"><span class="emoji">📊</span> Technical Alerts</h2>
-    <div class="card warn-card">
-      <p class="warn-title">⚠️ Technical data unavailable today due to API rate limit.</p>
-      <p class="warn-sub">הנתונים הטכניים (Bollinger Bands / RSI) אינם זמינים היום עקב מגבלת ה-API ואין נתונים שמורים במטמון. הסעיף יתעדכן בריצה הבאה. אין לכך השפעה על ציון איכות הנתונים של המניות.</p>
-    </div>
+    <h2 class="section-title">Earnings Follow-up</h2>
+    <p class="empty">${esc(earningsFollowUpStatusMessageHebrew(followUp.status))}</p>
   </section>`;
   }
 
-  // Above the upper band: show real breaches, else the closest names.
-  const aboveBlock =
-    alerts.aboveUpper.length > 0
-      ? `<h3 class="alert-subtitle">🔴 Above Upper Bollinger Band</h3>
-    ${renderAlertTable(alerts.aboveUpper, "above")}`
-      : `<h3 class="alert-subtitle">🔥 Closest To Upper Bollinger Band</h3>
-    <p class="alert-note">אף מניה לא פרצה את הרצועה העליונה. אלו הקרובות ביותר לפריצה (קניית-יתר אפשרית) – מרחק קטן יותר = קרובה יותר.</p>
-    ${renderProximityTable(alerts.closestToUpper, "upper")}`;
-
-  // Below the lower band: show real breaches, else the closest names.
-  const belowBlock =
-    alerts.belowLower.length > 0
-      ? `<h3 class="alert-subtitle">🟢 Below Lower Bollinger Band</h3>
-    ${renderAlertTable(alerts.belowLower, "below")}`
-      : `<h3 class="alert-subtitle">🟢 Closest To Lower Bollinger Band</h3>
-    <p class="alert-note">אף מניה לא שברה את הרצועה התחתונה. אלו הקרובות ביותר לשבירה (מכירת-יתר אפשרית) – מרחק קטן יותר = קרובה יותר.</p>
-    ${renderProximityTable(alerts.closestToLower, "lower")}`;
+  const rows = followUp.entries
+    .slice(0, 12)
+    .map((e) => {
+      const moveClass = e.priceChangeSincePct === null ? "flat" : changeClass(e.priceChangeSincePct);
+      return `
+        <tr>
+          <td class="symbol">${ltr(esc(e.ticker))}<span class="alert-name">${esc(e.name)}</span></td>
+          <td>${ltr(esc(e.reportDate))}</td>
+          <td class="${moveClass}">${ltr(esc(fmtFollowUpMove(e.priceChangeSincePct)))}</td>
+        </tr>`;
+    })
+    .join("");
 
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">📊</span> Technical Alerts</h2>
-    <p class="section-subtitle">רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.</p>
-    <p class="rsi-legend">RSI &gt; 70 = Overbought · 60–70 = Strong Momentum · 40–60 = Neutral · 30–40 = Weak · &lt; 30 = Oversold</p>
-
-    ${aboveBlock}
-
-    ${belowBlock}
-
-    <h3 class="alert-subtitle">📈 Bollinger Expansion Watch</h3>
-    <p class="alert-note">מניות עם ההתרחבות הגדולה ביותר ברוחב רצועות בולינג'ר לאחרונה. התרחבות מעידה על עלייה בתנודתיות – לעיתים תחילתו של מהלך חזק.</p>
-    ${renderExpansionTable(alerts.expansion)}
+    <h2 class="section-title">Earnings Follow-up</h2>
+    <div class="table-wrap card">
+      <table class="report-table">
+        <thead>
+          <tr><th>Company</th><th>Earnings Date</th><th>Price Reaction</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
   </section>`;
 }
 
-function renderOpportunityCard(s: EnrichedStock): string {
+// ===== 8. Top Opportunities =====
+
+function scoreTier(score: number): { cls: string; label: string } {
+  if (score >= 8) return { cls: "strong", label: "Strong" };
+  if (score >= 6) return { cls: "watchlist", label: "Watchlist" };
+  return { cls: "cautious", label: "Cautious" };
+}
+
+function metricChip(label: string, value: string): string {
+  return `
+        <div class="metric-chip">
+          <span class="metric-chip-label">${esc(label)}</span>
+          <span class="metric-chip-value">${esc(value)}</span>
+        </div>`;
+}
+
+function renderOpportunityCard(rank: number, s: EnrichedStock, thesis: OpportunityThesis | undefined): string {
   const tier = scoreTier(s.finalScore);
-  const name = s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
-  const sector = sectorOrDash(s);
-  const cap = fmtMarketCap(s.profile?.marketCap);
-  const volM = (s.volume / 1_000_000).toFixed(1);
-  const why = s.longTermWhyHebrew;
-  const risks = listRisksHebrew(s, s.profile, s.news);
-
-  const risksHtml = risks.map((r) => `<li>${esc(r)}</li>`).join("");
-
+  const name = displayName(s);
   const dq = s.dataQuality;
-  const missingText =
-    dq && dq.missing.length > 0 ? dq.missing.join(", ") : "אין – כל הנתונים שנאספו מלאים";
-  const rateLimitedHtml =
-    dq && dq.rateLimited.length > 0
-      ? `
-      <div class="opp-section">
-        <h4>סטטוס API (לא נספר באיכות)</h4>
-        <p>${esc(dq.rateLimited.join(", "))} — <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span></p>
-      </div>`
-      : "";
-  const reliability = dq?.reliabilityHebrew ?? "—";
+
+  const primaryField = (label: string, value: string) => `
+      <div class="opp-section opp-section-primary">
+        <h4>${esc(label)}</h4>
+        <p>${esc(value)}</p>
+      </div>`;
+  const secondaryField = (label: string, value: string) => `
+      <div class="opp-section opp-section-secondary">
+        <h4>${esc(label)}</h4>
+        <p>${esc(value)}</p>
+      </div>`;
 
   return `
     <article class="opportunity-card card ${tier.cls}">
       <div class="opp-head">
         <div class="opp-id">
+          <span class="rank-chip">#${rank}</span>
           <div>
-            <h3 class="ticker">${esc(s.ticker)}</h3>
+            <h3 class="ticker">${ltr(esc(s.ticker))}</h3>
             <p class="company">${esc(name)}</p>
-            <div class="opp-tags">
-              <span class="tier-chip">${esc(TIER_HEBREW[s.tier])}</span>
-              ${dqBadge(s)}
-            </div>
           </div>
         </div>
-        <div class="score-badge ${tier.cls}">
-          <span class="score-num">${s.finalScore.toFixed(1)}</span>
-          <span class="score-denom">/10</span>
-          <span class="score-tier">${tier.label}</span>
+        <div class="opp-head-right">
+          <div class="score-badge ${tier.cls}">
+            <span class="score-num">${s.finalScore.toFixed(1)}</span>
+            <span class="score-denom">/10</span>
+          </div>
+          ${s.price > 0 ? `<span class="metric-value ${changeClass(s.changePercent)}">${ltr(esc(fmtChange(s.changePercent)))}</span>` : ""}
         </div>
       </div>
 
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">💰 מחיר</span>
-          <span class="metric-value">${esc(fmtPrice(s.price))}</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📊 שינוי יומי</span>
-          <span class="metric-value ${changeClass(s.changePercent)}">${esc(s.price > 0 ? fmtChange(s.changePercent) : "—")}</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">📈 מחזור</span>
-          <span class="metric-value">${esc(fmtNum(s.volume))} <span class="metric-sub">(${volM}M)</span></span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">🏢 סקטור</span>
-          <span class="metric-value sm">${esc(sector)}${cap !== "—" ? ` · ${esc(cap)}` : ""}</span>
-        </div>
+      <div class="metrics-row">
+        ${metricChip("Coverage", dq ? `${dq.coverageScore}` : "—")}
+        ${metricChip("Confidence", dq ? `${dq.confidenceScore}` : "—")}
+        ${metricChip("Risk Level", riskLevelHebrew(s.tier))}
       </div>
 
-      <div class="opp-badges">
-        <span class="badge-label">📰 חדשות:</span> ${sourceBadge(s.newsSource)}
-        <span class="badge-label">📋 פרופיל:</span> ${sourceBadge(s.profileSource)}
-      </div>
-
-      <div class="opp-section">
-        <h4>למה המניה מופיעה כאן</h4>
-        <p>${esc(why)}</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>מה חסר בנתונים</h4>
-        <p>${esc(missingText)}</p>
-      </div>
-      ${rateLimitedHtml}
-
-      <div class="opp-section">
-        <h4>עד כמה האות אמין</h4>
-        <p>${esc(reliability)}</p>
-      </div>
-
-      <div class="opp-section">
-        <h4>סיכונים</h4>
-        <ul class="risks">${risksHtml}</ul>
-      </div>
+      ${primaryField("למה עכשיו", thesis?.whyToday ?? s.whyHebrew)}
+      ${primaryField("קטליזטור קרוב", thesis?.catalyst ?? "—")}
+      ${primaryField("סיכון מרכזי", thesis?.mainRisk ?? "—")}
+      ${secondaryField("מה השתנה לאחרונה", thesis?.whatChanged ?? "—")}
+      ${secondaryField("מדדים מרכזיים", thesis?.keyMetric ?? "—")}
+      ${secondaryField("מה יפריך את התזה", thesis?.invalidation ?? "—")}
     </article>`;
 }
 
-function renderTopOpportunities(stocks: EnrichedStock[]): string {
+function renderTopOpportunities(stocks: EnrichedStock[], theses: Map<string, OpportunityThesis>): string {
   const inner =
     stocks.length > 0
-      ? `<div class="opportunities">${stocks.map(renderOpportunityCard).join("\n")}</div>`
+      ? `<div class="opportunities">${stocks.map((s, idx) => renderOpportunityCard(idx + 1, s, theses.get(s.ticker))).join("\n")}</div>`
       : `<p class="empty">אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו.</p>`;
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">🎯</span> Top Opportunities (${stocks.length}/3)</h2>
-    <p class="section-subtitle">עד 3 הזדמנויות מובילות בלבד – אחרי דירוג וסינון לפי איכות נתונים (רק High/Medium).</p>
+    <h2 class="section-title">Top Opportunities</h2>
     ${inner}
   </section>`;
 }
 
-function renderWatchlistHighlights(stocks: EnrichedStock[]): string {
-  if (stocks.length === 0) {
+// ===== 9. Dividend Information (secondary, visually smaller) =====
+
+function renderDividends(items: DividendInfoItem[]): string {
+  if (items.length === 0) {
     return `
-  <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist Highlights (0/5)</h2>
-    <p class="empty">אין מניות מעקב שעברו את סף איכות הנתונים בריצה הזו.</p>
+  <section class="secondary-section">
+    <h3 class="section-title-sm">Dividend Information</h3>
+    <p class="empty empty-sm">אף אחת מהמניות המדווחות אינה מחלקת דיבידנד כרגע.</p>
   </section>`;
   }
 
-  const rows = stocks
-    .map((s) => {
-      const tier = scoreTier(s.finalScore);
-      const name = s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
-      return `
+  const rows = items
+    .map(
+      (d) => `
         <tr>
-          <td class="symbol">${esc(s.ticker)}</td>
-          <td>${esc(name)}</td>
-          <td>${esc(fmtPrice(s.price))}</td>
-          <td><span class="mini-score ${tier.cls}">${s.finalScore.toFixed(1)}</span></td>
-          <td>${dqBadge(s)}</td>
-        </tr>`;
-    })
+          <td class="symbol">${ltr(esc(d.ticker))}</td>
+          <td>${ltr(esc(`$${d.dividendPerShare.toFixed(2)}`))}</td>
+          <td>${d.dividendYieldPct !== null ? ltr(esc(`${d.dividendYieldPct.toFixed(2)}%`)) : "Unavailable"}</td>
+        </tr>`
+    )
     .join("");
 
   return `
-  <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist Highlights (${stocks.length}/5)</h2>
-    <p class="section-subtitle">עד 5 מניות המעקב האיכותיות ביותר בריצה הזו (לפי ניקוד ואיכות נתונים).</p>
-    <div class="table-wrap card">
-      <table class="movers">
+  <section class="secondary-section">
+    <h3 class="section-title-sm">Dividend Information</h3>
+    <div class="table-wrap card card-sm">
+      <table class="report-table report-table-sm">
         <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Name</th>
-            <th>Price</th>
-            <th>Score</th>
-            <th>Data Quality</th>
-          </tr>
+          <tr><th>Ticker</th><th>Annual Dividend</th><th>Yield</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -529,86 +514,57 @@ function renderWatchlistHighlights(stocks: EnrichedStock[]): string {
   </section>`;
 }
 
-function renderWatchlistTable(stocks: EnrichedStock[]): string {
-  if (stocks.length === 0) {
-    return `
-  <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist (all)</h2>
-    <p class="empty">אין נתונים להצגה.</p>
-  </section>`;
-  }
+// ===== 10. This Week To Watch – macro only; the earnings sub-list is shown
+// ONLY when it has entries beyond what Upcoming Earnings Calendar already
+// displayed (never a bare repeat of the same information). =====
 
-  const rows = stocks
-    .map((s) => {
-      const tier = scoreTier(s.finalScore);
-      const chg = s.price > 0 ? fmtChange(s.changePercent) : "—";
-      return `
-        <tr>
-          <td class="symbol">${esc(s.ticker)}</td>
-          <td>${esc(fmtPrice(s.price))}</td>
-          <td class="${s.price > 0 ? changeClass(s.changePercent) : "flat"}">${esc(chg)}</td>
-          <td><span class="mini-score ${tier.cls}">${s.finalScore.toFixed(1)}</span></td>
-          <td>${dqBadge(s)}</td>
-        </tr>`;
-    })
-    .join("");
+function renderWeekAhead(data: ReportData): string {
+  const { weekAhead } = data;
+  const extraEarnings = weekAheadExtraEarnings(data);
+
+  const earningsHtml =
+    extraEarnings.length > 0
+      ? `<ul class="week-list week-ahead-earnings">${extraEarnings.map((e) => `<li><strong>${ltr(esc(e.ticker))}</strong> — ${ltr(esc(e.reportDate))}</li>`).join("")}</ul>`
+      : "";
+
+  const econHtml =
+    weekAhead.economicReadings.length > 0
+      ? `<ul class="week-list">${weekAhead.economicReadings
+          .map((r) => `<li><strong>${esc(r.label)}:</strong> ${ltr(esc(String(r.value) + r.unit))}${r.asOfDate ? ` (${ltr(esc(r.asOfDate))})` : ""}</li>`)
+          .join("")}</ul>`
+      : `<p class="empty empty-sm">נתוני מאקרו אחרונים אינם זמינים כרגע.</p>`;
 
   return `
-  <section>
-    <h2 class="section-title"><span class="emoji">⭐</span> Watchlist (all)</h2>
-    <p class="section-subtitle">מעקב קבוע אחר כל מניות האיכות ברשימה – כולל איכות נתונים לכל אחת</p>
-    <div class="table-wrap card">
-      <table class="movers">
-        <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Price</th>
-            <th>Daily Change</th>
-            <th>Score</th>
-            <th>Data Quality</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
+  <section class="secondary-section">
+    <h3 class="section-title-sm">This Week To Watch</h3>
+    <div class="card card-sm">
+      ${extraEarnings.length > 0 ? `<h4>דיווחי רווחים נוספים</h4>${earningsHtml}` : ""}
+      <h4>מאקרו (נתונים שכבר פורסמו)</h4>
+      ${econHtml}
     </div>
   </section>`;
 }
 
-function renderDataQuality(status: RunStatus): string {
+// ===== 11. Data Diagnostics (bottom, muted) =====
+
+function renderDiagnostics(data: ReportData): string {
+  const { status, scanned, qualified } = data;
   return `
   <section>
-    <h2 class="section-title"><span class="emoji">⚠️</span> איכות נתונים</h2>
-    <div class="quality-grid">
-      <div class="quality-stat live-bg">
-        <div class="quality-num">${status.liveCount}</div>
-        <div class="quality-label">🟢 Live data</div>
-      </div>
-      <div class="quality-stat cached-bg">
-        <div class="quality-num">${status.cachedCount}</div>
-        <div class="quality-label">🟡 Cached data</div>
-      </div>
-      <div class="quality-stat unavailable-bg">
-        <div class="quality-num">${status.missingCount}</div>
-        <div class="quality-label">🔴 Unavailable</div>
-      </div>
+    <div class="diagnostics-card">
+      <span class="diagnostics-label">Data quality</span>
+      <span>${status.liveCount} Live · ${status.cachedCount} Cached · ${status.missingCount} Unavailable</span>
+      <span class="metric-sub">${scanned} scanned · ${qualified} qualified</span>
     </div>
-    <p class="dq-legend">🧪 <strong>Data Quality</strong> – מודד את שלמות הנתונים שנאספו בפועל, לא את זמינות ה-API. ציון 0–100 לפי מחיר (30), פרופיל (20), שווי שוק (20), מחזור (15), חדשות (10) וטכני (5). נתון שלא נשלף עקב מגבלת API מסומן <span class="dq-badge dq-ratelimit">Missing (Rate Limit)</span> ו<strong>אינו</strong> מפחית את הציון – רק נתון שחסר באמת מפחית אותו. תוויות: <span class="dq-badge dq-high">High ≥80</span> <span class="dq-badge dq-medium">Medium ≥60</span> <span class="dq-badge dq-low">Low ≥40</span> <span class="dq-badge dq-excluded">Excluded</span> (חוסר נתונים קריטי אמיתי בלבד).</p>
-    ${
-      status.rateLimitHit
-        ? '<p class="warn">⚠️ הופעלה מגבלת ה-API של Alpha Vantage בריצה זו – חלק מהנתונים נטענו מהמטמון.</p>'
-        : ""
-    }
+    ${status.rateLimitHit ? `<p class="rate-limit-notice">⚠️ Alpha Vantage rate limit hit during this run.</p>` : ""}
   </section>`;
 }
 
 function renderDisclaimer(): string {
   return `
-  <footer class="disclaimer card">
-    <h3>Disclaimer</h3>
-    <p><strong>Research only. Not investment advice.</strong></p>
-    <p>המידע בדוח זה הוא למטרות מחקר ולמידה בלבד ואינו מהווה ייעוץ השקעות, המלצה לקנייה
-    או מכירה של ניירות ערך, או תחליף לייעוץ פיננסי מקצועי. מסחר במניות כרוך בסיכון
-    לאובדן ההון – כל החלטה על אחריותך בלבד.</p>
+  <footer class="disclaimer">
+    <p><strong>Research only. Not investment advice.</strong> מסחר במניות כרוך בסיכון לאובדן ההון – כל החלטה על אחריותך בלבד.</p>
+    <p class="attachments-line">קבצים מצורפים: daily-stock-report.html · daily-stock-report.md</p>
     <p class="generated">Generated by stock-agent · ${esc(new Date().toISOString())}</p>
   </footer>`;
 }
@@ -619,23 +575,22 @@ const CSS = `
   :root {
     --navy: #0f172a;
     --navy-2: #1e3a8a;
-    --blue: #3b82f6;
-    --blue-soft: #dbeafe;
-    --bg: #ffffff;
-    --bg-soft: #f8fafc;
+    --page-bg: #eef2f7;
+    --card-bg: #ffffff;
     --border: #e2e8f0;
     --text: #0f172a;
     --muted: #64748b;
-    --green: #10b981;
-    --green-soft: #d1fae5;
-    --amber: #f59e0b;
-    --amber-soft: #fef3c7;
-    --red: #ef4444;
-    --red-soft: #fee2e2;
-    --slate-soft: #f1f5f9;
-    --shadow: 0 1px 3px rgba(15,23,42,.04), 0 4px 12px rgba(15,23,42,.06);
-    --shadow-lg: 0 4px 6px rgba(15,23,42,.04), 0 10px 30px rgba(15,23,42,.08);
-    --radius: 14px;
+    --muted-soft: #94a3b8;
+    --green: #0f9d58;
+    --green-soft: #e6f4ea;
+    --amber: #b45309;
+    --amber-soft: #fef3e2;
+    --red: #d93025;
+    --red-soft: #fce8e6;
+    --blue: #2563eb;
+    --blue-soft: #e8f0fe;
+    --shadow: 0 1px 2px rgba(15,23,42,.05), 0 2px 8px rgba(15,23,42,.05);
+    --radius: 12px;
     --radius-sm: 8px;
   }
 
@@ -643,7 +598,7 @@ const CSS = `
   html, body {
     margin: 0;
     padding: 0;
-    background: var(--bg);
+    background: var(--page-bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Heebo",
                  "Rubik", "Assistant", Arial, sans-serif;
@@ -652,635 +607,334 @@ const CSS = `
   }
 
   .container {
-    max-width: 1100px;
+    max-width: 760px;
     margin: 0 auto;
-    padding: 0 20px 80px;
+    padding: 0 20px 60px;
   }
 
-  /* ===== Hero ===== */
-  .hero {
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 100%);
+  /* ===== Header ===== */
+  .report-header {
+    background: var(--navy);
     color: #fff;
-    padding: 48px 0 64px;
-    margin-bottom: 32px;
-    border-bottom-left-radius: 24px;
-    border-bottom-right-radius: 24px;
-    box-shadow: var(--shadow-lg);
+    padding: 28px 0;
+    margin-bottom: 28px;
   }
-  .hero-inner {
-    max-width: 1100px;
+  .report-header-inner {
+    max-width: 760px;
     margin: 0 auto;
-    padding: 0 24px;
+    padding: 0 20px;
   }
-  .hero-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-  .hero-emoji { font-size: 36px; line-height: 1; }
-  .hero h1 {
+  .report-header h1 {
     margin: 0;
-    font-size: clamp(28px, 5vw, 40px);
+    font-size: 26px;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
-  .subtitle {
-    margin: 4px 0 20px;
+  .report-date {
+    margin: 4px 0 14px;
+    color: rgba(255,255,255,.75);
+    font-size: 14px;
+  }
+  .header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+  }
+  .freshness-line {
+    font-size: 13px;
     color: rgba(255,255,255,.85);
-    font-size: clamp(14px, 2.5vw, 17px);
-  }
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 20px;
-    font-size: 13px;
-    color: rgba(255,255,255,.92);
-  }
-  .meta-item {
-    background: rgba(255,255,255,.12);
-    padding: 6px 12px;
-    border-radius: 999px;
-    backdrop-filter: blur(4px);
-  }
-  .meta-item strong { color: #fff; font-weight: 600; }
-
-  /* ===== Market Story hero ===== */
-  .story-section { margin-top: -16px; }
-  .story-card {
-    display: flex;
-    gap: 22px;
-    align-items: stretch;
-    border-right: 5px solid var(--blue);
-    background: linear-gradient(180deg, var(--blue-soft) 0%, var(--bg) 55%);
-  }
-  .story-card.empty-story { display: block; }
-  .story-visual {
-    flex: 0 0 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .story-logo {
-    max-width: 180px;
-    max-height: 120px;
-    object-fit: contain;
-    border-radius: var(--radius-sm);
-    background: #fff;
-    padding: 8px;
-  }
-  .ticker-placeholder {
-    width: 180px;
-    height: 130px;
-    border-radius: var(--radius);
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 60%, var(--blue) 100%);
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    box-shadow: var(--shadow);
-  }
-  .ticker-symbol { font-size: 34px; font-weight: 800; letter-spacing: .02em; }
-  .ticker-tag {
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255,255,255,.78);
-    text-transform: uppercase;
-    letter-spacing: .08em;
-  }
-  .story-body { flex: 1 1 auto; min-width: 0; }
-  .story-tags {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .story-ticker {
-    background: var(--navy);
-    color: #fff;
-    font-weight: 800;
-    font-size: 13px;
-    padding: 3px 10px;
-    border-radius: 8px;
-  }
-  .story-company { color: var(--muted); font-size: 14px; font-weight: 600; }
-  .story-chip {
-    background: var(--slate-soft);
-    color: var(--navy-2);
-    font-size: 12px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: 999px;
-  }
-  .story-move { font-size: 13px; font-weight: 700; }
-  .story-move.up { color: var(--green); }
-  .story-move.down { color: var(--red); }
-  .story-move.flat { color: var(--muted); }
-  .story-headline {
-    margin: 4px 0 8px;
-    font-size: clamp(18px, 3vw, 23px);
-    font-weight: 800;
-    color: var(--navy);
-    line-height: 1.3;
-  }
-  .story-meta { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
-  .story-summary { margin: 0 0 10px; font-size: 15px; color: var(--text); }
-  .story-why {
-    margin: 0 0 12px;
-    font-size: 14px;
-    color: var(--text);
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 10px 14px;
-  }
-  .story-original { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
-  .story-link {
-    display: inline-block;
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--navy-2);
-    text-decoration: none;
-    border-bottom: 2px solid var(--blue);
-    padding-bottom: 1px;
-  }
-  .story-link:hover { color: var(--blue); }
-
-  /* ===== Generic card ===== */
-  .card {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 22px 22px;
-    box-shadow: var(--shadow);
-  }
-  section { margin-bottom: 28px; }
-  .section-title {
-    font-size: clamp(18px, 3vw, 22px);
-    font-weight: 700;
-    color: var(--navy);
-    margin: 32px 0 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .emoji { font-size: 1.1em; line-height: 1; }
-  .section-subtitle {
-    margin: -6px 0 14px;
-    color: var(--muted);
-    font-size: 14px;
-  }
-  .empty {
-    color: var(--muted);
-    background: var(--bg-soft);
-    border: 1px dashed var(--border);
-    border-radius: var(--radius-sm);
-    padding: 16px;
   }
 
-  /* ===== Mood card ===== */
-  .mood-card { border-right: 4px solid var(--blue); }
-  .card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-  .card-head h2 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--navy);
-  }
-  .mood-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .mood-tag {
-    background: var(--blue-soft);
-    color: var(--navy-2);
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .02em;
-  }
-  .mood-tag.muted { background: var(--slate-soft); color: var(--muted); }
-  .mood-text {
-    margin: 6px 0 0;
-    color: var(--text);
-    font-size: 15px;
-  }
-
-  /* ===== Fear & Greed gauge ===== */
-  .sentiment-card { border-right: 4px solid var(--blue); }
-  .fg-gauge {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 2px;
-    padding: 8px 16px;
-    border-radius: 12px;
-    font-weight: 800;
-    background: var(--slate-soft);
-    color: var(--muted);
-  }
-  .fg-score { font-size: 26px; line-height: 1; }
-  .fg-denom { font-size: 13px; opacity: .75; }
-  .fg-gauge.extreme-fear { background: var(--red-soft); color: #991b1b; }
-  .fg-gauge.fear { background: var(--amber-soft); color: #92400e; }
-  .fg-gauge.neutral { background: var(--slate-soft); color: var(--muted); }
-  .fg-gauge.greed { background: var(--green-soft); color: #065f46; }
-  .fg-gauge.extreme-greed { background: var(--green-soft); color: #064e3b; }
-
-  /* ===== Opportunity cards ===== */
-  .opportunities {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-  .opportunity-card {
-    border-right: 5px solid var(--blue);
-    padding: 24px;
-    transition: transform .15s ease, box-shadow .15s ease;
-  }
-  .opportunity-card:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-lg);
-  }
-  .opportunity-card.strong { border-right-color: var(--green); }
-  .opportunity-card.watchlist { border-right-color: var(--amber); }
-  .opportunity-card.cautious { border-right-color: var(--muted); }
-
-  .opp-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 18px;
-  }
-  .opp-id { display: flex; align-items: center; gap: 14px; }
-  .rank {
-    background: var(--navy);
-    color: #fff;
-    width: 36px; height: 36px;
-    border-radius: 10px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 14px;
-  }
-  .opp-id h3.ticker {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--navy);
-    letter-spacing: -.01em;
-  }
-  .opp-id p.company {
-    margin: 2px 0 0;
-    color: var(--muted);
-    font-size: 14px;
-  }
-
-  .score-badge {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 16px;
-    border-radius: 12px;
-    min-width: 90px;
-    text-align: center;
-    background: var(--slate-soft);
-    color: var(--muted);
-  }
-  .score-badge.strong { background: var(--green-soft); color: #065f46; }
-  .score-badge.watchlist { background: var(--amber-soft); color: #92400e; }
-  .score-badge.cautious { background: var(--slate-soft); color: var(--muted); }
-  .score-num { font-size: 22px; font-weight: 800; line-height: 1; }
-  .score-denom { font-size: 12px; opacity: .8; margin-top: 2px; }
-  .score-tier { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-top: 4px; }
-
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  .metric {
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .metric-label { font-size: 12px; color: var(--muted); }
-  .metric-value { font-size: 15px; font-weight: 700; color: var(--navy); }
-  .metric-value.sm { font-size: 13px; font-weight: 600; }
-  .metric-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
-  .metric-value.up { color: var(--green); }
-  .metric-value.down { color: var(--red); }
-
-  .opp-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    align-items: center;
-    margin-bottom: 16px;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .badge-label { font-weight: 600; color: var(--navy); }
-
-  .opp-section { margin-top: 14px; }
-  .opp-section h4 {
-    margin: 0 0 6px;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--navy);
-    letter-spacing: .01em;
-  }
-  .opp-section p {
-    margin: 0;
-    color: var(--text);
-    font-size: 14.5px;
-  }
-  .risks {
-    margin: 4px 0 0;
-    padding-inline-start: 18px;
-    color: var(--text);
-    font-size: 14px;
-  }
-  .risks li { margin-bottom: 4px; }
-
-  /* ===== Badges ===== */
+  /* ===== Badges (sentiment) ===== */
   .badge {
     display: inline-flex;
     align-items: center;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    border: 1px solid transparent;
-  }
-  .badge.live { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
-  .badge.cached { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
-  .badge.unavailable { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
-
-  /* ===== Data-quality badge + tier chip ===== */
-  .opp-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  .tier-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    background: var(--slate-soft);
-    color: var(--navy-2);
-  }
-  .dq-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 10px;
+    padding: 4px 12px;
     border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
-    background: var(--slate-soft);
-    color: var(--muted);
-    border: 1px solid var(--border);
   }
-  .dq-badge.dq-high { background: var(--green-soft); color: #065f46; border-color: #a7f3d0; }
-  .dq-badge.dq-medium { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
-  .dq-badge.dq-low { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
-  .dq-badge.dq-excluded { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
-  .dq-badge.dq-ratelimit { background: var(--blue-soft); color: var(--navy-2); border-color: #bfdbfe; }
+  .badge-neutral { background: rgba(255,255,255,.14); color: #fff; }
+  .badge-extreme-fear { background: var(--red-soft); color: #991b1b; }
+  .badge-fear { background: var(--amber-soft); color: #92400e; }
+  .badge-greed { background: var(--green-soft); color: #065f46; }
+  .badge-extreme-greed { background: var(--green-soft); color: #064e3b; }
+
+  /* ===== Generic layout ===== */
+  section { margin-bottom: 28px; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .card-sm { padding: 14px 16px; }
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 12px;
+  }
+  .section-title-sm {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--muted);
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .section-subtitle {
+    margin: -6px 0 12px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .empty {
+    color: var(--muted);
+    background: var(--card-bg);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+  }
+  .empty-sm { padding: 10px 14px; font-size: 13px; }
+  .secondary-section { opacity: .92; }
 
   /* ===== Tables ===== */
-  .table-wrap {
-    padding: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  table.movers {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 520px;
-  }
-  table.movers th,
-  table.movers td {
+  .table-wrap { padding: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.report-table { width: 100%; border-collapse: collapse; min-width: 460px; }
+  .report-table-sm { min-width: 320px; }
+  table.report-table th,
+  table.report-table td {
     text-align: start;
-    padding: 12px 16px;
-    font-size: 14px;
+    padding: 10px 14px;
+    font-size: 13.5px;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  table.movers thead th {
-    background: var(--bg-soft);
+  table.report-table thead th {
+    background: var(--page-bg);
     color: var(--muted);
     font-weight: 600;
-    font-size: 12px;
+    font-size: 11px;
     letter-spacing: .04em;
     text-transform: uppercase;
   }
-  table.movers tbody tr:last-child td { border-bottom: 0; }
-  table.movers tbody tr:hover { background: var(--bg-soft); }
-  td.symbol { font-weight: 800; color: var(--navy); }
-  td.up { color: var(--green); font-weight: 700; }
-  td.down { color: var(--red); font-weight: 700; }
-  td.flat { color: var(--muted); }
+  table.report-table tbody tr:last-child td { border-bottom: 0; }
+  table.report-table tbody tr.row-muted { color: var(--muted-soft); }
+  td.symbol { font-weight: 700; color: var(--navy); }
+  .up { color: var(--green); font-weight: 700; }
+  .down { color: var(--red); font-weight: 700; }
+  .flat { color: var(--muted); }
+  .muted-text { color: var(--muted-soft); font-style: italic; }
+  .alert-name { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .why-cell { white-space: normal; min-width: 200px; font-size: 12.5px; color: var(--muted); }
 
-  .mini-score {
+  /* ===== Date badges ===== */
+  .date-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
-    background: var(--slate-soft);
-    color: var(--muted);
+    white-space: nowrap;
   }
-  .mini-score.strong { background: var(--green-soft); color: #065f46; }
-  .mini-score.watchlist { background: var(--amber-soft); color: #92400e; }
+  .date-badge-today { background: var(--red-soft); color: #991b1b; }
+  .date-badge-tomorrow { background: var(--amber-soft); color: #92400e; }
+  .date-badge-soon { background: var(--amber-soft); color: #92400e; opacity: .85; }
+  .date-badge-later { background: var(--blue-soft); color: var(--navy-2); }
 
-  /* ===== Technical alerts ===== */
-  .rsi-legend {
-    margin: -6px 0 14px;
-    color: var(--muted);
-    font-size: 13px;
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 8px 12px;
-  }
-  .alert-subtitle {
-    margin: 18px 0 10px;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--navy);
-  }
-  .alert-note {
-    margin: -4px 0 10px;
-    color: var(--muted);
-    font-size: 13px;
-  }
-  .warn-card {
-    background: var(--amber-soft);
-    border-color: #fde68a;
-  }
-  .warn-card .warn-title {
-    margin: 0 0 6px;
-    font-weight: 700;
-    color: #92400e;
-    font-size: 15px;
-  }
-  .warn-card .warn-sub {
-    margin: 0;
-    color: #92400e;
-    font-size: 14px;
-  }
-  .alert-name {
-    display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-  }
-  .rsi-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    background: var(--slate-soft);
-    color: var(--muted);
-  }
-  .rsi-badge.overbought { background: var(--red-soft); color: #991b1b; }
-  .rsi-badge.strong { background: var(--green-soft); color: #065f46; }
-  .rsi-badge.neutral { background: var(--slate-soft); color: var(--muted); }
-  .rsi-badge.weak { background: var(--amber-soft); color: #92400e; }
-  .rsi-badge.oversold { background: var(--blue-soft); color: var(--navy-2); }
+  /* ===== Catalyst card ===== */
+  .catalyst-card { border-right: 4px solid var(--red); background: linear-gradient(135deg, var(--red-soft), var(--card-bg)); }
+  .catalyst-timing { margin: 0 0 4px; font-weight: 700; color: #991b1b; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .catalyst-headline { margin: 0 0 6px; font-size: 20px; color: var(--navy); }
+  .catalyst-meta { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .catalyst-why { margin: 0; font-size: 14px; color: var(--text); }
 
-  /* ===== Data quality ===== */
-  .quality-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px;
+  /* ===== Market Story ===== */
+  .story-card { display: flex; gap: 18px; align-items: stretch; }
+  .story-card.empty-story { display: block; }
+  .story-visual { flex: 0 0 100px; display: flex; align-items: center; justify-content: center; }
+  .story-logo { max-width: 96px; max-height: 72px; object-fit: contain; border-radius: var(--radius-sm); background: #fff; padding: 6px; }
+  .ticker-placeholder {
+    width: 96px; height: 72px; border-radius: var(--radius-sm);
+    background: var(--navy); color: #fff;
+    display: flex; align-items: center; justify-content: center;
   }
-  .quality-stat {
-    border-radius: var(--radius);
-    padding: 22px;
-    text-align: center;
-    border: 1px solid var(--border);
+  .ticker-symbol { font-size: 20px; font-weight: 800; }
+  .story-body { flex: 1 1 auto; min-width: 0; }
+  .story-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .story-ticker { background: var(--navy); color: #fff; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 6px; }
+  .story-company { color: var(--muted); font-size: 13px; font-weight: 600; }
+  .story-chip { background: var(--page-bg); color: var(--navy-2); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .story-move { font-size: 12.5px; font-weight: 700; }
+  .story-headline { margin: 2px 0 6px; font-size: 17px; font-weight: 700; color: var(--navy); line-height: 1.3; }
+  .story-meta { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+  .story-block { margin-bottom: 8px; }
+  .story-block h4 { margin: 0 0 2px; font-size: 12.5px; font-weight: 700; color: var(--navy); }
+  .story-block p { margin: 0; font-size: 14px; color: var(--text); }
+  .btn-link {
+    display: inline-block; margin-top: 6px;
+    font-weight: 700; font-size: 13px; color: #fff;
+    background: var(--navy-2); text-decoration: none;
+    padding: 8px 16px; border-radius: 999px;
+  }
+
+  /* ===== Headline cards ===== */
+  .headline-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .headline-card { padding: 14px 16px; }
+  .headline-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .headline-text { margin: 0 0 4px; font-size: 13.5px; color: var(--text); }
+
+  /* ===== Market Overview tiles ===== */
+  .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .overview-tile {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;
     box-shadow: var(--shadow);
   }
-  .live-bg { background: var(--green-soft); border-color: #a7f3d0; }
-  .cached-bg { background: var(--amber-soft); border-color: #fde68a; }
-  .unavailable-bg { background: var(--red-soft); border-color: #fecaca; }
-  .quality-num {
-    font-size: 36px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--navy);
+  .tile-label { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+  .tile-value { font-size: 18px; font-weight: 800; color: var(--navy); }
+  .tile-change { font-size: 12.5px; font-weight: 700; }
+
+  /* ===== RSI / signal badges ===== */
+  .rsi-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; background: var(--page-bg); color: var(--muted); }
+  .rsi-badge.overbought { background: var(--red-soft); color: #991b1b; }
+  .rsi-badge.strong { background: var(--green-soft); color: #065f46; }
+  .rsi-badge.neutral { background: var(--page-bg); color: var(--muted); }
+  .rsi-badge.weak { background: var(--amber-soft); color: #92400e; }
+  .rsi-badge.oversold { background: var(--blue-soft); color: var(--navy-2); }
+  .signal-badge { font-size: 12.5px; color: var(--text); }
+
+  /* ===== Opportunity cards ===== */
+  .opportunities { display: flex; flex-direction: column; gap: 16px; }
+  .opportunity-card { border-right: 4px solid var(--blue); padding: 20px; }
+  .opportunity-card.strong { border-right-color: var(--green); }
+  .opportunity-card.watchlist { border-right-color: var(--amber); }
+  .opportunity-card.cautious { border-right-color: var(--muted); }
+  .opp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .opp-id { display: flex; align-items: flex-start; gap: 10px; }
+  .rank-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 999px;
+    background: var(--page-bg); color: var(--muted); font-weight: 800; font-size: 12px;
+    flex-shrink: 0;
   }
-  .quality-label {
-    margin-top: 6px;
-    color: var(--navy);
-    font-weight: 600;
-    font-size: 14px;
+  .opp-id h3.ticker { margin: 0; font-size: 20px; font-weight: 800; color: var(--navy); }
+  .opp-id p.company { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
+  .opp-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .score-badge {
+    display: flex; align-items: baseline; gap: 2px;
+    padding: 4px 12px; border-radius: 999px;
+    background: var(--page-bg); color: var(--muted); font-weight: 800;
   }
-  .warn {
-    margin-top: 14px;
-    padding: 12px 16px;
-    background: var(--amber-soft);
-    color: #92400e;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    border: 1px solid #fde68a;
+  .score-badge.strong { background: var(--green-soft); color: #065f46; }
+  .score-badge.watchlist { background: var(--amber-soft); color: #92400e; }
+  .score-badge.cautious { background: var(--page-bg); color: var(--muted); }
+  .score-num { font-size: 17px; }
+  .score-denom { font-size: 11px; opacity: .8; }
+  .metric-value { font-size: 13px; font-weight: 700; }
+
+  .metrics-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .metric-chip {
+    background: var(--page-bg); border-radius: var(--radius-sm);
+    padding: 6px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 84px;
   }
-  .dq-legend {
-    margin-top: 16px;
-    padding: 12px 16px;
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    color: var(--text);
-    line-height: 2;
+  .metric-chip-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .metric-chip-value { font-size: 14px; font-weight: 700; color: var(--navy); }
+
+  .opp-section { margin-top: 10px; }
+  .opp-section h4 { margin: 0 0 3px; font-size: 13px; font-weight: 700; color: var(--navy); }
+  .opp-section p { margin: 0; color: var(--text); font-size: 13.5px; }
+  .opp-section-primary p { font-weight: 500; }
+  .opp-section-secondary { opacity: .78; }
+  .opp-section-secondary h4 { font-size: 12px; color: var(--muted); }
+  .opp-section-secondary p { font-size: 12.5px; }
+
+  /* ===== Diagnostics (muted, bottom) ===== */
+  .diagnostics-card {
+    display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+    background: var(--page-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 16px; color: var(--muted); font-size: 13px;
+  }
+  .diagnostics-label { font-weight: 700; color: var(--navy); }
+  .rate-limit-notice {
+    margin: 8px 0 0; background: var(--amber-soft); color: #92400e;
+    border-radius: var(--radius-sm); padding: 8px 14px; font-size: 12.5px;
   }
 
-  /* ===== Disclaimer ===== */
+  /* ===== Footer / disclaimer ===== */
   .disclaimer {
-    margin-top: 36px;
-    background: var(--bg-soft);
-    border-color: var(--border);
+    margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 12px;
   }
-  .disclaimer h3 {
-    margin: 0 0 8px;
-    color: var(--navy);
-    font-size: 16px;
-  }
-  .disclaimer p {
-    margin: 6px 0;
-    color: var(--text);
-    font-size: 14px;
-  }
-  .disclaimer .generated {
-    margin-top: 14px;
-    color: var(--muted);
-    font-size: 12px;
-  }
+  .disclaimer p { margin: 4px 0; }
+  .attachments-line { color: var(--muted-soft); }
+  .disclaimer .generated { color: var(--muted-soft); }
+
+  .metric-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .week-list { margin: 6px 0 14px; padding-inline-start: 20px; font-size: 13.5px; line-height: 1.7; }
 
   /* ===== Mobile ===== */
   @media (max-width: 640px) {
-    .container { padding: 0 14px 60px; }
-    .hero { padding: 36px 0 48px; border-radius: 0 0 18px 18px; }
-    .card, .opportunity-card { padding: 18px; }
+    .container { padding: 0 14px 40px; }
+    .report-header-inner { padding: 0 14px; }
+    .card, .opportunity-card { padding: 14px; }
     .opp-head { flex-direction: column; align-items: stretch; }
-    .score-badge { align-self: flex-start; }
-    .meta { font-size: 12px; }
+    .opp-head-right { align-items: flex-start; }
     .story-card { flex-direction: column; }
-    .story-visual { flex-basis: auto; }
-    .ticker-placeholder { width: 100%; height: 110px; }
   }
 `;
 
 // ===== top-level renderer =====
 
+// Canonical section order shared with the email HTML renderer so the
+// attachment and the email body can never silently drift apart:
+//   1. Header
+//   2. Upcoming Earnings Calendar
+//   3. Next Major Market Catalyst
+//   4. Market Story of the Day
+//   5. Important Headlines
+//   6. Market Overview
+//   7. Technical Watch
+//   8. Earnings Follow-up
+//   9. Top Opportunities
+//  10. Dividend Information
+//  11. This Week To Watch (macro only – earnings sub-list omitted when it
+//      would only repeat the Upcoming Earnings Calendar)
+//  12. Data Diagnostics + attachments/disclaimer footer
 export function generateHtmlReport(data: ReportData): string {
   const now = new Date();
   const {
+    earningsCalendar,
+    earningsCalendarStatus,
+    marketCatalyst,
+    marketOverview,
     topOpportunities,
-    watchlistHighlights,
-    watchlist,
+    opportunityTheses,
+    technicalWatch,
     technicalAlerts,
-    status,
-    scanned,
-    qualified,
-    fearGreed,
+    earningsFollowUp,
+    dividends,
   } = data;
 
   const body = [
-    renderHeader(now, scanned, qualified),
-    `<main class="container">`,
+    renderHeader(now, data),
+    `<main class="container" dir="rtl">`,
+    renderEarningsCalendar(earningsCalendar, earningsCalendarStatus),
+    renderMarketCatalyst(marketCatalyst),
     renderMarketStory(data.marketStory),
-    renderMarketSentiment(fearGreed),
-    renderTechnicalAlerts(technicalAlerts),
-    renderTopOpportunities(topOpportunities),
-    renderWatchlistHighlights(watchlistHighlights),
-    renderWatchlistTable(watchlist),
-    renderDataQuality(status),
+    renderImportantHeadlines(data.additionalHeadlines),
+    renderMarketOverview(marketOverview),
+    renderTechnicalWatch(technicalWatch, technicalAlerts.dataUnavailable),
+    renderEarningsFollowUp(earningsFollowUp),
+    renderTopOpportunities(topOpportunities, opportunityTheses),
+    renderDividends(dividends),
+    renderWeekAhead(data),
+    renderDiagnostics(data),
     renderDisclaimer(),
     `</main>`,
+    fingerprintHtmlComment(data),
   ].join("\n");
 
   return `<!DOCTYPE html>
@@ -1288,7 +942,7 @@ export function generateHtmlReport(data: ReportData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📈 דוח מניות למשקיע לטווח ארוך – ${esc(fmtDateTime(now))}</title>
+  <title>Daily Market Report – ${esc(fmtDateTime(now))}</title>
   <style>${CSS}</style>
 </head>
 <body>

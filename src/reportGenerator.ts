@@ -1,48 +1,33 @@
 import fs from "fs";
 import path from "path";
-import { listRisksHebrew } from "./explainer";
+import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
+import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
+import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
+import { visibleOverviewItems, MIN_VISIBLE_INDICATORS } from "./marketOverview";
+import { fingerprintHtmlComment } from "./reportFingerprint";
+import { formatOverviewValue } from "./reportPresentation";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
-  BandProximity,
   DataQualityLabel,
+  DividendInfoItem,
+  EarningsCalendarEntry,
+  EarningsCalendarStatus,
+  EarningsFollowUpResult,
+  EarningsUrgency,
   EnrichedStock,
-  ExpansionItem,
-  FearGreed,
+  MarketCatalystResult,
+  MarketOverviewItem,
   MarketStory,
-  OpportunityTier,
+  OpportunityThesis,
   ReportData,
-  TechnicalAlert,
-  TechnicalAlerts,
+  TechnicalWatchItem,
+  WeekAhead,
 } from "./types";
 
 function displayName(s: EnrichedStock): string {
   return s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker;
 }
-
-// ---------- data-quality helpers ----------
-
-const DQ_EMOJI: Record<DataQualityLabel, string> = {
-  High: "🟢",
-  Medium: "🟡",
-  Low: "🟠",
-  Excluded: "🔴",
-};
-
-function dqBadge(s: EnrichedStock): string {
-  const dq = s.dataQuality;
-  if (!dq) return "—";
-  return `${DQ_EMOJI[dq.label]} ${dq.label} (${dq.score}/100)`;
-}
-
-const TIER_HEBREW: Record<OpportunityTier, string> = {
-  core: "🏛️ Core · ליבה",
-  growth: "🌱 Growth · צמיחה",
-  speculative: "🎲 Speculative · ספקולטיבי",
-  none: "—",
-};
-
-// ---------- formatting helpers ----------
 
 function fmtNum(n: number): string {
   return n.toLocaleString("en-US");
@@ -56,34 +41,71 @@ function fmtPrice(p: number): string {
   return p > 0 ? `$${p.toFixed(2)}` : "—";
 }
 
-function fmtMarketCap(mc?: number): string {
-  if (!mc) return "—";
-  if (mc >= 1e12) return `$${(mc / 1e12).toFixed(2)}T`;
-  if (mc >= 1e9) return `$${(mc / 1e9).toFixed(2)}B`;
-  if (mc >= 1e6) return `$${(mc / 1e6).toFixed(0)}M`;
-  return `$${mc}`;
-}
-
 function fmtDateTime(d: Date): string {
   const iso = d.toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 }
 
-function sectorOrDash(s: EnrichedStock): string {
-  return s.profile?.industry || s.profile?.sector || "—";
+const DQ_EMOJI: Record<DataQualityLabel, string> = {
+  High: "🟢",
+  Medium: "🟡",
+  Low: "🟠",
+  Excluded: "🔴",
+};
+
+function dqBadge(s: EnrichedStock): string {
+  const dq = s.dataQuality;
+  if (!dq) return "—";
+  return `${DQ_EMOJI[dq.label]} ${dq.label} · כיסוי ${dq.coverageScore} · ביטחון ${dq.confidenceScore}`;
 }
 
-function newsStatusHebrew(s: EnrichedStock): string {
-  if (s.newsSource.source === "live") return `🟢 ${s.news.length} חדשות עדכניות`;
-  if (s.newsSource.source === "cached") {
-    const age = s.newsSource.ageHours;
-    const ageText = age !== undefined ? ` (~${age.toFixed(1)}h)` : "";
-    return `🟡 ${s.news.length} חדשות מהמטמון${ageText}`;
+// ---------- 1. Upcoming Earnings ----------
+
+const URGENCY_EMOJI: Record<EarningsUrgency, string> = {
+  today: "🔴",
+  tomorrow: "🟠",
+  week: "🟡",
+  later: "⚪",
+};
+
+function earningsCalendarSection(
+  entries: EarningsCalendarEntry[],
+  status: EarningsCalendarStatus
+): string {
+  if (entries.length === 0) {
+    return `## 📅 Upcoming Earnings Calendar
+
+_${earningsCalendarStatusMessageHebrew(status)}_`;
   }
-  return "🔴 חדשות לא זמינות";
+
+  const header =
+    "| | Symbol | Date | BMO/AMC | Days | EPS Est. | Revenue Est. | למה זה חשוב |\n" +
+    "| - | ------ | ---- | ------- | ---- | -------- | ------------- | ------------ |";
+  const rows = entries.slice(0, 12).map((e) => {
+    const eps = e.estimatedEps !== undefined ? `$${e.estimatedEps.toFixed(2)}` : "Unavailable";
+    const days = e.daysRemaining === 0 ? "היום" : e.daysRemaining === 1 ? "מחר" : `${e.daysRemaining}d`;
+    const bmoAmc = e.timeOfDay === "pre-market" ? "🌅 BMO" : e.timeOfDay === "post-market" ? "🌇 AMC" : "Unavailable";
+    return `| ${URGENCY_EMOJI[e.urgency]} | **${e.ticker}** | ${e.reportDate} | ${bmoAmc} | ${days} | ${eps} | Unavailable | ${e.reasonsHebrew.join(" · ")} |`;
+  });
+
+  return `## 📅 Upcoming Earnings Calendar
+
+${[header, ...rows].join("\n")}`;
 }
 
-// ---------- market story of the day ----------
+function marketCatalystSection(catalyst: MarketCatalystResult): string {
+  if (!catalyst.catalyst) {
+    return `## 🚨 Next Major Market Catalyst
+
+_${marketCatalystStatusMessageHebrew(catalyst.status)}_`;
+  }
+  const c = catalyst.catalyst;
+  return `## 🚨 Next Major Market Catalyst
+
+> 🚨 **${c.headline}** (\`${c.ticker}\` · ${c.timingHebrew}, ${c.reportDate})`;
+}
+
+// ---------- 2. Market Story ----------
 
 function marketStorySection(story: MarketStory | null): string {
   if (!story) {
@@ -96,9 +118,6 @@ _לא נמצאה ידיעה חדשותית מהותית היום._`;
     story.priceMove && story.priceMove.price > 0
       ? `\n- 📊 **תנועת מחיר:** ${fmtPrice(story.priceMove.price)} (${fmtChange(story.priceMove.changePercent)})`
       : "";
-  // Image: only show a logo URL if one is safely available; otherwise the ticker
-  // itself stands in as the visual anchor (no copyrighted images are embedded).
-  const logoLine = story.logoUrl ? `\n- 🖼️ **לוגו:** ${story.logoUrl}` : "";
   const original = story.originalSummary
     ? `\n\n> _תקציר המקור (באנגלית):_ ${story.originalSummary}`
     : "";
@@ -110,7 +129,7 @@ _לא נמצאה ידיעה חדשותית מהותית היום._`;
 **${story.headline}**
 
 - 🗞️ **מקור:** ${story.source}
-- 🕒 **תאריך:** ${story.publishedDisplay}${moveLine}${logoLine}
+- 🕒 **תאריך:** ${story.publishedDisplay}${moveLine}
 
 ${story.summaryHebrew}
 
@@ -119,280 +138,248 @@ ${story.summaryHebrew}
 🔗 [קריאת הידיעה המלאה במקור](${story.url})${original}`;
 }
 
-// ---------- market sentiment (Fear & Greed) ----------
+function importantHeadlinesSection(additional: MarketStory[]): string {
+  if (additional.length === 0) {
+    return `## 🗞️ Important Headlines
 
-function marketSentimentSection(fg: FearGreed | null): string {
-  if (!fg) {
-    return `## 🌎 Market Sentiment
-
-_Fear & Greed Index unavailable_`;
+_אין כותרות נוספות מהותיות היום מעבר לידיעה הראשית._`;
   }
-  return `## 🌎 Market Sentiment
+  const lines = additional
+    .map((a) => `- **${a.ticker}** (${a.companyName}) — "${a.headline}" (${a.source}, ${a.publishedDisplay}) [🔗](${a.url})`)
+    .join("\n");
+  return `## 🗞️ Important Headlines
 
-- **Fear & Greed Index:** ${fg.score}
-- **Classification:** ${fg.classification}
-
-${fg.hebrew}`;
+${lines}`;
 }
 
-// ---------- technical alerts (Bollinger Bands + RSI) ----------
+// ---------- 3. Market Overview ----------
 
-function alertBlock(a: TechnicalAlert, kind: "above" | "below"): string {
-  const rsi = rsiInterpretation(a.rsi14);
-  const bandLabel = kind === "above" ? "Upper Band" : "Lower Band";
-  const distLabel = kind === "above" ? "Above Band" : "Below Band";
-  return `**${a.ticker}** — ${a.name}
-- Price: ${fmtPrice(a.price)}
-- ${bandLabel}: ${fmtPrice(a.band)}
-- ${distLabel}: +${a.pctFromBand.toFixed(1)}%
-- RSI: ${Math.round(a.rsi14)} (${rsi.label} · ${rsi.hebrew})`;
-}
+function marketOverviewSection(items: MarketOverviewItem[]): string {
+  const visible = visibleOverviewItems(items);
 
-function proximityTable(items: BandProximity[], distHeader: string): string {
-  if (items.length === 0) return "_אין נתונים זמינים._";
-  const header =
-    `| Symbol | Price | ${distHeader} | RSI |\n` +
-    "| ------ | ----- | ------------- | --- |";
-  const rows = items.map((p) => {
-    const rsi = rsiInterpretation(p.rsi14);
-    return `| **${p.ticker}** | ${fmtPrice(p.price)} | ${p.distancePct.toFixed(1)}% | ${Math.round(p.rsi14)} (${rsi.label}) |`;
+  if (visible.length < MIN_VISIBLE_INDICATORS) {
+    return `## 🌎 Market Overview
+
+_נתוני שוק כלליים אינם זמינים מספיק כרגע (${visible.length}/${items.length} מדדים בלבד) – הסעיף יתעדכן כשהמקור יחזור להיות זמין._`;
+  }
+
+  const header = "| Indicator | Value | Daily Change |\n| --------- | ----- | ------------ |";
+  const rows = visible.map((i) => {
+    const change = i.changePercent !== null ? fmtChange(i.changePercent) : "—";
+    return `| ${i.label} | ${formatOverviewValue(i)} | ${change} |`;
   });
-  return [header, ...rows].join("\n");
-}
-
-function expansionTable(items: ExpansionItem[]): string {
-  if (items.length === 0) return "_אין נתוני התרחבות זמינים._";
-  const header =
-    "| Symbol | Band Width Δ | RSI |\n" +
-    "| ------ | ------------ | --- |";
-  const rows = items.map((e) => {
-    const rsi = rsiInterpretation(e.rsi14);
-    const sign = e.widthChangePct >= 0 ? "+" : "";
-    return `| **${e.ticker}** | ${sign}${e.widthChangePct.toFixed(1)}% | ${Math.round(e.rsi14)} (${rsi.label}) |`;
-  });
-  return [header, ...rows].join("\n");
-}
-
-function technicalAlertsSection(alerts: TechnicalAlerts): string {
-  const { aboveUpper, belowLower, closestToUpper, closestToLower, expansion } = alerts;
-
-  // No daily data at all (rate-limited, no cache) – show a clear notice.
-  if (alerts.dataUnavailable) {
-    return `## 📊 Technical Alerts
-
-> ⚠️ **Technical data unavailable today due to API rate limit.**
->
-> הנתונים הטכניים (Bollinger Bands / RSI) אינם זמינים היום עקב מגבלת ה-API ואין נתונים שמורים במטמון. הסעיף יתעדכן בריצה הבאה. אין לכך השפעה על ציון איכות הנתונים של המניות.`;
-  }
-
-  // Above the upper band: real breaches if any, otherwise the closest names.
-  const aboveBlock =
-    aboveUpper.length > 0
-      ? `### 🔴 Above Upper Bollinger Band
-
-${aboveUpper.map((a) => alertBlock(a, "above")).join("\n\n")}`
-      : `### 🔥 Closest To Upper Bollinger Band
-
-_אף מניה לא פרצה את הרצועה העליונה. אלו הקרובות ביותר לפריצה (קניית-יתר אפשרית) – מרחק קטן יותר = קרובה יותר:_
-
-${proximityTable(closestToUpper, "Distance To Upper")}`;
-
-  // Below the lower band: real breaches if any, otherwise the closest names.
-  const belowBlock =
-    belowLower.length > 0
-      ? `### 🟢 Below Lower Bollinger Band
-
-${belowLower.map((a) => alertBlock(a, "below")).join("\n\n")}`
-      : `### 🟢 Closest To Lower Bollinger Band
-
-_אף מניה לא שברה את הרצועה התחתונה. אלו הקרובות ביותר לשבירה (מכירת-יתר אפשרית) – מרחק קטן יותר = קרובה יותר:_
-
-${proximityTable(closestToLower, "Distance To Lower")}`;
-
-  return `## 📊 Technical Alerts
-
-רצועות בולינג'ר מסייעות לזהות מצבי קיצון. מניות מעל הרצועה העליונה עשויות להיות במצב קניית יתר, ומניות מתחת לרצועה התחתונה עשויות להיות במצב מכירת יתר.
-
-**פירוש RSI:** RSI > 70 = Overbought · 60–70 = Strong Momentum · 40–60 = Neutral · 30–40 = Weak · < 30 = Oversold
-
-${aboveBlock}
-
-${belowBlock}
-
-### 📈 Bollinger Expansion Watch
-
-_מניות עם ההתרחבות הגדולה ביותר ברוחב רצועות בולינג'ר לאחרונה. התרחבות מעידה על עלייה בתנודתיות – לעיתים תחילתו של מהלך חזק:_
-
-${expansionTable(expansion)}`;
-}
-
-// ---------- opportunity block ----------
-
-function opportunityBlock(s: EnrichedStock): string {
-  const name = displayName(s);
-  const sector = sectorOrDash(s);
-  const volM = (s.volume / 1_000_000).toFixed(1);
-  const cap = fmtMarketCap(s.profile?.marketCap);
-
-  const risks = listRisksHebrew(s, s.profile, s.news);
-  const risksMd = risks.map((r) => `- ${r}`).join("\n");
-
-  const dq = s.dataQuality;
-  const missingMd =
-    dq && dq.missing.length > 0 ? dq.missing.join(", ") : "אין – כל הנתונים שנאספו מלאים";
-  const rateLimitedMd =
-    dq && dq.rateLimited.length > 0
-      ? `\n\n#### סטטוס API (לא נספר באיכות)\n\n${dq.rateLimited.join(", ")} — Missing (Rate Limit)`
-      : "";
-  const reliability = dq?.reliabilityHebrew ?? "—";
-
-  return `### ${s.ticker} — ${name}
-
-> ⭐ **Score: ${s.finalScore.toFixed(1)}/10** · 🏷️ **${TIER_HEBREW[s.tier]}** · 🧪 **איכות נתונים: ${dqBadge(s)}**
-
-- 💰 **Price:** ${fmtPrice(s.price)}
-- 📊 **Daily Change:** ${fmtChange(s.changePercent)}
-- 🏢 **Sector:** ${sector}${cap !== "—" ? ` · ${cap}` : ""}
-- 📈 **Volume:** ${fmtNum(s.volume)} (${volM}M)
-- 📰 **News Status:** ${newsStatusHebrew(s)}
-
-#### למה המניה מופיעה כאן
-
-${s.longTermWhyHebrew}
-
-#### מה חסר בנתונים
-
-${missingMd}${rateLimitedMd}
-
-#### עד כמה האות אמין
-
-${reliability}
-
-#### סיכונים
-
-${risksMd}
-`;
-}
-
-function topOpportunitiesSection(stocks: EnrichedStock[]): string {
-  const body =
-    stocks.length > 0
-      ? stocks.map(opportunityBlock).join("\n---\n\n")
-      : "_אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו._";
-  return `## 🎯 Top Opportunities (${stocks.length}/3)
-
-_עד 3 הזדמנויות מובילות בלבד – אחרי דירוג וסינון לפי איכות נתונים (רק High/Medium)._
-
-${body}`;
-}
-
-// ---------- watchlist table ----------
-
-function watchlistTable(stocks: EnrichedStock[]): string {
-  if (stocks.length === 0) return "_אין נתונים להצגה_";
-  const header =
-    "| Symbol | Price | Daily Change | Score | Data Quality |\n" +
-    "| ------ | ----- | ------------ | ----- | ------------ |";
-  const rows = stocks.map(
-    (s) =>
-      `| **${s.ticker}** | ${fmtPrice(s.price)} | ${s.price > 0 ? fmtChange(s.changePercent) : "—"} | ${s.finalScore.toFixed(1)}/10 | ${dqBadge(s)} |`
-  );
-  return [header, ...rows].join("\n");
-}
-
-function watchlistHighlightsSection(stocks: EnrichedStock[]): string {
-  if (stocks.length === 0) {
-    return `## ⭐ Watchlist Highlights (0/5)
-
-_אין מניות מעקב שעברו את סף איכות הנתונים בריצה הזו._`;
-  }
-  const header =
-    "| Symbol | Name | Price | Score | Data Quality |\n" +
-    "| ------ | ---- | ----- | ----- | ------------ |";
-  const rows = stocks.map(
-    (s) =>
-      `| **${s.ticker}** | ${displayName(s)} | ${fmtPrice(s.price)} | ${s.finalScore.toFixed(1)}/10 | ${dqBadge(s)} |`
-  );
-  return `## ⭐ Watchlist Highlights (${stocks.length}/5)
-
-_עד 5 מניות המעקב האיכותיות ביותר בריצה הזו (לפי ניקוד ואיכות נתונים)._
+  return `## 🌎 Market Overview
 
 ${[header, ...rows].join("\n")}`;
 }
 
+// ---------- 4. Top Opportunities ----------
+
+function opportunityBlock(s: EnrichedStock, thesis: OpportunityThesis | undefined): string {
+  const name = displayName(s);
+  return `### ${s.ticker} — ${name}
+
+> ⭐ **${s.finalScore.toFixed(1)}/10** · 🧪 ${dqBadge(s)}
+
+- 💰 ${fmtPrice(s.price)} (${s.price > 0 ? fmtChange(s.changePercent) : "—"})
+
+**למה עכשיו:** ${thesis?.whyToday ?? s.whyHebrew}
+**מה השתנה לאחרונה:** ${thesis?.whatChanged ?? "—"}
+**מדדים מרכזיים:** ${thesis?.keyMetric ?? "—"}
+**קטליזטור קרוב:** ${thesis?.catalyst ?? "—"}
+**סיכון מרכזי:** ${thesis?.mainRisk ?? "—"}
+**מה יפריך את התזה:** ${thesis?.invalidation ?? "—"}`;
+}
+
+function topOpportunitiesSection(
+  stocks: EnrichedStock[],
+  theses: Map<string, OpportunityThesis>
+): string {
+  if (stocks.length === 0) {
+    return `## 🎯 Top Opportunities
+
+_אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו._`;
+  }
+  const body = stocks.map((s) => opportunityBlock(s, theses.get(s.ticker))).join("\n\n---\n\n");
+  return `## 🎯 Top Opportunities (${stocks.length}/3)
+
+${body}`;
+}
+
+// ---------- 5. Technical Watch ----------
+
+function technicalWatchSection(items: TechnicalWatchItem[], dataUnavailable: boolean): string {
+  if (dataUnavailable || items.length === 0) {
+    return `## 📊 Technical Watch
+
+_נתונים טכניים (RSI / Bollinger Bands, מחושבים מקומית) אינם זמינים כרגע._`;
+  }
+  const header =
+    "| Symbol | Price | Change | RSI(14) | Status |\n" + "| ------ | ----- | ------ | ------- | ------ |";
+  const rows = items.map((i) => {
+    const rsi = i.rsi14 !== null ? `${Math.round(i.rsi14)} (${rsiInterpretation(i.rsi14).label})` : "—";
+    return `| **${i.ticker}** | ${fmtPrice(i.price)} | ${i.price > 0 ? fmtChange(i.changePercent) : "—"} | ${rsi} | ${i.statusHebrew} |`;
+  });
+  return `## 📊 Technical Watch
+
+_RSI ורצועות בולינג'ר מחושבים מקומית מנתוני מחיר יומיים (Yahoo Finance) – לא נשלפים מ-Alpha Vantage._
+
+${[header, ...rows].join("\n")}`;
+}
+
+// ---------- 5b. Earnings Follow-up ----------
+
+function fmtFollowUpMove(pct: number | null): string {
+  if (pct === null) return "Unavailable";
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function earningsFollowUpSection(followUp: EarningsFollowUpResult): string {
+  if (followUp.entries.length === 0) {
+    return `## 📮 Earnings Follow-up
+
+_${earningsFollowUpStatusMessageHebrew(followUp.status)}_`;
+  }
+  const header = "| Symbol | Report Date | BMO/AMC | Reported | Move Since |\n| ------ | ----------- | ------- | -------- | ---------- |";
+  const rows = followUp.entries.slice(0, 12).map((e) => {
+    const bmoAmc = e.timeOfDay === "pre-market" ? "🌅 BMO" : e.timeOfDay === "post-market" ? "🌇 AMC" : "Unavailable";
+    const reported = e.daysAgo === 0 ? "היום" : e.daysAgo === 1 ? "אתמול" : `לפני ${e.daysAgo} ימים`;
+    return `| **${e.ticker}** | ${e.reportDate} | ${bmoAmc} | ${reported} | ${fmtFollowUpMove(e.priceChangeSincePct)} |`;
+  });
+  return `## 📮 Earnings Follow-up
+
+_מהלך המחיר המשוער מאז מועד הדיווח (מבוסס על ימי מסחר, קירוב)._
+
+${[header, ...rows].join("\n")}`;
+}
+
+// ---------- 5c. Dividend Information ----------
+
+function dividendsSection(items: DividendInfoItem[]): string {
+  if (items.length === 0) {
+    return `## 💵 Dividend Information
+
+_אף אחת מהמניות המדווחות ברשימת המעקב או בהזדמנויות המובילות אינה מחלקת דיבידנד כרגע._`;
+  }
+  const header = "| Symbol | Div/Share | Yield | Ex-Div Date | Pay Date |\n| ------ | --------- | ----- | ----------- | -------- |";
+  const rows = items.map(
+    (d) =>
+      `| **${d.ticker}** | $${d.dividendPerShare.toFixed(2)} | ${d.dividendYieldPct !== null ? `${d.dividendYieldPct.toFixed(2)}%` : "Unavailable"} | ${d.exDividendDate ?? "Unavailable"} | ${d.dividendDate ?? "Unavailable"} |`
+  );
+  return `## 💵 Dividend Information
+
+${[header, ...rows].join("\n")}`;
+}
+
+// ---------- 6. This Week To Watch ----------
+
+function weekAheadSection(week: WeekAhead): string {
+  const earningsLines =
+    week.earnings.length > 0
+      ? week.earnings.map((e) => `- **${e.ticker}** — ${e.reportDate}`).join("\n")
+      : `_${earningsCalendarStatusMessageHebrew(week.earningsStatus === "unavailable" ? "unavailable" : "noneFound")}_`;
+
+  const econSection =
+    week.economicReadings.length > 0
+      ? week.economicReadings
+          .map((r) => `- **${r.label}:** ${r.value}${r.unit}${r.asOfDate ? ` (${r.asOfDate})` : ""}`)
+          .join("\n")
+      : "_נתוני מאקרו אחרונים אינם זמינים כרגע._";
+
+  return `## 📅 This Week To Watch
+
+**דיווחי רווחים:**
+${earningsLines}
+
+**מאקרו (נתונים שכבר פורסמו, לא לוח קדימה):**
+${econSection}`;
+}
+
+// ---------- 7. Compact Data Diagnostics ----------
+
+function diagnosticsSection(data: ReportData): string {
+  const { status, scanned, qualified } = data;
+  return `## 🧪 Data Diagnostics
+
+Live: ${status.liveCount} · Cached: ${status.cachedCount} · Unavailable: ${status.missingCount} · Scanned: ${scanned} · Qualified: ${qualified}${status.rateLimitHit ? " · ⚠️ Alpha Vantage rate limit hit" : ""}`;
+}
+
 // ---------- main report ----------
 
+// Canonical section order shared with the email HTML/text renderers so the
+// attachment and the email body can never silently drift apart:
+//   1. Upcoming Earnings Calendar
+//   2. Next Major Market Catalyst
+//   3. Market Story of the Day
+//   4. Important Headlines
+//   5. Market Overview
+//   6. Technical Watch
+//   7. Earnings Follow-up
+//   8. Top Opportunities
+//   9. Dividend Information
+//  10. This Week To Watch
+//  11. Data Diagnostics
 export function generateReport(data: ReportData): string {
   const now = new Date();
-  const {
-    marketStory,
-    topOpportunities,
-    watchlistHighlights,
-    watchlist,
-    technicalAlerts,
-    status,
-    scanned,
-    qualified,
-    fearGreed,
-  } = data;
-
-  const rateLimitBanner = status.rateLimitHit
-    ? "> ⚠️ **הופעלה מגבלת ה-API במהלך הריצה.** חלק מהנתונים נטענו מהמטמון או מסומנים כלא זמינים.\n\n"
-    : "";
+  const { earningsCalendar, earningsCalendarStatus, marketCatalyst } = data;
 
   return `# 📈 דוח מניות למשקיע לטווח ארוך
 
 > **Generated:** ${fmtDateTime(now)}
-> **Coverage:** ${scanned} מניות נסרקו · ${qualified} עברו את סינון האיכות
-> **גישה:** פחות רעיונות, באיכות גבוהה יותר – חברות מבוססות עם יסודות חזקים.
-
-${rateLimitBanner}---
-
-${marketStorySection(marketStory)}
 
 ---
 
-${marketSentimentSection(fearGreed)}
+${earningsCalendarSection(earningsCalendar, earningsCalendarStatus)}
 
 ---
 
-${technicalAlertsSection(technicalAlerts)}
+${marketCatalystSection(marketCatalyst)}
 
 ---
 
-${topOpportunitiesSection(topOpportunities)}
+${marketStorySection(data.marketStory)}
 
 ---
 
-${watchlistHighlightsSection(watchlistHighlights)}
+${importantHeadlinesSection(data.additionalHeadlines)}
 
 ---
 
-## ⭐ Watchlist (all)
-
-_מעקב קבוע אחר כל מניות האיכות ברשימה (כולל איכות נתונים לכל אחת):_
-
-${watchlistTable(watchlist)}
+${marketOverviewSection(data.marketOverview)}
 
 ---
 
-## ⚠️ הערות חשובות
+${technicalWatchSection(data.technicalWatch, data.technicalAlerts.dataUnavailable)}
 
-- 🟢 **Live data:** ${status.liveCount} קריאות API טריות
-- 🟡 **Cached data:** ${status.cachedCount} ערכים מהמטמון המקומי
-- 🔴 **Missing data:** ${status.missingCount} ערכים לא זמינים
-- 🧪 **איכות נתונים (Data Quality):** מודד את שלמות הנתונים שנאספו בפועל – לא זמינות ה-API. ציון 0–100 לפי מחיר (30), פרופיל (20), שווי שוק (20), מחזור (15), חדשות (10) וטכני (5). נתון שלא נשלף עקב מגבלת API מסומן "Missing (Rate Limit)" ו**אינו** מפחית את הציון (מוסר מהחישוב). רק נתון שחסר באמת מפחית את הציון. תוויות: 🟢 High ≥80 · 🟡 Medium ≥60 · 🟠 Low ≥40 · 🔴 Excluded (חוסר נתונים קריטי אמיתי בלבד).
-- 🧹 **סינון:** מתחת ל-$10, שווי שוק מתחת ל-$2B, OTC, וורנטים, יחידות ושרידי SPAC הוסרו. תנועה יומית מעל 40% מותרת רק לחברות מעל $10B.
-- 🎯 **ניקוד:** 40% איכות החברה · 20% מומנטום · 20% מחזור · 20% איכות חדשות (עם קנס על הפסדים, מיקרו-קאפ ותנודתיות קיצונית).
-${status.rateLimitHit ? "- ⚠️ **API rate limit** הופעל בריצה זו\n" : ""}---
+---
+
+${earningsFollowUpSection(data.earningsFollowUp)}
+
+---
+
+${topOpportunitiesSection(data.topOpportunities, data.opportunityTheses)}
+
+---
+
+${dividendsSection(data.dividends)}
+
+---
+
+${weekAheadSection(data.weekAhead)}
+
+---
+
+${diagnosticsSection(data)}
+
+---
 
 ## Disclaimer
 
-**Research only. Not investment advice.**
-המידע בדוח זה הוא למטרות מחקר ולמידה בלבד ואינו מהווה ייעוץ השקעות, המלצה לקנייה או מכירה של ניירות ערך,
-או תחליף לייעוץ פיננסי מקצועי. מסחר במניות כרוך בסיכון לאובדן ההון – כל החלטה על אחריותך בלבד.
+**Research only. Not investment advice.** מסחר במניות כרוך בסיכון לאובדן ההון – כל החלטה על אחריותך בלבד.
 
 _Generated by stock-agent · ${now.toISOString()}_
+
+${fingerprintHtmlComment(data)}
 `;
 }
 
@@ -403,3 +390,6 @@ export function writeReport(content: string, outDir = "reports"): string {
   fs.writeFileSync(filePath, content, "utf8");
   return filePath;
 }
+
+// exported for reuse by htmlReportGenerator.ts and tests
+export { fmtNum, fmtChange, fmtPrice, fmtDateTime, dqBadge, displayName };

@@ -26,6 +26,47 @@ export const WATCHLIST: WatchlistEntry[] = [
 
 export const WATCHLIST_TICKERS = new Set(WATCHLIST.map((w) => w.ticker));
 
+// Mega-cap US companies that move the broad market – used only to decide
+// which non-watchlist names are worth surfacing in the earnings calendar.
+export const MEGA_CAP_PRIORITY: string[] = [
+  "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AVGO",
+  "JPM", "V", "UNH", "LLY",
+];
+
+// Display names for mega-cap tickers not already in WATCHLIST.
+export const MEGA_CAP_NAMES: Record<string, string> = {
+  AAPL: "Apple Inc.",
+  TSLA: "Tesla Inc.",
+  AVGO: "Broadcom Inc.",
+  JPM: "JPMorgan Chase & Co.",
+  V: "Visa Inc.",
+  UNH: "UnitedHealth Group",
+  LLY: "Eli Lilly and Company",
+};
+
+export function trackedCompanyName(ticker: string): string {
+  return watchlistName(ticker) ?? MEGA_CAP_NAMES[ticker.toUpperCase()] ?? ticker;
+}
+
+// Every ticker the newsletter's calendar-style sections (earnings calendar,
+// earnings follow-up) should always check – independent of whether the
+// ticker happened to pass today's movers/quality scan.
+export function trackedTickers(): Array<{ ticker: string; name: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ ticker: string; name: string }> = [];
+  for (const w of WATCHLIST) {
+    if (seen.has(w.ticker)) continue;
+    seen.add(w.ticker);
+    out.push({ ticker: w.ticker, name: w.name });
+  }
+  for (const t of MEGA_CAP_PRIORITY) {
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push({ ticker: t, name: trackedCompanyName(t) });
+  }
+  return out;
+}
+
 export function watchlistName(ticker: string): string | undefined {
   return WATCHLIST.find((w) => w.ticker === ticker.toUpperCase())?.name;
 }

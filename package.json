@@ -7,6 +7,9 @@
     "dev": "ts-node src/index.ts",
     "report": "ts-node src/index.ts",
     "email-report": "ts-node src/emailReport.ts",
+    "email:preview": "ts-node src/emailPreview.ts",
+    "perf:selftest": "ts-node src/performance/selftest.ts",
+    "content:selftest": "ts-node src/contentValidation.selftest.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

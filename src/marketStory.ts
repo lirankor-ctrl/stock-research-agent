@@ -1,3 +1,4 @@
+import { isPromotionalOrLegalNews, isSubstantiveNews } from "./newsFilter";
 import { EnrichedStock, MarketStory, NewsItem, ReportData } from "./types";
 import { watchlistName } from "./universe";
 
@@ -12,9 +13,7 @@ function parsePublished(raw: string): Date | null {
   const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/.exec(raw ?? "");
   if (!m) return null;
   const [, y, mo, d, h, mi, s] = m;
-  const date = new Date(
-    Date.UTC(+y, +mo - 1, +d, +h, +mi, +s)
-  );
+  const date = new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s));
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -51,6 +50,11 @@ const MIN_SCORE = 0.18;
 // invent anything – every field comes straight from the feed.
 function scoreNews(stock: EnrichedStock, item: NewsItem, now: number): ScoredNews | null {
   if (!item.title || !item.url) return null; // need a real headline + link
+  // Promotional / law-firm solicitation headlines carry ~zero investment
+  // value and are never material company developments – hard exclude rather
+  // than merely down-rank, so they can never win a story slot.
+  if (isPromotionalOrLegalNews(item)) return null;
+
   const date = parsePublished(item.publishedAt);
   if (!date) return null;
 
@@ -60,8 +64,12 @@ function scoreNews(stock: EnrichedStock, item: NewsItem, now: number): ScoredNew
   const relevance = item.relevanceScore ?? 0.3;
   const impact = Math.min(Math.abs(item.sentimentScore ?? 0), 1);
   const recency = Math.max(0, 1 - hoursAgo / (RECENT_DAYS * 24));
+  // Small, deliberate boost for substantive categories (earnings, guidance,
+  // product news, regulation, M&A, leadership, analyst calls) so they win
+  // ties against generic market-noise headlines – never a hard requirement.
+  const substantiveBoost = isSubstantiveNews(item) ? 0.1 : 0;
 
-  const score = relevance * 0.4 + impact * 0.35 + recency * 0.25;
+  const score = relevance * 0.4 + impact * 0.35 + recency * 0.25 + substantiveBoost;
   return { stock, item, date, score };
 }
 
@@ -109,12 +117,29 @@ function buildWhyMattersHebrew(s: ScoredNews): string {
   return base ? `${base} ${newsAngle}` : newsAngle;
 }
 
-// ===== public API =====
+function toMarketStory(s: ScoredNews): MarketStory {
+  return {
+    ticker: s.stock.ticker,
+    companyName: displayName(s.stock),
+    headline: s.item.title,
+    url: s.item.url,
+    source: s.item.source,
+    publishedAt: s.item.publishedAt,
+    publishedDisplay: fmtPublished(s.date),
+    sentimentLabel: s.item.sentimentLabel,
+    summaryHebrew: buildSummaryHebrew(s),
+    whyMattersHebrew: buildWhyMattersHebrew(s),
+    originalSummary: s.item.summary,
+    priceMove: s.stock.price > 0 ? { price: s.stock.price, changePercent: s.stock.changePercent } : undefined,
+    // No safe/licensed logo source is wired in, so renderers use the ticker
+    // placeholder. Leave undefined rather than hotlink a copyrighted image.
+    logoUrl: undefined,
+  };
+}
 
-// Pick the single most meaningful recent news story across the report's stocks
-// (Top Opportunities, Watchlist Highlights, technical-alert names, full
-// Watchlist). Returns null when nothing recent/meaningful is available.
-export function selectMarketStory(data: ReportData, nowMs: number): MarketStory | null {
+// Every candidate item across the report's stocks, scored and sorted
+// (best first), deduped by ticker so one company can't occupy every slot.
+function scoreAllCandidates(data: ReportData, nowMs: number): ScoredNews[] {
   const techTickers = new Set([
     ...data.technicalAlerts.aboveUpper.map((a) => a.ticker),
     ...data.technicalAlerts.belowLower.map((a) => a.ticker),
@@ -122,41 +147,47 @@ export function selectMarketStory(data: ReportData, nowMs: number): MarketStory 
 
   const pool = dedupe([
     ...data.topOpportunities,
-    ...data.watchlistHighlights,
     ...data.core,
     ...data.growth,
     ...data.speculative,
-    // Watchlist last so highlights/opportunities win ties on first-seen.
     ...data.watchlist,
   ]).filter((s) => s.news.length > 0 || techTickers.has(s.ticker));
 
-  let best: ScoredNews | null = null;
+  const bestPerStock: ScoredNews[] = [];
   for (const stock of pool) {
+    let best: ScoredNews | null = null;
     for (const item of stock.news) {
       const scored = scoreNews(stock, item, nowMs);
       if (scored && (!best || scored.score > best.score)) best = scored;
     }
+    if (best && best.score >= MIN_SCORE) bestPerStock.push(best);
   }
 
-  if (!best || best.score < MIN_SCORE) return null;
+  bestPerStock.sort((a, b) => b.score - a.score);
+  return bestPerStock;
+}
 
-  return {
-    ticker: best.stock.ticker,
-    companyName: displayName(best.stock),
-    headline: best.item.title,
-    url: best.item.url,
-    source: best.item.source,
-    publishedAt: best.item.publishedAt,
-    publishedDisplay: fmtPublished(best.date),
-    sentimentLabel: best.item.sentimentLabel,
-    summaryHebrew: buildSummaryHebrew(best),
-    whyMattersHebrew: buildWhyMattersHebrew(best),
-    originalSummary: best.item.summary,
-    priceMove: best.stock.price > 0
-      ? { price: best.stock.price, changePercent: best.stock.changePercent }
-      : undefined,
-    // No safe/licensed logo source is wired in, so renderers use the ticker
-    // placeholder. Leave undefined rather than hotlink a copyrighted image.
-    logoUrl: undefined,
-  };
+// ===== public API =====
+
+// Pick the single most meaningful recent news story across the report's
+// stocks. Returns null when nothing recent/meaningful is available.
+export function selectMarketStory(data: ReportData, nowMs: number): MarketStory | null {
+  const candidates = scoreAllCandidates(data, nowMs);
+  return candidates.length > 0 ? toMarketStory(candidates[0]) : null;
+}
+
+// Up to `count` more relevant, distinct-ticker headlines beyond the hero
+// story – short items for the "Market Story + N additional headlines" slot.
+export function selectAdditionalHeadlines(
+  data: ReportData,
+  nowMs: number,
+  count = 2
+): MarketStory[] {
+  const candidates = scoreAllCandidates(data, nowMs);
+  if (candidates.length === 0) return [];
+  const [hero, ...rest] = candidates;
+  return rest
+    .filter((c) => c.stock.ticker !== hero.stock.ticker)
+    .slice(0, count)
+    .map(toMarketStory);
 }

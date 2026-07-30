@@ -1,5 +1,4 @@
-import { sleep } from "./alphaVantage";
-import { getDailyCloses } from "./dataSources";
+import { getYahooDailyCloses } from "./dataSources";
 import { computeTechnicals } from "./technicals";
 import { watchlistName } from "./universe";
 import {
@@ -9,15 +8,11 @@ import {
   TechnicalAlert,
   TechnicalAlerts,
 } from "./types";
-import { LiveBudget } from "./enricher";
 
 // How many names to surface in each fallback / expansion list.
 const TOP_N = 3;
 
 export interface TechnicalOptions {
-  apiKey: string;
-  budget: LiveBudget;
-  delayMs: number;
   onProgress?: (msg: string) => void;
 }
 
@@ -37,59 +32,50 @@ function dedupeByTicker(stocks: EnrichedStock[]): EnrichedStock[] {
   return out;
 }
 
+export interface TechnicalRecord {
+  ticker: string;
+  name: string;
+  price: number;
+  upper: number;
+  lower: number;
+  rsi14: number;
+  widthChangePct: number | null;
+}
+
 export interface TechnicalResult {
   alerts: TechnicalAlerts;
   available: Set<string>;   // tickers for which Bollinger/RSI were computable
-  rateLimited: Set<string>; // tickers whose daily-closes couldn't be fetched (budget/API)
+  rateLimited: Set<string>; // tickers whose daily-closes couldn't be fetched
+  byTicker: Map<string, TechnicalRecord>; // for the compact Technical Watch table
 }
 
-// Fetch daily closes (cache-first, budget-aware) for every watchlist + report
-// stock, compute Bollinger Bands + RSI, and split into above-upper / below-lower
-// alerts. Never throws – stocks without enough history are simply skipped.
-// Also reports which tickers yielded usable technical data (for data quality).
+// Fetch daily closes from Yahoo Finance (cache-first, independent of Alpha
+// Vantage – Priority 3: RSI/Bollinger Bands are always computed LOCALLY from
+// this raw price history, never requested from Alpha Vantage), compute
+// Bollinger Bands + RSI, and split into above-upper / below-lower alerts.
+// Never throws – stocks without enough history are simply skipped.
 export async function buildTechnicalAlerts(
   stocks: EnrichedStock[],
-  opts: TechnicalOptions
+  opts: TechnicalOptions = {}
 ): Promise<TechnicalResult> {
-  const { apiKey, budget, delayMs, onProgress = () => {} } = opts;
+  const { onProgress = () => {} } = opts;
   const candidates = dedupeByTicker(stocks);
 
   const aboveUpper: TechnicalAlert[] = [];
   const belowLower: TechnicalAlert[] = [];
   const available = new Set<string>();
   const rateLimited = new Set<string>();
-
-  // Every computable stock, retained so we can build the proximity / expansion
-  // fallbacks after the breach alerts.
-  interface Record {
-    ticker: string;
-    name: string;
-    price: number;
-    upper: number;
-    lower: number;
-    rsi14: number;
-    widthChangePct: number | null;
-  }
-  const records: Record[] = [];
+  const byTicker = new Map<string, TechnicalRecord>();
+  const records: TechnicalRecord[] = [];
 
   for (let i = 0; i < candidates.length; i++) {
     const s = candidates[i];
     onProgress(`  [${i + 1}/${candidates.length}] technicals ${s.ticker} ...`);
 
-    const res = await getDailyCloses(
-      s.ticker,
-      apiKey,
-      (m) => onProgress(`     ${m}`),
-      budget.allow
-    );
-    budget.note(res.source);
-    if (res.source.source === "live" && i < candidates.length - 1) {
-      await sleep(delayMs);
-    }
+    const res = await getYahooDailyCloses(s.ticker, (m) => onProgress(`     ${m}`));
 
     const closes = res.value;
     if (!closes) {
-      // Distinguish "couldn't fetch" (rate limit) from "no data at all".
       if (res.source.source === "unavailable") rateLimited.add(s.ticker);
       continue;
     }
@@ -100,7 +86,7 @@ export async function buildTechnicalAlerts(
     available.add(s.ticker);
     const name = displayName(s);
 
-    records.push({
+    const record: TechnicalRecord = {
       ticker: s.ticker,
       name,
       price: tech.price,
@@ -108,7 +94,9 @@ export async function buildTechnicalAlerts(
       lower: tech.bands.lower,
       rsi14: tech.rsi14,
       widthChangePct: tech.widthChangePct,
-    });
+    };
+    records.push(record);
+    byTicker.set(s.ticker, record);
 
     if (tech.price > tech.bands.upper) {
       aboveUpper.push({
@@ -173,9 +161,9 @@ export async function buildTechnicalAlerts(
     .sort((a, b) => b.widthChangePct - a.widthChangePct)
     .slice(0, TOP_N);
 
-  // No usable daily data at all AND we were blocked by the budget/API → the
-  // section should say so clearly rather than render empty tables. If cache
-  // supplied closes, `records` is non-empty and this stays false.
+  // No usable daily data at all AND we were blocked → the section should say
+  // so clearly rather than render empty tables. If cache supplied closes,
+  // `records` is non-empty and this stays false.
   const dataUnavailable = records.length === 0 && rateLimited.size > 0;
 
   return {
@@ -189,5 +177,18 @@ export async function buildTechnicalAlerts(
     },
     available,
     rateLimited,
+    byTicker,
   };
+}
+
+// Short Hebrew "technical status" label for a single ticker – used by the Top
+// Opportunities cards and the compact Technical Watch table. Reuses the
+// already-computed alerts rather than issuing new fetches.
+export function technicalStatusHebrew(ticker: string, alerts: TechnicalAlerts): string {
+  if (alerts.aboveUpper.some((a) => a.ticker === ticker)) return "🔴 מעל הרצועה העליונה";
+  if (alerts.belowLower.some((a) => a.ticker === ticker)) return "🟢 מתחת לרצועה התחתונה";
+  if (alerts.closestToUpper.some((a) => a.ticker === ticker)) return "🔥 קרוב לרצועה העליונה";
+  if (alerts.closestToLower.some((a) => a.ticker === ticker)) return "🟡 קרוב לרצועה התחתונה";
+  if (alerts.dataUnavailable) return "— לא זמין";
+  return "⚪ ניטרלי";
 }

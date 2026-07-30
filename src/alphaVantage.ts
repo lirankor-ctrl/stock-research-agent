@@ -62,6 +62,11 @@ export async function fetchCompanyOverview(
       ? Number(raw)
       : undefined;
 
+  const str = (raw: any): string | undefined =>
+    raw !== undefined && raw !== null && raw !== "None" && raw !== ""
+      ? String(raw)
+      : undefined;
+
   return {
     symbol: data.Symbol,
     name: data.Name,
@@ -74,6 +79,10 @@ export async function fetchCompanyOverview(
     peRatio: num(data.PERatio),
     eps: num(data.EPS),
     profitMargin: num(data.ProfitMargin),
+    dividendPerShare: num(data.DividendPerShare),
+    dividendYield: num(data.DividendYield),
+    exDividendDate: str(data.ExDividendDate),
+    dividendDate: str(data.DividendDate),
   };
 }
 
@@ -111,34 +120,6 @@ export async function fetchQuote(
     changePercent: Number.isNaN(changePercent) ? 0 : changePercent,
     volume: Number.isNaN(volume) ? 0 : volume,
   };
-}
-
-// Last ~100 daily closes (chronological, oldest first) for a ticker. One API
-// call returns enough history for 20-day Bollinger Bands and RSI(14).
-export async function fetchDailyCloses(
-  symbol: string,
-  apiKey: string
-): Promise<number[] | null> {
-  const { data } = await axios.get(BASE_URL, {
-    params: {
-      function: "TIME_SERIES_DAILY",
-      symbol,
-      outputsize: "compact",
-      apikey: apiKey,
-    },
-    timeout: 15000,
-  });
-  checkApiError(data, `TIME_SERIES_DAILY ${symbol}`);
-
-  const series = data?.["Time Series (Daily)"];
-  if (!series || typeof series !== "object") return null;
-
-  const closes = Object.keys(series)
-    .sort() // ISO dates sort chronologically (oldest -> newest)
-    .map((date) => parseFloat(series[date]?.["4. close"]))
-    .filter((n) => !Number.isNaN(n));
-
-  return closes.length > 0 ? closes : null;
 }
 
 export async function fetchNewsForTicker(
@@ -183,6 +164,43 @@ export async function fetchNewsForTicker(
 
   items.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
   return items.slice(0, limit);
+}
+
+// ===== Economic indicators (latest released reading) =====
+// Note: TREASURY_YIELD is intentionally NOT here – Yahoo Finance's ^TNX
+// (see marketData.ts) gives the real 10-year yield without competing for
+// Alpha Vantage's daily quota, so Market Overview uses that instead.
+
+export type EconomicIndicatorFn = "CPI" | "UNEMPLOYMENT" | "REAL_GDP" | "FEDERAL_FUNDS_RATE";
+
+export interface EconomicIndicatorPoint {
+  date: string;
+  value: number;
+}
+
+export async function fetchEconomicIndicator(
+  fn: EconomicIndicatorFn,
+  apiKey: string
+): Promise<EconomicIndicatorPoint | null> {
+  const params: Record<string, string> = { function: fn, apikey: apiKey };
+  if (fn === "CPI" || fn === "FEDERAL_FUNDS_RATE") {
+    params.interval = "monthly";
+  } else if (fn === "REAL_GDP") {
+    params.interval = "quarterly";
+  }
+
+  const { data } = await axios.get(BASE_URL, {
+    params,
+    timeout: 15000,
+  });
+  checkApiError(data, fn);
+
+  const series: any[] = Array.isArray(data?.data) ? data.data : [];
+  if (series.length === 0) return null;
+  const latest = series[0]; // Alpha Vantage returns newest-first
+  const value = parseFloat(latest?.value);
+  if (!latest?.date || Number.isNaN(value)) return null;
+  return { date: latest.date, value };
 }
 
 export function sleep(ms: number): Promise<void> {

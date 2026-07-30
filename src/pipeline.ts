@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { categorize } from "./categorizer";
-import { computeDataQuality, meetsRecommendationThreshold } from "./dataQuality";
+import { computeDataQuality, dataQualityDebugSummary, meetsRecommendationThreshold } from "./dataQuality";
 import { getTopMovers } from "./dataSources";
 import {
   buildSkeletonEnriched,
@@ -10,23 +10,50 @@ import {
   LiveBudget,
   REQUEST_DELAY_MS,
 } from "./enricher";
+import { buildEarningsCalendar } from "./earningsCalendar";
+import { buildEarningsFollowUp } from "./earningsFollowUp";
+import { buildDividendInfo } from "./dividends";
+import { buildEconomicReadings } from "./economicIndicators";
 import { getFearGreed } from "./fearGreed";
 import { generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
-import { selectMarketStory } from "./marketStory";
+import { selectMarketCatalyst } from "./marketCatalyst";
+import { buildMarketOverview } from "./marketOverview";
+import { selectAdditionalHeadlines, selectMarketStory } from "./marketStory";
+import { buildOpportunityThesis } from "./opportunityThesis";
 import { preRank } from "./ranker";
 import { generateReport, writeReport } from "./reportGenerator";
 import { buildTechnicalAlerts } from "./technicalAlerts";
-import { WATCHLIST } from "./universe";
+import { technicalStatusHebrew } from "./technicalAlerts";
+import { WATCHLIST, watchlistName } from "./universe";
+import { buildWeekAhead } from "./weekAhead";
 import {
+  DimensionStatus,
   EnrichedStock,
   FearGreed,
   MarketStory,
+  OpportunityThesis,
   ReportData,
   RunStatus,
   SourceInfo,
   Stock,
   TechnicalAlerts,
+  TechnicalWatchItem,
 } from "./types";
+import { computeConfidence, computeRunDataQuality } from "./performance/tracker";
+import { runTracking } from "./performance/run";
+import { RecAction, RecInput, Metrics } from "./performance/types";
+import { buildLatestJson, OpportunityWithRec, writeLatestJson } from "./latestJson";
+
+// Long-term evaluation horizon for realized-return tracking.
+const RECOMMENDATION_HORIZON_DAYS = Number(
+  process.env.STOCK_AGENT_HORIZON_DAYS ?? 90
+);
+
+function actionForScore(score: number): RecAction {
+  if (score >= 8) return "accumulate";
+  if (score >= 6.5) return "watch";
+  return "avoid";
+}
 
 const LIVE_BUDGET = Number(process.env.STOCK_AGENT_LIVE_BUDGET ?? DEFAULT_LIVE_BUDGET);
 const ENRICH_DELAY_MS = Number(process.env.STOCK_AGENT_DELAY_MS ?? REQUEST_DELAY_MS);
@@ -36,6 +63,7 @@ const MAX_MOVERS = Number(process.env.STOCK_AGENT_MAX_MOVERS ?? 8);
 export interface ReportResult {
   mdPath: string;
   htmlPath: string;
+  metrics: Metrics;
   status: RunStatus;
   core: EnrichedStock[];
   growth: EnrichedStock[];
@@ -45,6 +73,14 @@ export interface ReportResult {
   fearGreed: FearGreed | null;
   marketStory: MarketStory | null;
   hasData: boolean;
+  // The exact same normalized view model used to render the HTML/Markdown
+  // attachments – the email renderers MUST build from this object (never a
+  // hand-picked subset of it) so attachments and email can never diverge.
+  data: ReportData;
+  // The attachment content as actually written to disk this run, so
+  // consistency validation compares against the real bytes, not a re-read.
+  htmlContent: string;
+  mdContent: string;
 }
 
 export interface RunOptions {
@@ -85,8 +121,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
 
   const budget = new LiveBudget(LIVE_BUDGET);
 
-  // ===== Phase 1: Movers (universe of qualifying movers) =====
-  log("📡 [1/4] Loading market movers (cache-first)...");
+  // ===== Phase 1: Movers (universe of qualifying movers) – Alpha Vantage =====
+  log("📡 [1/5] Loading market movers (cache-first)...");
   const moversRes = await getTopMovers(apiKey, (m) => {
     log(`   ${m}`);
     if (m.toLowerCase().includes("rate limit")) status.rateLimitHit = true;
@@ -107,8 +143,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     : [];
   log(`   movers scanned: ${scanned} · top candidates to consider: ${moverCandidates.length}`);
 
-  // ===== Phase 2: Watchlist quotes (priority – always shown) =====
-  log(`💧 [2/4] Fetching watchlist quotes (${WATCHLIST.length} names)...`);
+  // ===== Phase 2: Watchlist quotes (priority – always shown) – Alpha Vantage =====
+  log(`💧 [2/5] Fetching watchlist quotes (${WATCHLIST.length} names)...`);
   const wlQuotes = await buildWatchlistStocks({
     apiKey,
     budget,
@@ -122,8 +158,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   status.cachedCount += wlQuotes.tally.cached;
   status.missingCount += wlQuotes.tally.unavailable;
 
-  // ===== Phase 3: Enrich watchlist + top movers (profile + news) =====
-  log(`🔬 [3/4] Enriching watchlist & movers (live-call budget: ${budget.remaining})...`);
+  // ===== Phase 3: Enrich watchlist + top movers (profile + news) – Alpha Vantage =====
+  log(`🔬 [3/5] Enriching watchlist & movers (live-call budget: ${budget.remaining})...`);
 
   const wlEnriched = await enrichStocks(wlQuotes.stocks, {
     apiKey,
@@ -157,8 +193,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     (s) => wlByTicker.get(s.ticker) ?? buildSkeletonEnriched(s)
   );
 
-  // ===== Phase 4: Categorize & report =====
-  // Universe for Core/Growth/Speculative = qualifying watchlist names + movers.
+  // ===== Phase 4: Categorize, technicals (Yahoo, local calc), data quality =====
   const universe = [...wlEnriched.stocks, ...moversEnriched.stocks];
   const cats = categorize(universe);
   const qualified = universe.length;
@@ -166,7 +201,6 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   status.enriched =
     universe.length === 0 ? { source: "unavailable" } : { source: "live" };
 
-  // Market sentiment (CNN Fear & Greed) – cache-first, independent of Alpha Vantage.
   log("🌎 Fetching CNN Fear & Greed Index (cache-first)...");
   const fearGreed = await getFearGreed((m) => {
     log(`   ${m}`);
@@ -178,16 +212,156 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
       : "   Fear & Greed: unavailable"
   );
 
-  // Technical alerts (Bollinger Bands + RSI) for watchlist + every stock that
-  // made it into the report. Cache-first and budget-aware like the rest.
-  log("📊 Computing technical alerts (Bollinger Bands + RSI)...");
-  const technicalUniverse = [
-    ...watchlist,
-    ...cats.core,
-    ...cats.growth,
-    ...cats.speculative,
-  ];
+  // Bollinger Bands + RSI, computed LOCALLY from Yahoo Finance daily closes –
+  // independent of Alpha Vantage, never touches the AV daily-call budget.
+  log("📊 [4/5] Computing technicals locally (Yahoo daily closes → RSI/Bollinger)...");
+  const technicalUniverse = [...watchlist, ...cats.core, ...cats.growth, ...cats.speculative];
   const techResult = await buildTechnicalAlerts(technicalUniverse, {
+    onProgress: (m) => log(m),
+  });
+  const technicalAlerts = techResult.alerts;
+  log(
+    `   alerts: ${technicalAlerts.aboveUpper.length} above upper band · ${technicalAlerts.belowLower.length} below lower band · ${techResult.available.size}/${technicalUniverse.length} computed`
+  );
+
+  log("🧪 Scoring data quality (coverage + confidence)...");
+  const technicalStatus = (ticker: string): DimensionStatus =>
+    techResult.available.has(ticker)
+      ? "available"
+      : techResult.rateLimited.has(ticker)
+      ? "rateLimited"
+      : "genuinelyMissing";
+  for (const s of [...watchlist, ...universe]) {
+    s.dataQuality = computeDataQuality(s, technicalStatus(s.ticker));
+  }
+  log("   data-quality debug (watchlist):");
+  for (const s of watchlist) {
+    if (!s.dataQuality) continue;
+    log(
+      `     ${s.ticker.padEnd(6)} coverage=${s.dataQuality.coverageScore.toString().padStart(3)} ` +
+        `confidence=${s.dataQuality.confidenceScore.toString().padStart(3)} ` +
+        `label=${s.dataQuality.label.padEnd(8)} excluded=${s.dataQuality.excluded} ` +
+        `[${dataQualityDebugSummary(s.dataQuality)}]`
+    );
+  }
+
+  // Top opportunities: ranked across tiers, only stocks that clear the quality
+  // threshold (no Excluded / Low), capped at 3 – quality over quantity.
+  const topOpportunities = [...cats.core, ...cats.growth, ...cats.speculative]
+    .filter((s) => s.price > 0 && meetsRecommendationThreshold(s.dataQuality))
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, 3);
+  log(`   top opportunities: ${topOpportunities.length}/3`);
+
+  // Technical Watch – one compact row per tracked watchlist stock.
+  const technicalWatch: TechnicalWatchItem[] = watchlist.map((s) => {
+    const rec = techResult.byTicker.get(s.ticker);
+    return {
+      ticker: s.ticker,
+      name: s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker,
+      price: s.price,
+      changePercent: s.changePercent,
+      rsi14: rec?.rsi14 ?? null,
+      statusHebrew: technicalStatusHebrew(s.ticker, technicalAlerts),
+    };
+  });
+
+  // ===== Performance tracking: record recs, mark/close prior ones, self-eval =====
+  log("📒 Performance tracking (record → evaluate → calibrate)...");
+  const generatedAt = new Date().toISOString();
+  const { score: runDataQuality, freshness } = computeRunDataQuality(
+    status.liveCount,
+    status.cachedCount,
+    status.missingCount
+  );
+
+  const oppsWithRec: OpportunityWithRec[] = topOpportunities.map((s) => ({
+    stock: s,
+    action: actionForScore(s.finalScore),
+    confidence: computeConfidence(
+      s.finalScore,
+      s.dataQuality?.confidenceScore ?? 0,
+      runDataQuality
+    ),
+    horizonDays: RECOMMENDATION_HORIZON_DAYS,
+  }));
+
+  const recs: RecInput[] = oppsWithRec.map(({ stock, action, confidence, horizonDays }) => ({
+    symbol: stock.ticker,
+    name: stock.profile?.name,
+    score: stock.finalScore,
+    confidence,
+    entryPrice: stock.price,
+    dataQuality: stock.dataQuality?.coverageScore ?? 0,
+    action,
+    horizonDays,
+    sector: stock.profile?.industry || stock.profile?.sector,
+    marketCap: stock.profile?.marketCap,
+  }));
+
+  const prices: Record<string, number> = {};
+  for (const s of [...watchlist, ...universe]) {
+    if (s.price > 0) prices[s.ticker] = s.price;
+  }
+
+  const { metrics } = runTracking({
+    reportsDir: "reports",
+    market: "US",
+    nowIso: generatedAt,
+    recs,
+    prices,
+    runDataQuality,
+    freshness,
+  });
+  log(
+    `   run data-quality: ${metrics.runDataQuality}/100 (${metrics.freshness}) · ` +
+      `open: ${metrics.openCount} · closed: ${metrics.closedCount} · ` +
+      `win-rate: ${metrics.winRate === null ? "n/a (building baseline)" : (metrics.winRate * 100).toFixed(0) + "%"}`
+  );
+
+  // ===== Phase 5: Newsletter sections – earnings calendar (Nasdaq), market
+  // overview (Yahoo), week ahead. Both new providers are independent of
+  // Alpha Vantage and never touch its daily-call budget. =====
+  log("🗓️  [5/5] Building newsletter sections (Nasdaq earnings calendar, Yahoo market data)...");
+  const newsletterNow = new Date();
+
+  const enrichedByTicker = new Map<string, { sector?: string; industry?: string }>();
+  for (const s of [...watchlist, ...topOpportunities]) {
+    if (!enrichedByTicker.has(s.ticker)) {
+      enrichedByTicker.set(s.ticker, {
+        sector: s.profile?.sector,
+        industry: s.profile?.industry,
+      });
+    }
+  }
+
+  const earningsCalendarRes = await buildEarningsCalendar({
+    now: newsletterNow,
+    enrichedByTicker,
+    onProgress: (m) => log(m),
+  });
+  const earningsCalendar = earningsCalendarRes.entries;
+  log(
+    `   earnings calendar (next 14d): ${earningsCalendarRes.status} · ${earningsCalendar.length} companies`
+  );
+
+  const marketCatalyst = selectMarketCatalyst(earningsCalendarRes);
+  log(
+    `   market catalyst: ${marketCatalyst.status}${marketCatalyst.catalyst ? ` – ${marketCatalyst.catalyst.headline} (${marketCatalyst.catalyst.timingHebrew})` : ""}`
+  );
+
+  const earningsFollowUp = await buildEarningsFollowUp({
+    now: newsletterNow,
+    onProgress: (m) => log(m),
+  });
+  log(
+    `   earnings follow-up (last 7d): ${earningsFollowUp.status} · ${earningsFollowUp.entries.length} companies`
+  );
+
+  const dividends = buildDividendInfo([...watchlist, ...topOpportunities]);
+  log(`   dividend info: ${dividends.length} dividend-paying names`);
+
+  const economicReadings = await buildEconomicReadings({
     apiKey,
     budget,
     delayMs: ENRICH_DELAY_MS,
@@ -196,76 +370,85 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
       if (m.toLowerCase().includes("rate limit")) status.rateLimitHit = true;
     },
   });
-  const technicalAlerts = techResult.alerts;
+
+  const marketOverview = await buildMarketOverview({
+    fearGreed,
+    onProgress: (m) => log(m),
+  });
   log(
-    `   alerts: ${technicalAlerts.aboveUpper.length} above upper band · ${technicalAlerts.belowLower.length} below lower band`
+    `   market overview: ${marketOverview.filter((i) => i.value !== null).length}/${marketOverview.length} indicators with a value`
   );
 
-  // ===== Data quality: score every stock now that all data has been gathered =====
-  // Data Quality measures genuine data completeness, NOT API availability:
-  // a dimension we couldn't fetch (rate limit) is reported separately and does
-  // not lower the score.
-  log("🧪 Scoring data quality (price/volume/cap/profile/news/technical)...");
-  const technicalStatus = (ticker: string) =>
-    techResult.available.has(ticker)
-      ? "available"
-      : techResult.rateLimited.has(ticker)
-      ? "rateLimited"
-      : "missing";
-  for (const s of [...watchlist, ...universe]) {
-    s.dataQuality = computeDataQuality(s, technicalStatus(s.ticker));
+  const weekAhead = buildWeekAhead(earningsCalendarRes, economicReadings);
+
+  // Structured, non-generic thesis per Top Opportunity (Priority 5) – every
+  // field is built from that stock's own real numbers.
+  const opportunityTheses = new Map<string, OpportunityThesis>();
+  for (const s of topOpportunities) {
+    opportunityTheses.set(s.ticker, buildOpportunityThesis(s, earningsCalendar));
   }
 
-  // Top opportunities: ranked across tiers, only stocks that clear the quality
-  // threshold (no Excluded / Low), capped at 3 – quality over quantity.
-  // A displayable price is required (can't recommend without one).
-  const topOpportunities = [...cats.core, ...cats.growth, ...cats.speculative]
-    .filter((s) => s.price > 0 && meetsRecommendationThreshold(s.dataQuality))
-    .sort((a, b) => b.finalScore - a.finalScore)
-    .slice(0, 3);
-
-  // Watchlist highlights: best non-excluded watchlist names with a price, capped at 5.
-  const watchlistHighlights = [...watchlist]
-    .filter((s) => s.price > 0 && s.dataQuality && !s.dataQuality.excluded)
-    .sort((a, b) => b.finalScore - a.finalScore)
-    .slice(0, 5);
-
-  log(
-    `   recommendations: ${topOpportunities.length} top opportunities · ${watchlistHighlights.length} watchlist highlights`
-  );
-
-  log("📝 [4/4] Generating Hebrew reports (Markdown + HTML)...");
+  log("📝 Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
     marketStory: null, // filled in below, once the report stocks are known
+    additionalHeadlines: [],
     core: cats.core,
     growth: cats.growth,
     speculative: cats.speculative,
     topOpportunities,
-    watchlistHighlights,
+    opportunityTheses,
     watchlist,
+    technicalWatch,
     technicalAlerts,
     status,
     scanned,
     qualified,
     fearGreed,
+    earningsCalendar,
+    earningsCalendarStatus: earningsCalendarRes.status,
+    marketCatalyst,
+    marketOverview,
+    earningsFollowUp,
+    dividends,
+    weekAhead,
   };
 
-  // 📰 Market Story of the Day – the single most meaningful recent news item.
+  // 📰 Market Story of the Day + up to 2 additional relevant headlines.
   data.marketStory = selectMarketStory(data, Date.now());
+  data.additionalHeadlines = selectAdditionalHeadlines(data, Date.now(), 2);
   log(
     data.marketStory
-      ? `   market story: ${data.marketStory.ticker} – "${data.marketStory.headline}"`
+      ? `   market story: ${data.marketStory.ticker} – "${data.marketStory.headline}" (+${data.additionalHeadlines.length} more headlines)`
       : "   market story: none meaningful today"
   );
 
-  const mdPath = writeReport(generateReport(data));
-  const htmlPath = writeHtmlReport(generateHtmlReport(data));
+  const mdContent = generateReport(data);
+  const htmlContent = generateHtmlReport(data);
+  const mdPath = writeReport(mdContent);
+  const htmlPath = writeHtmlReport(htmlContent);
+
+  // Machine-readable contract for the Investment Committee (preferred over MD).
+  const latestJsonPath = writeLatestJson(
+    buildLatestJson({
+      generatedAt,
+      status,
+      opportunities: oppsWithRec,
+      watchlist,
+      metrics,
+      earningsCalendar,
+      earningsCalendarStatus: earningsCalendarRes.status,
+      marketCatalyst,
+      marketOverview,
+    })
+  );
   log(`✅ Markdown report: ${mdPath}`);
   log(`✅ HTML report:     ${htmlPath}`);
+  log(`✅ latest.json:     ${latestJsonPath}`);
 
   return {
     mdPath,
     htmlPath,
+    metrics,
     status,
     core: cats.core,
     growth: cats.growth,
@@ -275,5 +458,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     fearGreed,
     marketStory: data.marketStory,
     hasData: universe.length > 0 || watchlist.some((s) => s.price > 0),
+    data,
+    htmlContent,
+    mdContent,
   };
 }

@@ -6,6 +6,15 @@ on:
     # GitHub may delay scheduled runs by several minutes during high load.
     - cron: '10 12 * * 1-5'
   workflow_dispatch:
+    inputs:
+      test_recipient:
+        description: >-
+          One-off override: send ONLY to this address (BCC disabled for the
+          run) instead of the configured EMAIL_TO/EMAIL_BCC secrets. Leave
+          empty for the normal recipient list. Never persisted — scheduled
+          runs and dispatch runs without this input are unaffected.
+        required: false
+        type: string
 
 jobs:
   email-report:
@@ -32,8 +41,8 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          EMAIL_BCC: ${{ secrets.EMAIL_BCC }}
+          EMAIL_TO: ${{ github.event.inputs.test_recipient || secrets.EMAIL_TO }}
+          EMAIL_BCC: ${{ github.event.inputs.test_recipient && '' || secrets.EMAIL_BCC }}
         run: npm run email-report
 
       - name: Upload report artifacts

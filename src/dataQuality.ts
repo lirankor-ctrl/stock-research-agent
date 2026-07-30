@@ -18,7 +18,7 @@ const WEIGHTS = {
 };
 
 type Dim = keyof DataQualityStatuses;
-const DIMS: Dim[] = ["price", "volume", "marketCap", "profile", "news", "technical"];
+export const DIMS: Dim[] = ["price", "volume", "marketCap", "profile", "news", "technical"];
 
 // A stock is recommendable only when its quality clears this label.
 const RECOMMEND_LABELS: ReadonlySet<DataQualityLabel> = new Set<DataQualityLabel>([
@@ -36,9 +36,8 @@ const DIM_HEBREW: Record<Dim, string> = {
   technical: "נתונים טכניים (Bollinger/RSI)",
 };
 
-// We couldn't even reach the data when the source is missing/unavailable.
-function unreachable(src?: SourceInfo): boolean {
-  return !src || src.source === "unavailable";
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
 }
 
 function hasProfileIdentity(s: EnrichedStock): boolean {
@@ -46,26 +45,40 @@ function hasProfileIdentity(s: EnrichedStock): boolean {
   return !!(p && (p.name || p.sector || p.industry));
 }
 
-// Classify every dimension as available / genuinely missing / rate-limited.
-// `technicalStatus` is decided by the pipeline (did the daily-closes fetch
-// succeed, fail to compute, or get skipped by the budget?).
+// Classify a single dimension using (a) whether we actually have a usable
+// value and (b) the SourceInfo that produced it (or its absence).
+//
+//   hasValue=true,  source=live      -> "available"
+//   hasValue=true,  source=cached    -> "cached"        (counts same as available for coverage)
+//   hasValue=false, source=undefined -> "notRequested"   (never attempted)
+//   hasValue=false, source=unavailable -> "rateLimited"  (attempted, nothing usable)
+//   hasValue=false, source=live/cached -> "genuinelyMissing" (we reached the
+//                                          source and it confirmed absence)
+function classifyDimension(hasValue: boolean, source: SourceInfo | undefined): DimensionStatus {
+  if (hasValue) {
+    return source?.source === "live" ? "available" : "cached";
+  }
+  if (!source) return "notRequested";
+  if (source.source === "unavailable") return "rateLimited";
+  return "genuinelyMissing";
+}
+
+// Classify every dimension. `technicalStatus` is decided by the pipeline (did
+// the local Bollinger/RSI computation succeed, fail, get rate-limited, or was
+// it never attempted?).
 function computeStatuses(
   s: EnrichedStock,
   technicalStatus: DimensionStatus
 ): DataQualityStatuses {
-  const profileUnreachable = s.profileSource.source === "unavailable";
-
   return {
-    price: s.price > 0 ? "available" : unreachable(s.quoteSource) ? "rateLimited" : "missing",
-    volume: s.volume > 0 ? "available" : unreachable(s.quoteSource) ? "rateLimited" : "missing",
-    profile: hasProfileIdentity(s) ? "available" : profileUnreachable ? "rateLimited" : "missing",
-    marketCap:
-      s.profile?.marketCap && s.profile.marketCap > 0
-        ? "available"
-        : profileUnreachable
-        ? "rateLimited"
-        : "missing",
-    news: s.news.length > 0 ? "available" : s.newsSource.source === "unavailable" ? "rateLimited" : "missing",
+    price: classifyDimension(s.price > 0, s.quoteSource),
+    volume: classifyDimension(s.volume > 0, s.quoteSource),
+    profile: classifyDimension(hasProfileIdentity(s), s.profileSource),
+    marketCap: classifyDimension(
+      !!(s.profile?.marketCap && s.profile.marketCap > 0),
+      s.profileSource
+    ),
+    news: classifyDimension(s.news.length > 0, s.newsSource),
     technical: technicalStatus,
   };
 }
@@ -73,74 +86,136 @@ function computeStatuses(
 function reliabilityHebrew(
   label: DataQualityLabel,
   missing: string[],
-  rateLimited: string[]
+  rateLimited: string[],
+  priceUnusable: boolean,
+  confidenceScore: number
 ): string {
   const rlNote =
     rateLimited.length > 0
-      ? ` נתונים שלא נשלפו עקב מגבלת API (אינם פוגעים בציון): ${rateLimited.join(", ")}.`
+      ? ` נתונים שלא נשלפו עקב מגבלת API/לא נתבקשו (אינם פוגעים בכיסוי): ${rateLimited.join(", ")}.`
       : "";
+  const confNote = ` רמת ביטחון (טריות + שלמות): ${confidenceScore}/100.`;
+
+  if (label === "Excluded" && priceUnusable) {
+    return (
+      `הוחרגה – אין מחיר עדכני או שמור במטמון עבור המניה, ולכן לא ניתן לדרג או להמליץ עליה ` +
+      `(ללא קשר לסיבה – חוסר נתון אמיתי או מגבלת API).${rlNote}`
+    );
+  }
 
   switch (label) {
     case "High":
-      return `אמינות גבוהה – כל הנתונים שנאספו זמינים ומלאים.${rlNote}`;
+      return `כיסוי נתונים גבוה – כל הנתונים שנאספו זמינים ומלאים.${confNote}${rlNote}`;
     case "Medium":
-      return `אמינות בינונית – חלק מהנתונים חסרים באמת (${missing.join(", ")}); מומלץ לאמת לפני פעולה.${rlNote}`;
+      return `כיסוי נתונים בינוני – חלק מהנתונים חסרים באמת (${missing.join(", ")}); מומלץ לאמת לפני פעולה.${confNote}${rlNote}`;
     case "Low":
-      return `אמינות נמוכה – חסרים נתונים מהותיים באמת (${missing.join(", ")}); האות אינדיקטיבי בלבד.${rlNote}`;
+      return `כיסוי נתונים נמוך – חסרים נתונים מהותיים באמת (${missing.join(", ")}); האות אינדיקטיבי בלבד.${confNote}${rlNote}`;
     case "Excluded":
       return `הוחרגה – נתונים קריטיים חסרים באמת (${missing.join(", ")}); לא ניתן לדרג או להמליץ על המניה.${rlNote}`;
   }
 }
 
-// Compute the data-quality verdict for a single stock. The score reflects only
-// the QUALITY of the data we could actually assess – dimensions that were
-// rate-limited are removed from the calculation entirely (not penalized).
+// Compute the data-quality verdict for a single stock.
+//
+// Coverage score reflects only how much data was retrieved:
+//  - "rateLimited" / "notRequested" dimensions are excluded from BOTH the
+//    numerator and denominator entirely (not a quality issue).
+//  - "genuinelyMissing" dimensions count in the denominator but earn nothing
+//    (a real quality issue).
+//  - "available" / "cached" dimensions earn their full weight – a cached
+//    value is just as usable as a live one for COVERAGE purposes.
+//
+// Confidence score starts from coverage and is then reduced by (a) cache
+// staleness on any dimension that isn't live, and (b) a flat penalty when
+// optional technical data isn't available – technical never excludes a
+// stock, but its absence must always keep confidence below a perfect 100.
+//
+// Critical rule: a stock with NO usable price (live or cached) is ALWAYS
+// excluded, regardless of whether that's because the price is genuinely
+// missing or because the quote call was rate-limited. Price is not just
+// another weighted dimension – without it the stock cannot be displayed,
+// ranked, or recommended at all.
 export function computeDataQuality(
   s: EnrichedStock,
   technicalStatus: DimensionStatus
 ): DataQuality {
   const statuses = computeStatuses(s, technicalStatus);
 
-  // Score = earned / assessable, where rate-limited dims are excluded from both.
+  const priceUsable = statuses.price === "available" || statuses.price === "cached";
+
   let assessable = 0;
   let earned = 0;
   for (const d of DIMS) {
-    if (statuses[d] === "rateLimited") continue; // not a quality issue
+    const st = statuses[d];
+    if (st === "rateLimited" || st === "notRequested") continue; // not a coverage issue
     assessable += WEIGHTS[d];
-    if (statuses[d] === "available") earned += WEIGHTS[d];
+    if (st === "available" || st === "cached") earned += WEIGHTS[d];
   }
-  const score = assessable > 0 ? Math.round((earned / assessable) * 100) : 0;
+  // Without a usable price, no other dimension can carry the score to 100 –
+  // the score itself must reflect the exclusion, not just the label.
+  const coverageScore = !priceUsable ? 0 : assessable > 0 ? Math.round((earned / assessable) * 100) : 0;
 
-  const missing = DIMS.filter((d) => statuses[d] === "missing").map((d) => DIM_HEBREW[d]);
-  const rateLimited = DIMS.filter((d) => statuses[d] === "rateLimited").map((d) => DIM_HEBREW[d]);
+  // Freshness penalty: average staleness across every CACHED (non-live) dim
+  // that has a real value, capped so it can't alone zero out confidence.
+  const dimSource: Partial<Record<Dim, SourceInfo | undefined>> = {
+    price: s.quoteSource,
+    volume: s.quoteSource,
+    profile: s.profileSource,
+    marketCap: s.profileSource,
+    news: s.newsSource,
+  };
+  const cachedAges: number[] = [];
+  for (const d of ["price", "volume", "profile", "marketCap", "news"] as Dim[]) {
+    if (statuses[d] === "cached") {
+      cachedAges.push(dimSource[d]?.ageHours ?? 12);
+    }
+  }
+  const avgAge = cachedAges.length > 0 ? cachedAges.reduce((a, b) => a + b, 0) / cachedAges.length : 0;
+  const freshnessPenalty = cachedAges.length > 0 ? clamp(avgAge * 1.5, 5, 30) : 0;
+  // Optional technical data is never a reason to exclude a stock, but its
+  // absence must always keep confidence below a perfect score.
+  const technicalGapPenalty = statuses.technical === "available" ? 0 : 15;
+  const confidenceScore = clamp(coverageScore - freshnessPenalty - technicalGapPenalty, 0, 100);
 
-  // Exclusion is based ONLY on genuinely missing data, never on rate limits.
+  const missing = DIMS.filter((d) => statuses[d] === "genuinelyMissing").map((d) => DIM_HEBREW[d]);
+  const rateLimited = DIMS.filter(
+    (d) => statuses[d] === "rateLimited" || statuses[d] === "notRequested"
+  ).map((d) => DIM_HEBREW[d]);
+
   const criticalGenuineMissing = (["price", "volume", "marketCap", "profile"] as Dim[]).filter(
-    (d) => statuses[d] === "missing"
+    (d) => statuses[d] === "genuinelyMissing"
   ).length;
+
   const excluded =
     assessable === 0 || // nothing usable at all
-    statuses.price === "missing" || // genuinely no price
+    !priceUsable ||      // no usable price, live or cached – can't rank it, full stop
     criticalGenuineMissing >= 3; // too much genuinely missing
 
   let label: DataQualityLabel;
   if (excluded) label = "Excluded";
-  else if (score >= 80) label = "High";
-  else if (score >= 60) label = "Medium";
+  else if (coverageScore >= 80) label = "High";
+  else if (coverageScore >= 60) label = "Medium";
   else label = "Low";
 
   return {
     statuses,
-    score,
+    coverageScore,
+    confidenceScore,
     label,
     excluded,
     missing,
     rateLimited,
-    reliabilityHebrew: reliabilityHebrew(label, missing, rateLimited),
+    reliabilityHebrew: reliabilityHebrew(label, missing, rateLimited, !priceUsable, confidenceScore),
   };
 }
 
 // A stock may be ranked / recommended only when its quality clears the threshold.
 export function meetsRecommendationThreshold(dq: DataQuality | undefined): boolean {
   return !!dq && !dq.excluded && RECOMMEND_LABELS.has(dq.label);
+}
+
+// One-line debug summary of which dimensions fed the score – printed per
+// watchlist stock during a run so scoring mistakes are visible immediately.
+export function dataQualityDebugSummary(dq: DataQuality): string {
+  return DIMS.map((d) => `${d}=${dq.statuses[d]}`).join(" ");
 }

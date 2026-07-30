@@ -24,6 +24,17 @@ async function main() {
   summarize("🏛️  Core", result.core);
   summarize("🌱  Growth", result.growth);
   summarize("🎲  Speculative", result.speculative);
+
+  const m = result.metrics;
+  console.log("\n📊  Self-evaluation KPIs:");
+  console.log(`  run data-quality:  ${m.runDataQuality}/100 (${m.freshness})`);
+  console.log(`  recommendations:   ${m.recommendationsThisRun} · avg confidence ${m.avgConfidence ?? "n/a"}`);
+  console.log(`  open positions:    ${m.openCount} · closed: ${m.closedCount}`);
+  console.log(
+    `  win-rate:          ${m.winRate === null ? "building baseline (need closed positions)" : (m.winRate * 100).toFixed(0) + "%"}`
+  );
+  console.log(`  avg return:        ${m.avgReturnPct === null ? "n/a" : m.avgReturnPct + "%"}`);
+  console.log(`  report quality:    ${m.reportQualityScore}/100 · actionability ${m.actionabilityScore}/100`);
 }
 
 main().catch((err) => {
