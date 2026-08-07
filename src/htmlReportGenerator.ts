@@ -17,7 +17,7 @@ import {
   sentimentTone,
   weekAheadExtraEarnings,
 } from "./reportPresentation";
-import { fingerprintHtmlComment } from "./reportFingerprint";
+import { fingerprintHtmlComment, provenanceHtmlComment } from "./reportFingerprint";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
@@ -334,10 +334,13 @@ function renderTechnicalWatch(items: TechnicalWatchItem[], dataUnavailable: bool
         i.rsi14 !== null
           ? `<span class="rsi-badge ${rsiTone(i.rsi14)}">${Math.round(i.rsi14)}</span>`
           : "—";
+      const priceCell = hasPrice
+        ? `${ltr(esc(fmtPrice(i.price)))}${i.isLastClose ? ` <span class="alert-name">(Last close)</span>` : ""}`
+        : `<span class="muted-text">Price unavailable</span>`;
       return `
         <tr class="${hasPrice ? "" : "row-muted"}">
           <td class="symbol">${ltr(esc(i.ticker))}<span class="alert-name">${esc(i.name)}</span></td>
-          <td>${hasPrice ? ltr(esc(fmtPrice(i.price))) : `<span class="muted-text">Price unavailable</span>`}</td>
+          <td>${priceCell}</td>
           <td>${rsiHtml}</td>
           <td><span class="signal-badge">${esc(i.statusHebrew)}</span></td>
         </tr>`;
@@ -453,8 +456,6 @@ function renderOpportunityCard(rank: number, s: EnrichedStock, thesis: Opportuni
         </div>
       </div>
 
-      ${s.emergencyMode ? `<div style="margin:6px 0 0;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:800;font-size:11.5px;display:inline-block;">⚠️ ${EMERGENCY_MODE_LABEL}</div>` : ""}
-
       <div class="metrics-row">
         ${metricChip("Coverage", dq ? `${dq.coverageScore}` : "—")}
         ${metricChip("Confidence", dq ? `${dq.confidenceScore}` : "—")}
@@ -470,22 +471,63 @@ function renderOpportunityCard(rank: number, s: EnrichedStock, thesis: Opportuni
     </article>`;
 }
 
-function renderTopOpportunities(
-  stocks: EnrichedStock[],
-  theses: Map<string, OpportunityThesis>,
-  emergencyModeActive: boolean
-): string {
-  const notice = emergencyModeActive
-    ? `<p class="empty" style="margin-bottom:14px;">⚠️ ${esc(EMERGENCY_MODE_EXPLANATION_HEBREW)}</p>`
-    : "";
+// Top Opportunities NEVER contains an Emergency-Mode-promoted stock – when
+// nothing clears the normal bar this simply shows fewer than 3 (down to 0)
+// rather than backfilling. See renderEmergencyWatch below for where those go.
+function renderTopOpportunities(stocks: EnrichedStock[], theses: Map<string, OpportunityThesis>): string {
   const inner =
     stocks.length > 0
-      ? `${notice}<div class="opportunities">${stocks.map((s, idx) => renderOpportunityCard(idx + 1, s, theses.get(s.ticker))).join("\n")}</div>`
+      ? `<div class="opportunities">${stocks.map((s, idx) => renderOpportunityCard(idx + 1, s, theses.get(s.ticker))).join("\n")}</div>`
       : `<p class="empty">אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו.</p>`;
   return `
   <section>
     <h2 class="section-title">Top Opportunities</h2>
     ${inner}
+  </section>`;
+}
+
+// ===== 8b. Reduced-Confidence Watch (Emergency Report Mode only) =====
+//
+// Renders nothing at all when Emergency Mode isn't engaged – this block only
+// exists on the days it's actually needed. Deliberately the muted/"cautious"
+// tier styling regardless of score, plus an explicit badge, so it can never
+// visually read as a normal (green/strong) Top Opportunity.
+function renderEmergencyWatchCard(s: EnrichedStock): string {
+  const name = displayName(s);
+  const dq = s.dataQuality;
+  return `
+    <article class="opportunity-card card cautious">
+      <div class="opp-head">
+        <div class="opp-id">
+          <div>
+            <h3 class="ticker">${ltr(esc(s.ticker))}</h3>
+            <p class="company">${esc(name)}</p>
+          </div>
+        </div>
+        <div class="opp-head-right">
+          <div class="score-badge cautious">
+            <span class="score-num">${s.finalScore.toFixed(1)}</span>
+            <span class="score-denom">/10</span>
+          </div>
+          ${s.price > 0 ? `<span class="metric-value ${changeClass(s.changePercent)}">${ltr(esc(fmtChange(s.changePercent)))}</span>` : ""}
+        </div>
+      </div>
+      <div style="margin:8px 0 0;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:800;font-size:11.5px;display:inline-block;">⚠️ ${EMERGENCY_MODE_LABEL}</div>
+      <div class="metrics-row">
+        ${metricChip("Coverage", dq ? `${dq.coverageScore}` : "—")}
+        ${metricChip("Confidence", dq ? `${dq.confidenceScore}` : "—")}
+      </div>
+      <p style="margin-top:10px;font-size:12.5px;color:var(--muted);">${esc(dq?.reliabilityHebrew ?? "")}</p>
+    </article>`;
+}
+
+function renderEmergencyWatch(stocks: EnrichedStock[]): string {
+  if (stocks.length === 0) return "";
+  return `
+  <section>
+    <h2 class="section-title">⚠️ Reduced-Confidence Watch</h2>
+    <p class="empty" style="margin-bottom:14px;">${esc(EMERGENCY_MODE_EXPLANATION_HEBREW)}</p>
+    <div class="opportunities">${stocks.map((s) => renderEmergencyWatchCard(s)).join("\n")}</div>
   </section>`;
 }
 
@@ -575,12 +617,12 @@ function renderDiagnostics(data: ReportData): string {
   </section>`;
 }
 
-function renderDisclaimer(): string {
+function renderDisclaimer(generatedAt: string): string {
   return `
   <footer class="disclaimer">
     <p><strong>Research only. Not investment advice.</strong> מסחר במניות כרוך בסיכון לאובדן ההון – כל החלטה על אחריותך בלבד.</p>
     <p class="attachments-line">קבצים מצורפים: daily-stock-report.html · daily-stock-report.md</p>
-    <p class="generated">Generated by stock-agent · ${esc(new Date().toISOString())}</p>
+    <p class="generated">Generated by stock-agent · ${esc(generatedAt)}</p>
   </footer>`;
 }
 
@@ -919,14 +961,14 @@ const CSS = `
 //      would only repeat the Upcoming Earnings Calendar)
 //  12. Data Diagnostics + attachments/disclaimer footer
 export function generateHtmlReport(data: ReportData): string {
-  const now = new Date();
+  const now = new Date(data.generatedAt);
   const {
     earningsCalendar,
     earningsCalendarStatus,
     marketCatalyst,
     marketOverview,
     topOpportunities,
-    topOpportunitiesEmergencyMode,
+    emergencyWatch,
     opportunityTheses,
     technicalWatch,
     technicalAlerts,
@@ -945,13 +987,15 @@ export function generateHtmlReport(data: ReportData): string {
     renderMarketOverview(marketOverview),
     renderTechnicalWatch(technicalWatch, technicalAlerts.dataUnavailable),
     renderEarningsFollowUp(earningsFollowUp),
-    renderTopOpportunities(topOpportunities, opportunityTheses, topOpportunitiesEmergencyMode),
+    renderTopOpportunities(topOpportunities, opportunityTheses),
+    renderEmergencyWatch(emergencyWatch),
     renderDividends(dividends, dividendsStatus),
     renderWeekAhead(data),
     renderDiagnostics(data),
-    renderDisclaimer(),
+    renderDisclaimer(data.generatedAt),
     `</main>`,
     fingerprintHtmlComment(data),
+    provenanceHtmlComment(data),
   ].join("\n");
 
   return `<!DOCTYPE html>
@@ -960,6 +1004,83 @@ export function generateHtmlReport(data: ReportData): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily Market Report – ${esc(fmtDateTime(now))}</title>
+  <style>${CSS}</style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+}
+
+// ===== Diagnostic-only report (Report Quality Score below SEND_THRESHOLD) =====
+//
+// Rendered INSTEAD of the normal newsletter when quality stayed poor even
+// after the recovery pass – see src/reportQuality.ts and pipeline.ts. Reuses
+// the same header/CSS shell as the normal report (same visual system, per
+// the approved design), just with a short, honest body instead of the full
+// section set.
+
+function renderProviderIssues(data: ReportData): string {
+  const failing = data.reportQuality.dimensions.filter((d) => d.scorePct < 60);
+  const rows =
+    failing.length > 0
+      ? failing.map((d) => `<li><strong>${esc(d.label)}</strong>: ${d.scorePct}% (${esc(d.detail)})</li>`).join("")
+      : `<li>לא זוהה כשל ספק בודד וחמור – הציון ירד משילוב של כמה פערי כיסוי חלקיים.</li>`;
+  return `
+  <section>
+    <h2 class="section-title">⚠️ Provider Issues</h2>
+    <div class="card"><ul style="margin:0;padding-inline-start:20px;">${rows}</ul></div>
+  </section>`;
+}
+
+function renderLastVerified(data: ReportData): string {
+  const rows = data.watchlist
+    .map((s) => {
+      const src = s.quoteSource;
+      const label =
+        !src || src.source === "unavailable"
+          ? "לא זמין"
+          : src.source === "live"
+          ? "עדכני (נשלף כעת)"
+          : `במטמון (${src.ageHours ?? "?"} שעות)`;
+      return `<li><strong>${ltr(esc(s.ticker))}</strong>: ${esc(label)}</li>`;
+    })
+    .join("");
+  return `
+  <section>
+    <h2 class="section-title">🕒 Last Verified Data</h2>
+    <div class="card"><ul style="margin:0;padding-inline-start:20px;">${rows}</ul></div>
+  </section>`;
+}
+
+export function generateDiagnosticHtmlReport(data: ReportData): string {
+  const now = new Date(data.generatedAt);
+  const q = data.reportQuality;
+
+  const body = [
+    renderHeader(now, data),
+    `<main class="container" dir="rtl">`,
+    `<section><div class="card" style="border-right:4px solid var(--amber);">
+      <h2 class="section-title">⚠️ הדוח היום לא הופק ברמת האיכות הרגילה</h2>
+      <p class="empty">Today's market report could not be produced at normal quality (Report Quality Score: ${q.score}/100 – ${esc(q.band)}). Rather than send a misleading or near-empty newsletter, this is a short diagnostic summary of what we do know right now. The full report resumes automatically once data coverage recovers.</p>
+    </div></section>`,
+    renderMarketOverview(data.marketOverview),
+    renderEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
+    renderProviderIssues(data),
+    renderLastVerified(data),
+    renderDiagnostics(data),
+    renderDisclaimer(data.generatedAt),
+    `</main>`,
+    fingerprintHtmlComment(data),
+    provenanceHtmlComment(data),
+  ].join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Market Report (Diagnostic) – ${esc(fmtDateTime(now))}</title>
   <style>${CSS}</style>
 </head>
 <body>

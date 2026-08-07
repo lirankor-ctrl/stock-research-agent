@@ -16,7 +16,9 @@ async function main() {
   console.log("🛠  Generating report (preview only – no email will be sent)...");
   const result = await runReport();
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Derived from result.data.generatedAt, never an independent `new Date()`
+  // – see emailReport.ts for why.
+  const today = result.data.generatedAt.slice(0, 10);
   const htmlBody = generateEmailHtmlBody(result.data, today);
   const textBody = generateEmailTextBody(result.data, today);
 

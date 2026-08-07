@@ -25,6 +25,12 @@ const EXCLUDE_PATTERNS: RegExp[] = [
   // never investment-relevant on their own).
   /has (?:a |an )?\$[\d.,]+\s*(?:million|billion|thousand)?\s*position in/i,
   /(?:boosts|trims|lifts|raises|lowers|grows|cuts|reduces) (?:its |their )?(?:stake|position|holdings) in/i,
+  // "X is Y's Nth Largest Position" – another routine 13F-disclosure phrasing.
+  /\bis\b.{0,60}\b\d+(?:st|nd|rd|th)\s+(?:largest\s+)?(?:position|holding)\b/i,
+  // Passive-voice "X Shares Purchased/Sold/Bought/Acquired by Y" – same
+  // routine 13F-disclosure class as the "Position Boosted by ..." pattern
+  // above, just phrased around "shares" instead of "position/stake".
+  /\bshares?\b.{0,40}\b(?:purchased|bought|sold|acquired)\s+by\b/i,
   // Passive-voice MarketBeat-style institutional filing headlines, e.g.
   // "$AMZN Position Boosted by Griffith & Werner Inc." / "Stake Lowered by ...".
   /\b(?:position|stake|holdings)\b.*\b(?:boosted|raised|lifted|grown|lowered|trimmed|cut|reduced|increased|decreased)\s+by\b/i,
@@ -44,7 +50,31 @@ const EXCLUDE_PATTERNS: RegExp[] = [
   // with nothing else in the headline). A price target or explicit reasoning
   // keyword makes it substantive instead – see isSubstantiveNews below.
   /^\S+.*\b(?:maintains|reiterates)\b.*\brating\b$/i,
+  // Automated "the stock moved X%" articles – algorithmically generated,
+  // carry no actual reasoning even when they mention a real move.
+  /^why\s+(?:is\s+)?\S+\s+stock\s+(?:is\s+)?(?:up|down|moving|rising|falling|jumping|sinking)/i,
+  /\bstock\s+(?:is\s+)?(?:up|down)\s+\d+(?:\.\d+)?%/i,
+  /shares?\s+(?:of\s+\S+\s+)?(?:are|is|were)\s+(?:up|down|trading)\s+\d+(?:\.\d+)?%/i,
+  /\b\d+(?:\.\d+)?%\s+(?:higher|lower)\b.*\btoday\b/i,
 ];
+
+// Leveraged/inverse ETF and fund-of-the-underlying articles – these mention
+// the company's ticker (an ETF literally tracks it) but are NOT a story
+// about the company itself, they're about a derivative product. Checked
+// separately from EXCLUDE_PATTERNS so isEtfOrLeveragedFundNews can also be
+// used standalone (e.g. by tests) without pulling in the rest of the
+// promotional/legal exclusion list.
+const ETF_FUND_FAMILY_NAMES =
+  /\b(graniteshares|direxion|proshares|microsectors|tuttle capital|themes etf|defiance etf|kurv|roundhill|yieldmax|tradr|volatility shares)\b/i;
+
+export function isEtfOrLeveragedFundNews(item: NewsItem): boolean {
+  const title = (item.title ?? "").toLowerCase();
+  if (ETF_FUND_FAMILY_NAMES.test(title)) return true;
+  const mentionsEtf = /\betf\b/.test(title);
+  const mentionsLeverage =
+    /\b\d+x\b/.test(title) || /\b(leveraged|inverse|daily long|daily short|bull|bear)\b/.test(title);
+  return mentionsEtf && mentionsLeverage;
+}
 
 export function isPromotionalOrLegalNews(item: NewsItem): boolean {
   const title = item.title ?? "";
@@ -53,6 +83,7 @@ export function isPromotionalOrLegalNews(item: NewsItem): boolean {
   if (/\b(?:maintains|reiterates)\b.*\brating\b/i.test(title) && isSubstantiveNews(item)) {
     return false;
   }
+  if (isEtfOrLeveragedFundNews(item)) return true;
   return EXCLUDE_PATTERNS.some((re) => re.test(title));
 }
 
@@ -73,6 +104,47 @@ const SUBSTANTIVE_PATTERNS: RegExp[] = [
 export function isSubstantiveNews(item: NewsItem): boolean {
   const title = item.title ?? "";
   return SUBSTANTIVE_PATTERNS.some((re) => re.test(title));
+}
+
+// Legal-entity suffixes stripped off a company's display name to get its
+// recognizable "stem" for headline matching – e.g. "Amazon.com, Inc." ->
+// "amazon", "NVIDIA Corporation" -> "nvidia", "Alphabet Inc Class A" ->
+// "alphabet".
+const LEGAL_SUFFIX_RE =
+  /\b(inc|incorporated|corp|corporation|co|company|ltd|plc|group|holdings|technologies|class\s*[a-z])\b\.?/gi;
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function nameStem(companyName: string | undefined): string {
+  if (!companyName) return "";
+  return companyName.replace(LEGAL_SUFFIX_RE, "").trim().split(/[\s,]+/)[0] ?? "";
+}
+
+// A ticker being tagged "relevant" by the news provider is not the same as
+// an article actually being ABOUT that company – provider relevance tagging
+// also catches leveraged-ETF products, sector round-ups, and articles about
+// a different company that merely mentions the ticker in passing. Require
+// the ticker (as "$TICKER" or a standalone word) or the company's
+// recognizable name stem to actually appear in the headline. This is a
+// heuristic, not a semantic understanding of the article – but real
+// financial-news headlines for genuine company coverage overwhelmingly name
+// the company or ticker, so it reliably catches off-topic attribution
+// without discarding real stories.
+export function isDirectlyAboutCompany(
+  ticker: string,
+  companyName: string | undefined,
+  item: NewsItem
+): boolean {
+  const title = (item.title ?? "").toLowerCase();
+  if (!title) return false;
+  const t = ticker.toLowerCase();
+  if (title.includes(`$${t}`)) return true;
+  if (new RegExp(`\\b${escapeRegExp(t)}\\b`, "i").test(title)) return true;
+  const stem = nameStem(companyName).toLowerCase();
+  if (stem.length >= 3 && title.includes(stem)) return true;
+  return false;
 }
 
 // First relevant (non-promotional) item, preserving the caller's ordering.

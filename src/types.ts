@@ -1,3 +1,5 @@
+import { ReportQuality } from "./reportQuality";
+
 export type StockCategory = "gainer" | "loser" | "active";
 
 // Where a candidate entered the pipeline from.
@@ -379,23 +381,36 @@ export interface TechnicalWatchItem {
   name: string;
   price: number;
   changePercent: number;
+  // true when `price` came from the historical daily-close series used for
+  // RSI/Bollinger (Yahoo), because no live/cached quote was available – the
+  // row must show "Last close" rather than an unlabeled (and implicitly
+  // wrong) daily change. See src/technicalAlerts.ts / src/pipeline.ts.
+  isLastClose: boolean;
   rsi14: number | null;
   statusHebrew: string; // e.g. "מעל הרצועה העליונה", "ניטרלי", "לא זמין"
 }
 
 // Everything the report renderers need, already filtered & categorized.
 export interface ReportData {
+  // Single shared "generated at" timestamp for the entire run (ISO string).
+  // Every renderer (Markdown, HTML, HTML email, text email) MUST derive its
+  // displayed date/time from this field – never call `new Date()`
+  // independently, or two outputs of the same run can show different
+  // timestamps despite being "the same report".
+  generatedAt: string;
   marketStory: MarketStory | null; // null when no meaningful recent news exists
   additionalHeadlines: MarketStory[]; // up to 2 more relevant (non-promotional) stories
   core: EnrichedStock[];
   growth: EnrichedStock[];
   speculative: EnrichedStock[]; // max 1
-  topOpportunities: EnrichedStock[];   // max 3 – quality-gated, ranked across tiers
-  // true when 0 candidates cleared the normal High/Medium quality bar and
-  // Emergency Report Mode had to fill topOpportunities from safety-filtered,
-  // reduced-confidence candidates instead of rendering an empty section.
+  topOpportunities: EnrichedStock[];   // 0-3 – quality-gated, ranked across tiers. NEVER contains an emergency-promoted stock.
+  // 0-3 reduced-confidence candidates, populated ONLY when topOpportunities
+  // is empty – rendered in their own "⚠️ Reduced-Confidence Watch" block,
+  // never inside Top Opportunities. See src/emergencyMode.ts.
+  emergencyWatch: EnrichedStock[];
+  // true iff emergencyWatch is non-empty (Emergency Report Mode engaged).
   topOpportunitiesEmergencyMode: boolean;
-  opportunityTheses: Map<string, OpportunityThesis>; // ticker -> structured thesis
+  opportunityTheses: Map<string, OpportunityThesis>; // ticker -> structured thesis, keyed by ticker for BOTH arrays above
   watchlist: EnrichedStock[];   // fixed list, in WATCHLIST order
   technicalWatch: TechnicalWatchItem[];
   technicalAlerts: TechnicalAlerts;
@@ -411,6 +426,13 @@ export interface ReportData {
   dividends: DividendInfoItem[];
   dividendsStatus: DividendsStatus;
   weekAhead: WeekAhead;
+  // 0-100 Report Quality Score computed just before rendering – see
+  // src/reportQuality.ts. `belowSendThreshold` is true when the score stayed
+  // under SEND_THRESHOLD even after the recovery pass, in which case every
+  // renderer replaces the normal newsletter with a short diagnostic report
+  // rather than sending something misleading or near-empty.
+  reportQuality: ReportQuality;
+  belowSendThreshold: boolean;
 }
 
 export interface RunStatus {

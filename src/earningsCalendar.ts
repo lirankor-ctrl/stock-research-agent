@@ -2,9 +2,25 @@ import { daysBetweenIso, normalizeTicker, usMarketDateIso } from "./dateUtils";
 import { getNasdaqEarningsForDate } from "./dataSources";
 import { NasdaqEarningsRow } from "./nasdaqEarnings";
 import { EarningsCalendarEntry, EarningsCalendarStatus, EarningsUrgency } from "./types";
-import { trackedCompanyName, trackedTickers, WATCHLIST_TICKERS } from "./universe";
+import { isIndexMember, trackedCompanyName, WATCHLIST_TICKERS } from "./universe";
 
-const WINDOW_DAYS = 14;
+// Primary discovery window: every company reporting in the next 7 calendar
+// days is a ranking candidate. The 8-14 day window is secondary – only
+// pulled from when the primary window alone can't reach TARGET_MIN.
+const PRIMARY_WINDOW_DAYS = 7;
+const SECONDARY_WINDOW_DAYS = 14;
+
+// Normal day target: enough to be genuinely useful, never a full market dump.
+const TARGET_MIN = 5;
+const TARGET_MAX = 10;
+
+// A company needs at least this market cap (or watchlist/index membership,
+// which bypasses the floor entirely) to enter the ranking pool at all – this
+// is what keeps "not every micro-cap" true without silently hiding anything
+// meaningful. Below this floor there are, on a typical day, dozens of
+// thinly-traded names reporting that nobody researching long-term ideas
+// would call "interesting".
+const MIN_MARKET_CAP_FOR_RANKING = 1_000_000_000;
 
 // Sector hints for mega-cap names that aren't already enriched with a real
 // profile (kept minimal – only used as a fallback for the "why watch" blurb).
@@ -109,7 +125,7 @@ export async function buildEarningsCalendar(
   const nowIso = usMarketDateIso(now);
 
   const rowsByDate: Array<{ dateIso: string; rows: NasdaqEarningsRow[] | null }> = [];
-  for (let offset = 0; offset <= WINDOW_DAYS; offset++) {
+  for (let offset = 0; offset <= SECONDARY_WINDOW_DAYS; offset++) {
     const dateIso = usMarketDateIso(new Date(now.getTime() + offset * 24 * 60 * 60 * 1000));
     const res = await getNasdaqEarningsForDate(dateIso, (m) => onProgress(`   ${m}`));
     rowsByDate.push({ dateIso, rows: res.value });
@@ -126,14 +142,55 @@ export function earningsCalendarStatusMessageHebrew(status: EarningsCalendarStat
     case "unavailable":
       return "לוח הרווחים אינו זמין כרגע (בעיית תקשורת עם מקור הנתונים) – לא ניתן לאשר האם קיימים דיווחי רווחים קרובים או לא. הסעיף יתעדכן בריצה הבאה.";
     case "noneFound":
-      return "אין דיווחי רווחים מאושרים ברשימת המעקב, בהזדמנויות המובילות או בחברות המגה-קאפ הנבחרות ב-14 הימים הקרובים.";
+      return "לא אותרו חברות מוכרות עם דיווחי רווחים מתוכננים ב-14 הימים הקרובים, מתוך לוח הרווחים המלא של השוק האמריקאי.";
     case "confirmed":
       return "";
   }
 }
 
+// Importance score used to rank the FULL market's reporting companies (not
+// just our watchlist) – higher wins. Deliberately built only from fields
+// Nasdaq's calendar itself provides (market cap, EPS estimates) plus our own
+// curated index-membership sets, so ranking never costs an extra API call of
+// any kind, Alpha Vantage or otherwise.
+function importanceScore(ticker: string, row: NasdaqEarningsRow, isWatchlist: boolean): number {
+  if (isWatchlist) return Number.MAX_SAFE_INTEGER; // always first, full stop.
+  let score = 0;
+  if (isIndexMember(ticker)) score += 5_000;
+  const cap = row.marketCap ?? 0;
+  if (cap >= 500_000_000_000) score += 4_000;
+  else if (cap >= 100_000_000_000) score += 3_000;
+  else if (cap >= 20_000_000_000) score += 2_000;
+  else if (cap >= 5_000_000_000) score += 1_000;
+  else if (cap >= MIN_MARKET_CAP_FOR_RANKING) score += 300;
+  // A real YoY EPS comparison is available -> a more substantive, concrete
+  // report worth flagging over one we can only describe generically.
+  if (row.epsForecast !== undefined && row.lastYearEPS !== undefined) score += 50;
+  return score;
+}
+
+// A company must clear index membership or a market-cap floor to even enter
+// the ranking pool – otherwise a normal trading day's several dozen
+// micro-cap reporters would drown out anything genuinely interesting.
+// Watchlist names always qualify, floor or not.
+function qualifiesForRanking(ticker: string, row: NasdaqEarningsRow, isWatchlist: boolean): boolean {
+  if (isWatchlist) return true;
+  if (isIndexMember(ticker)) return true;
+  return (row.marketCap ?? 0) >= MIN_MARKET_CAP_FOR_RANKING;
+}
+
+interface ScoredEntry {
+  entry: EarningsCalendarEntry;
+  score: number;
+}
+
 // Pure, testable derivation from raw per-date rows – used by
 // buildEarningsCalendar above and directly by content-validation tests.
+// Searches the FULL market calendar (every row Nasdaq returned for every
+// date, not a pre-filtered tracked-ticker list) and ranks by importance –
+// see importanceScore/qualifiesForRanking above. Watchlist names are always
+// included regardless of rank; everything else competes on merit so a quiet
+// week for our own names still surfaces genuinely notable earnings.
 export function deriveEarningsCalendarFromRows(
   rowsByDate: Array<{ dateIso: string; rows: NasdaqEarningsRow[] | null }>,
   opts: {
@@ -142,29 +199,33 @@ export function deriveEarningsCalendarFromRows(
   }
 ): EarningsCalendarResult {
   const { nowIso, enrichedByTicker } = opts;
-  const tracked = new Map(trackedTickers().map((t) => [t.ticker, t.name]));
 
   let anySucceeded = false;
-  const entries: EarningsCalendarEntry[] = [];
+  const primary: ScoredEntry[] = [];
+  const secondary: ScoredEntry[] = [];
 
   for (const { dateIso, rows } of rowsByDate) {
     if (rows === null) continue;
     anySucceeded = true;
+    const daysRemaining = daysBetweenIso(nowIso, dateIso);
+
     for (const row of rows) {
       // Defensive normalization – this pure function must not assume its
       // caller already normalized the ticker casing.
       const ticker = normalizeTicker(row.symbol ?? "");
-      if (!ticker || !tracked.has(ticker)) continue;
-      const daysRemaining = daysBetweenIso(nowIso, dateIso);
+      if (!ticker) continue;
+      const isWatchlist = WATCHLIST_TICKERS.has(ticker);
+      if (!qualifiesForRanking(ticker, row, isWatchlist)) continue;
+
       const enriched = enrichedByTicker.get(ticker);
-      const priority: EarningsCalendarEntry["priority"] = WATCHLIST_TICKERS.has(ticker)
+      const priority: EarningsCalendarEntry["priority"] = isWatchlist
         ? "watchlist"
         : enrichedByTicker.has(ticker)
         ? "topOpportunity"
         : "megaCap";
-      entries.push({
+      const entry: EarningsCalendarEntry = {
         ticker,
-        name: tracked.get(ticker) ?? row.name ?? trackedCompanyName(ticker),
+        name: row.name || trackedCompanyName(ticker),
         reportDate: dateIso,
         daysRemaining,
         urgency: urgencyFor(daysRemaining),
@@ -172,18 +233,46 @@ export function deriveEarningsCalendarFromRows(
         timeOfDay: row.timeOfDay,
         reasonsHebrew: reasonsHebrew(row, enriched?.sector, enriched?.industry),
         priority,
-      });
+      };
+      const scored: ScoredEntry = { entry, score: importanceScore(ticker, row, isWatchlist) };
+      if (daysRemaining <= PRIMARY_WINDOW_DAYS) primary.push(scored);
+      else if (daysRemaining <= SECONDARY_WINDOW_DAYS) secondary.push(scored);
     }
   }
 
   if (!anySucceeded) return { entries: [], status: "unavailable" };
+
+  const byScoreThenSoonest = (a: ScoredEntry, b: ScoredEntry) =>
+    b.score - a.score || a.entry.daysRemaining - b.entry.daysRemaining;
+  primary.sort(byScoreThenSoonest);
+  secondary.sort(byScoreThenSoonest);
+
+  // Watchlist names are guaranteed inclusion, however many there are, before
+  // anything else competes for the remaining slots.
+  const watchlistEntries = primary.filter((c) => c.entry.priority === "watchlist").map((c) => c.entry);
+  const rest = primary.filter((c) => c.entry.priority !== "watchlist");
+
+  const selected: EarningsCalendarEntry[] = [...watchlistEntries];
+  for (const c of rest) {
+    if (selected.length >= TARGET_MAX) break;
+    selected.push(c.entry);
+  }
+  // The primary (0-7 day) window alone didn't reach a normally-useful count
+  // – reach into the secondary (8-14 day) window rather than pad with
+  // anything that didn't clear the ranking bar.
+  if (selected.length < TARGET_MIN) {
+    for (const c of secondary) {
+      if (selected.length >= TARGET_MIN) break;
+      selected.push(c.entry);
+    }
+  }
 
   const priorityRank: Record<EarningsCalendarEntry["priority"], number> = {
     watchlist: 0,
     topOpportunity: 1,
     megaCap: 2,
   };
-  entries.sort((a, b) => {
+  selected.sort((a, b) => {
     if (priorityRank[a.priority] !== priorityRank[b.priority]) {
       return priorityRank[a.priority] - priorityRank[b.priority];
     }
@@ -191,6 +280,6 @@ export function deriveEarningsCalendarFromRows(
   });
 
   // We DID get real calendar data for at least one date – zero matches means
-  // genuinely no tracked company reports in the window, not "unavailable".
-  return { entries, status: entries.length > 0 ? "confirmed" : "noneFound" };
+  // genuinely no qualifying company reports in the window, not "unavailable".
+  return { entries: selected, status: selected.length > 0 ? "confirmed" : "noneFound" };
 }

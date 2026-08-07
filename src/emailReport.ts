@@ -9,7 +9,12 @@ async function main() {
   console.log("🛠  Generating report...");
   const result = await runReport();
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Derived from result.data.generatedAt (the run's single shared
+  // timestamp), never a fresh `new Date()` here – the pipeline can take
+  // seconds to minutes to run, and a separately-computed "today" is exactly
+  // the kind of silent drift that can make the email look stale/different
+  // from the attachments it was rendered alongside.
+  const today = result.data.generatedAt.slice(0, 10);
   const subject = `דוח שוק יומי - ${today}`;
 
   // The email body is rendered from the exact same ReportData object

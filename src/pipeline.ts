@@ -16,16 +16,15 @@ import { buildEarningsFollowUp } from "./earningsFollowUp";
 import { buildDividendInfo } from "./dividends";
 import { buildEconomicReadings } from "./economicIndicators";
 import { getFearGreed } from "./fearGreed";
-import { generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
+import { generateDiagnosticHtmlReport, generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
 import { selectMarketCatalyst } from "./marketCatalyst";
 import { buildMarketOverview } from "./marketOverview";
-import { selectAdditionalHeadlines, selectMarketStory } from "./marketStory";
+import { RECOVERY_RECENT_DAYS, selectAdditionalHeadlines, selectMarketStory } from "./marketStory";
 import { buildOpportunityThesis } from "./opportunityThesis";
-import { buildPreflightAudit, formatPreflightAudit } from "./preflightAudit";
 import { preRank } from "./ranker";
-import { generateReport, writeReport } from "./reportGenerator";
-import { buildTechnicalAlerts } from "./technicalAlerts";
-import { technicalStatusHebrew } from "./technicalAlerts";
+import { computeReportQuality, formatReportQuality, RECOVERY_THRESHOLD, SEND_THRESHOLD } from "./reportQuality";
+import { generateDiagnosticReport, generateReport, writeReport } from "./reportGenerator";
+import { buildTechnicalAlerts, resolveTechnicalWatchPrice, technicalStatusHebrew } from "./technicalAlerts";
 import { WATCHLIST, watchlistName } from "./universe";
 import { buildWeekAhead } from "./weekAhead";
 import {
@@ -257,25 +256,33 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     .filter((s) => s.price > 0)
     .sort((a, b) => b.finalScore - a.finalScore);
   const topOppResult = buildTopOpportunities(rankedCandidates, 3);
-  const topOpportunities = topOppResult.stocks;
+  const topOpportunities = topOppResult.topOpportunities;
+  const emergencyWatch = topOppResult.emergencyWatch;
   log(`   top opportunities: ${topOpportunities.length}/3`);
   if (topOppResult.emergencyModeActive) {
     log(
-      `   ⚠️  Emergency Report Mode: no candidate met the High/Medium quality bar – ` +
-        `showing ${topOpportunities.length} best-available, safety-checked candidate(s) marked "${EMERGENCY_MODE_LABEL}".`
+      `   ⚠️  Emergency Report Mode: no candidate met the normal quality bar – ` +
+        `showing ${emergencyWatch.length} best-available, safety-checked candidate(s) in a separate ` +
+        `"${EMERGENCY_MODE_LABEL}" watch list, NOT as normal Top Opportunities.`
     );
   } else if (topOpportunities.length === 0) {
     log("   ⚠️  No usable candidate at all (every price is unavailable) – Top Opportunities stays empty.");
   }
 
-  // Technical Watch – one compact row per tracked watchlist stock.
+  // Technical Watch – one compact row per tracked watchlist stock. When the
+  // live/cached quote is unavailable but RSI/Bollinger were still computed
+  // (a completely separate Yahoo daily-closes fetch), fall back to the same
+  // dataset's latest close rather than showing a valid RSI next to
+  // "Price unavailable" – see src/technicalAlerts.ts's TechnicalRecord.price.
   const technicalWatch: TechnicalWatchItem[] = watchlist.map((s) => {
     const rec = techResult.byTicker.get(s.ticker);
+    const resolved = resolveTechnicalWatchPrice(s.price, s.changePercent, rec);
     return {
       ticker: s.ticker,
       name: s.profile?.name ?? watchlistName(s.ticker) ?? s.ticker,
-      price: s.price,
-      changePercent: s.changePercent,
+      price: resolved.price,
+      changePercent: resolved.changePercent,
+      isLastClose: resolved.isLastClose,
       rsi14: rec?.rsi14 ?? null,
       statusHebrew: technicalStatusHebrew(s.ticker, technicalAlerts),
     };
@@ -283,7 +290,14 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
 
   // ===== Performance tracking: record recs, mark/close prior ones, self-eval =====
   log("📒 Performance tracking (record → evaluate → calibrate)...");
-  const generatedAt = new Date().toISOString();
+  // Single shared timestamp for the ENTIRE run – every renderer (Markdown,
+  // HTML, HTML email, text email) must show the identical "generated at"
+  // moment, and every date-math call (earnings calendar window, "today")
+  // must agree on what "now" is. Independent `new Date()` calls scattered
+  // across renderers is exactly the kind of silent-drift bug that makes two
+  // outputs of the same run look like they came from different data.
+  const now = new Date();
+  const generatedAt = now.toISOString();
   const { score: runDataQuality, freshness } = computeRunDataQuality(
     status.liveCount,
     status.cachedCount,
@@ -338,7 +352,6 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   // overview (Yahoo), week ahead. Both new providers are independent of
   // Alpha Vantage and never touch its daily-call budget. =====
   log("🗓️  [5/5] Building newsletter sections (Nasdaq earnings calendar, Yahoo market data)...");
-  const newsletterNow = new Date();
 
   const enrichedByTicker = new Map<string, { sector?: string; industry?: string }>();
   for (const s of [...watchlist, ...topOpportunities]) {
@@ -351,7 +364,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   }
 
   const earningsCalendarRes = await buildEarningsCalendar({
-    now: newsletterNow,
+    now,
     enrichedByTicker,
     onProgress: (m) => log(m),
   });
@@ -366,7 +379,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   );
 
   const earningsFollowUp = await buildEarningsFollowUp({
-    now: newsletterNow,
+    now,
     onProgress: (m) => log(m),
   });
   log(
@@ -403,33 +416,16 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     opportunityTheses.set(s.ticker, buildOpportunityThesis(s, earningsCalendar));
   }
 
-  // ===== Preflight Quality Audit – final rollup of the Data Investigation
-  // phase, printed before rendering so degraded runs are visible in the logs
-  // even though the report itself still renders (recovery already applied
-  // above for Top Opportunities; every other section has its own honest
-  // tri-state fallback already). =====
-  const preflight = buildPreflightAudit({
-    moversAvailable: status.movers.source !== "unavailable",
-    watchlistUsable: wlQuotes.tally.live + wlQuotes.tally.cached,
-    watchlistTotal: WATCHLIST.length,
-    technicalsAvailable: techResult.available.size,
-    technicalsTotal: technicalUniverse.length,
-    earningsCalendarStatus: earningsCalendarRes.status,
-    marketOverviewWithValue: marketOverview.filter((i) => i.value !== null).length,
-    marketOverviewTotal: marketOverview.length,
-    fearGreedAvailable: !!fearGreed,
-    topOpportunitiesCount: topOpportunities.length,
-  });
-  for (const line of formatPreflightAudit(preflight)) log(line);
-
   log("📝 Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
+    generatedAt,
     marketStory: null, // filled in below, once the report stocks are known
     additionalHeadlines: [],
     core: cats.core,
     growth: cats.growth,
     speculative: cats.speculative,
     topOpportunities,
+    emergencyWatch,
     topOpportunitiesEmergencyMode: topOppResult.emergencyModeActive,
     opportunityTheses,
     watchlist,
@@ -447,6 +443,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     dividends: dividendInfo.items,
     dividendsStatus: dividendInfo.status,
     weekAhead,
+    reportQuality: { dimensions: [], score: 0, band: "Poor" }, // filled in below
+    belowSendThreshold: false, // filled in below
   };
 
   // 📰 Market Story of the Day + up to 2 additional relevant headlines.
@@ -458,8 +456,54 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
       : "   market story: none meaningful today"
   );
 
-  const mdContent = generateReport(data);
-  const htmlContent = generateHtmlReport(data);
+  // ===== Report Quality Score – final rollup of the Data Investigation
+  // phase, computed before rendering. Below RECOVERY_THRESHOLD, attempt one
+  // concrete recovery action (widen the Market Story news window); below
+  // SEND_THRESHOLD even after recovery, render a diagnostic-only report
+  // instead of the normal newsletter (every other dimension's fallback –
+  // cache / alt-provider / last-close – is already exhausted DURING normal
+  // fetching, see cacheFirst everywhere, so there's nothing left to retry
+  // for those specifically). =====
+  const qualityUniverse = [...watchlist, ...topOpportunities];
+  const quality = computeReportQuality({
+    earningsCalendarStatus: earningsCalendarRes.status,
+    marketOverviewWithValue: marketOverview.filter((i) => i.value !== null).length,
+    marketOverviewTotal: marketOverview.length,
+    watchlistPriceUsable: watchlist.filter((s) => s.price > 0).length,
+    watchlistTotal: WATCHLIST.length,
+    technicalsAvailable: techResult.available.size,
+    technicalsTotal: technicalUniverse.length,
+    newsAvailableCount: qualityUniverse.filter((s) => s.newsSource.source !== "unavailable").length,
+    newsTotal: qualityUniverse.length,
+    fundamentalsAvailableCount: qualityUniverse.filter((s) => s.profileSource.source !== "unavailable").length,
+    fundamentalsTotal: qualityUniverse.length,
+    topOpportunitiesConfidence: topOpportunities.map((s) => s.dataQuality?.confidenceScore ?? 0),
+    emergencyWatchCount: emergencyWatch.length,
+  });
+
+  if (quality.score < RECOVERY_THRESHOLD && !data.marketStory) {
+    log(`   🔧 Recovery pass engaged (quality ${quality.score} < ${RECOVERY_THRESHOLD}): widening Market Story news window to ${RECOVERY_RECENT_DAYS}d...`);
+    data.marketStory = selectMarketStory(data, Date.now(), RECOVERY_RECENT_DAYS);
+    data.additionalHeadlines = selectAdditionalHeadlines(data, Date.now(), 2, RECOVERY_RECENT_DAYS);
+    log(
+      data.marketStory
+        ? `      recovered: ${data.marketStory.ticker} – "${data.marketStory.headline}"`
+        : "      no story found even with the wider window – genuinely nothing qualifies today."
+    );
+  }
+
+  data.reportQuality = quality;
+  data.belowSendThreshold = quality.score < SEND_THRESHOLD;
+  for (const line of formatReportQuality(quality)) log(line);
+  if (data.belowSendThreshold) {
+    log(
+      `   🔴 Report Quality Score ${quality.score}/100 is below the send threshold (${SEND_THRESHOLD}) even after recovery – ` +
+        `rendering a diagnostic-only report instead of the normal newsletter.`
+    );
+  }
+
+  const mdContent = data.belowSendThreshold ? generateDiagnosticReport(data) : generateReport(data);
+  const htmlContent = data.belowSendThreshold ? generateDiagnosticHtmlReport(data) : generateHtmlReport(data);
   const mdPath = writeReport(mdContent);
   const htmlPath = writeHtmlReport(htmlContent);
 

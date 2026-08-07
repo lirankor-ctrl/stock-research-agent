@@ -181,6 +181,31 @@ export async function buildTechnicalAlerts(
   };
 }
 
+export interface TechnicalWatchPrice {
+  price: number;
+  changePercent: number;
+  isLastClose: boolean;
+}
+
+// Priority for the Technical Watch table's price column: live/cached quote
+// first; when that's unavailable, fall back to the latest close from the
+// SAME historical dataset RSI/Bollinger were computed from (never leave a
+// valid RSI sitting next to "Price unavailable" when we actually have a
+// price, just not a fresh quote for it). A historical close carries no
+// reliable "today" change, so changePercent is 0 and the caller must label
+// it "Last close" rather than rendering a fabricated daily move.
+export function resolveTechnicalWatchPrice(
+  quotePrice: number,
+  quoteChangePercent: number,
+  record: TechnicalRecord | undefined
+): TechnicalWatchPrice {
+  if (quotePrice > 0) {
+    return { price: quotePrice, changePercent: quoteChangePercent, isLastClose: false };
+  }
+  const fallbackPrice = record?.price ?? 0;
+  return { price: fallbackPrice, changePercent: 0, isLastClose: fallbackPrice > 0 };
+}
+
 // Short Hebrew "technical status" label for a single ticker – used by the Top
 // Opportunities cards and the compact Technical Watch table. Reuses the
 // already-computed alerts rather than issuing new fetches.

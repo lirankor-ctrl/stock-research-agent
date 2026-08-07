@@ -9,18 +9,25 @@ import { deriveEarningsFollowUpFromRows } from "./earningsFollowUp";
 import { generateEmailHtmlBody, generateEmailTextBody } from "./emailBodyGenerator";
 import { buildTopOpportunities, EMERGENCY_MODE_LABEL, passesEmergencySafetyFilter } from "./emergencyMode";
 import { passesLongTermFilter } from "./filters";
-import { generateHtmlReport } from "./htmlReportGenerator";
-import { selectMarketStory } from "./marketStory";
+import { generateDiagnosticHtmlReport, generateHtmlReport } from "./htmlReportGenerator";
+import { RECOVERY_RECENT_DAYS, selectMarketStory } from "./marketStory";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import { NasdaqEarningsRow } from "./nasdaqEarnings";
-import { isPromotionalOrLegalNews } from "./newsFilter";
+import { isEtfOrLeveragedFundNews, isPromotionalOrLegalNews } from "./newsFilter";
 import { buildOpportunityThesis } from "./opportunityThesis";
 import { validatePresentation } from "./presentationValidation";
-import { generateReport } from "./reportGenerator";
+import { computeProvenance, extractProvenance } from "./reportFingerprint";
+import { generateDiagnosticReport, generateReport } from "./reportGenerator";
 import { EMAIL_MAX_WIDTH, formatOverviewValue, weekAheadExtraEarnings } from "./reportPresentation";
+import { computeReportQuality, RECOVERY_THRESHOLD, ReportQuality, SEND_THRESHOLD } from "./reportQuality";
 import { validateReportConsistency } from "./reportValidation";
+import { resolveTechnicalWatchPrice } from "./technicalAlerts";
 import { computeTechnicals } from "./technicals";
 import { DataQuality, EnrichedStock, MarketOverviewItem, NewsItem, ReportData } from "./types";
+
+// Shared "everything's fine" quality fixture for tests that aren't
+// exercising the Report Quality Score / recovery-pass logic itself.
+const GOOD_QUALITY: ReportQuality = { dimensions: [], score: 100, band: "Excellent" };
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {
@@ -79,6 +86,81 @@ function makeNews(overrides: Partial<NewsItem> = {}): NewsItem {
 
 function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRow {
   return { symbol: "META", name: "Meta Platforms, Inc.", ...overrides };
+}
+
+function makeDQ(overrides: Partial<DataQuality> = {}): DataQuality {
+  return {
+    statuses: {
+      price: "available",
+      volume: "available",
+      marketCap: "available",
+      profile: "available",
+      news: "available",
+      technical: "available",
+    },
+    coverageScore: 100,
+    confidenceScore: 100,
+    label: "High",
+    excluded: false,
+    missing: [],
+    rateLimited: [],
+    reliabilityHebrew: "",
+    ...overrides,
+  };
+}
+
+function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
+  return {
+    generatedAt: "2026-08-07T13:00:00.000Z",
+    marketStory: null,
+    additionalHeadlines: [],
+    core: [],
+    growth: [],
+    speculative: [],
+    topOpportunities: [],
+    emergencyWatch: [],
+    topOpportunitiesEmergencyMode: false,
+    reportQuality: GOOD_QUALITY,
+    belowSendThreshold: false,
+    opportunityTheses: new Map(),
+    watchlist: [],
+    technicalWatch: [],
+    technicalAlerts: {
+      aboveUpper: [],
+      belowLower: [],
+      closestToUpper: [],
+      closestToLower: [],
+      expansion: [],
+      dataUnavailable: false,
+    },
+    status: {
+      movers: { source: "live" },
+      enriched: { source: "live" },
+      rateLimitHit: false,
+      notes: [],
+      liveCount: 0,
+      cachedCount: 0,
+      missingCount: 0,
+    },
+    scanned: 0,
+    qualified: 0,
+    fearGreed: null,
+    earningsCalendar: [],
+    earningsCalendarStatus: "noneFound",
+    marketCatalyst: { catalyst: null, status: "noneFound" },
+    marketOverview: [],
+    earningsFollowUp: { entries: [], status: "noneFound" },
+    dividends: [],
+    dividendsStatus: "confirmed",
+    weekAhead: {
+      earnings: [],
+      earningsStatus: "noneFound",
+      economicReadings: [],
+      economicUnavailableCount: 0,
+      unavailableNoticeHebrew: "",
+    },
+    ...overrides,
+  };
 }
 
 // ===== Priority 1: Earnings calendar contains real upcoming events =====
@@ -166,13 +248,17 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
 
   const stockWithOnlyInstitutionalNews = makeStock({ ticker: "INSTONLY", news: [institutional] });
   const reportData: ReportData = {
+    generatedAt: "2026-07-21T13:00:00.000Z",
     marketStory: null,
     additionalHeadlines: [],
     core: [stockWithOnlyInstitutionalNews],
     growth: [],
     speculative: [],
     topOpportunities: [],
+    emergencyWatch: [],
     topOpportunitiesEmergencyMode: false,
+    reportQuality: GOOD_QUALITY,
+    belowSendThreshold: false,
     opportunityTheses: new Map(),
     watchlist: [stockWithOnlyInstitutionalNews],
     technicalWatch: [],
@@ -403,13 +489,17 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     profile: { symbol: "OPP1", name: "Opportunity One", marketCap: 500_000_000_000 },
   });
   const baseData: ReportData = {
+    generatedAt: "2026-08-07T13:00:00.000Z",
     marketStory: null,
     additionalHeadlines: [],
     core: [opp],
     growth: [],
     speculative: [],
     topOpportunities: [opp],
+    emergencyWatch: [],
     topOpportunitiesEmergencyMode: false,
+    reportQuality: GOOD_QUALITY,
+    belowSendThreshold: false,
     opportunityTheses: new Map(),
     watchlist: [opp],
     technicalWatch: [],
@@ -519,6 +609,99 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
   );
 }
 
+// ===== Rendering pipeline: single-ReportData-instance guarantee =====
+//
+// Directly targets the reported bug class: an email showing "no upcoming
+// earnings" / an old catalyst while the HTML attachment, from the SAME run,
+// showed real current data. Proves (a) all four outputs carry an identical,
+// human-readable provenance tag (date/earnings-count/quality/first-ticker)
+// when genuinely rendered from one ReportData, and (b) validateReportConsistency
+// catches it immediately if even one renderer is ever fed different data.
+{
+  const freshEarnings = [
+    { ticker: "VST", name: "Vistra Corp", reportDate: "2026-08-07", daysRemaining: 0, urgency: "today" as const, reasonsHebrew: [], priority: "megaCap" as const },
+    { ticker: "TTWO", name: "Take-Two Interactive", reportDate: "2026-08-07", daysRemaining: 0, urgency: "today" as const, reasonsHebrew: [], priority: "megaCap" as const },
+  ];
+  const topOpp = makeStock({ ticker: "AAA", finalScore: 8, dataQuality: makeDQ() });
+  const freshData = makeReportData({
+    generatedAt: "2026-08-07T13:00:00.000Z",
+    earningsCalendar: freshEarnings,
+    earningsCalendarStatus: "confirmed",
+    topOpportunities: [topOpp],
+    watchlist: [topOpp],
+    reportQuality: computeReportQuality({
+      earningsCalendarStatus: "confirmed",
+      marketOverviewWithValue: 9,
+      marketOverviewTotal: 9,
+      watchlistPriceUsable: 9,
+      watchlistTotal: 9,
+      technicalsAvailable: 9,
+      technicalsTotal: 9,
+      newsAvailableCount: 9,
+      newsTotal: 9,
+      fundamentalsAvailableCount: 9,
+      fundamentalsTotal: 9,
+      topOpportunitiesConfidence: [90],
+      emergencyWatchCount: 0,
+    }),
+  });
+
+  // --- (a) genuinely one ReportData -> identical provenance in all four outputs ---
+  const today = "2026-08-07";
+  const htmlAttachment = generateHtmlReport(freshData);
+  const mdAttachment = generateReport(freshData);
+  const emailHtml = generateEmailHtmlBody(freshData, today);
+  const emailText = generateEmailTextBody(freshData, today);
+
+  const expected = computeProvenance(freshData);
+  assert(expected.earningsCount === 2 && expected.firstOpportunityTicker === "AAA", "sanity: the fresh fixture has the earnings/opportunity data the rest of this test expects");
+
+  const provenances = [
+    ["HTML attachment", extractProvenance(htmlAttachment)],
+    ["Markdown attachment", extractProvenance(mdAttachment)],
+    ["Email HTML body", extractProvenance(emailHtml)],
+    ["Email text body", extractProvenance(emailText)],
+  ] as const;
+  for (const [label, found] of provenances) {
+    assert(found !== null, `${label} embeds a report-provenance tag`);
+  }
+  const distinctProvenances = new Set(provenances.map(([, found]) => found));
+  assert(
+    distinctProvenances.size === 1,
+    `all four outputs embed the IDENTICAL provenance tag when genuinely rendered from one ReportData (got: ${[...distinctProvenances].join(" | ")})`
+  );
+
+  const consistent = validateReportConsistency({ data: freshData, htmlAttachment, mdAttachment, emailHtml, emailText });
+  assert(consistent.length === 0, `a genuinely single-ReportData run has zero consistency violations (got: ${consistent.join(" | ")})`);
+
+  // --- (b) reproduce the reported bug directly: email rendered from STALE
+  // data (0 earnings, no catalyst, different top opportunity) while the
+  // attachments come from the current run's fresh data ---
+  const staleData = makeReportData({
+    generatedAt: "2026-08-06T13:00:00.000Z",
+    earningsCalendar: [],
+    earningsCalendarStatus: "noneFound",
+    topOpportunities: [],
+  });
+  const staleEmailHtml = generateEmailHtmlBody(staleData, "2026-08-06");
+  const staleEmailText = generateEmailTextBody(staleData, "2026-08-06");
+  const staleViolations = validateReportConsistency({
+    data: freshData, // the current run's actual data
+    htmlAttachment,
+    mdAttachment,
+    emailHtml: staleEmailHtml,
+    emailText: staleEmailText,
+  });
+  assert(
+    staleViolations.some((v) => v.includes("Email HTML body") && v.includes("stale or different data")),
+    "an email rendered from stale data (0 earnings, no top opportunity) while attachments show fresh data (10-style earnings, real opportunity) is caught by the provenance check"
+  );
+  assert(
+    staleViolations.some((v) => v.includes(`earnings=${expected.earningsCount}`)),
+    "the caught violation names the EXPECTED earnings count from the current run, making the mismatch immediately diagnosable"
+  );
+}
+
 // ===== Market Overview value formatting: Fear & Greed and VIX must never
 // render with a "$" prefix (they're an index/score, not a price); percent
 // units and real per-unit prices are unaffected. =====
@@ -556,18 +739,22 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
   });
 
   const richData: ReportData = {
+    generatedAt: "2026-08-07T13:00:00.000Z",
     marketStory: null,
     additionalHeadlines: [],
     core: [oppA],
     growth: [oppB],
     speculative: [],
     topOpportunities: [oppA, oppB],
+    emergencyWatch: [],
     topOpportunitiesEmergencyMode: false,
+    reportQuality: GOOD_QUALITY,
+    belowSendThreshold: false,
     opportunityTheses: new Map(),
     watchlist: [oppA, oppB],
     technicalWatch: [
-      { ticker: "OPPA", name: "Opportunity A", price: 120, changePercent: 1.5, rsi14: 55, statusHebrew: "ניטרלי" },
-      { ticker: "OPPB", name: "Opportunity B", price: 0, changePercent: 0, rsi14: null, statusHebrew: "לא זמין" },
+      { ticker: "OPPA", name: "Opportunity A", price: 120, changePercent: 1.5, isLastClose: false, rsi14: 55, statusHebrew: "ניטרלי" },
+      { ticker: "OPPB", name: "Opportunity B", price: 0, changePercent: 0, isLastClose: false, rsi14: null, statusHebrew: "לא זמין" },
     ],
     technicalAlerts: {
       aboveUpper: [],
@@ -690,77 +877,6 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
 
 // ===== Emergency Report Mode: safety validation =====
 {
-  function makeDQ(overrides: Partial<DataQuality> = {}): DataQuality {
-    return {
-      statuses: {
-        price: "available",
-        volume: "available",
-        marketCap: "available",
-        profile: "available",
-        news: "available",
-        technical: "available",
-      },
-      coverageScore: 100,
-      confidenceScore: 100,
-      label: "High",
-      excluded: false,
-      missing: [],
-      rateLimited: [],
-      reliabilityHebrew: "",
-      ...overrides,
-    };
-  }
-
-  function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
-    return {
-      marketStory: null,
-      additionalHeadlines: [],
-      core: [],
-      growth: [],
-      speculative: [],
-      topOpportunities: [],
-      topOpportunitiesEmergencyMode: false,
-      opportunityTheses: new Map(),
-      watchlist: [],
-      technicalWatch: [],
-      technicalAlerts: {
-        aboveUpper: [],
-        belowLower: [],
-        closestToUpper: [],
-        closestToLower: [],
-        expansion: [],
-        dataUnavailable: false,
-      },
-      status: {
-        movers: { source: "live" },
-        enriched: { source: "live" },
-        rateLimitHit: false,
-        notes: [],
-        liveCount: 0,
-        cachedCount: 0,
-        missingCount: 0,
-      },
-      scanned: 0,
-      qualified: 0,
-      fearGreed: null,
-      earningsCalendar: [],
-      earningsCalendarStatus: "noneFound",
-      marketCatalyst: { catalyst: null, status: "noneFound" },
-      marketOverview: [],
-      earningsFollowUp: { entries: [], status: "noneFound" },
-      dividends: [],
-      dividendsStatus: "confirmed",
-      weekAhead: {
-        earnings: [],
-        earningsStatus: "noneFound",
-        economicReadings: [],
-        economicUnavailableCount: 0,
-        unavailableNoticeHebrew: "",
-      },
-      ...overrides,
-    };
-  }
-
   // --- 1. Provider failure alone must never silently remove a valid candidate ---
   const moverStock = makeStock({ ticker: "NEWCO", price: 42, changePercent: 3, origin: "mover" });
   assert(
@@ -805,14 +921,35 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
   assert(passesEmergencySafetyFilter(routineDipStock).ok === true, "routine negative news (a miss/decline) is NOT treated as a material negative event");
 
   // --- 5. buildTopOpportunities: normal mode is used automatically when adequate data coverage exists ---
+  // makeStock's default profile already carries marketCap+eps+profitMargin (3
+  // fundamentals) and a name, so it clears the stricter normal bar (>=2
+  // fundamentals + identity) without extra overrides.
   const goodCandidate = makeStock({ ticker: "GOOD", price: 100, finalScore: 8, dataQuality: makeDQ() });
   const weakCandidate = makeStock({ ticker: "WEAK", price: 50, finalScore: 5, dataQuality: makeDQ({ label: "Low", coverageScore: 40, confidenceScore: 30 }) });
   const normalResult = buildTopOpportunities([goodCandidate, weakCandidate], 3);
   assert(normalResult.emergencyModeActive === false, "normal mode is used automatically when at least one candidate meets the quality bar");
-  assert(!normalResult.stocks.some((s) => s.emergencyMode), "no stock is marked emergencyMode when normal mode is used");
-  assert(normalResult.stocks.length === 1 && normalResult.stocks[0].ticker === "GOOD", "normal mode only includes candidates that actually clear the quality bar");
+  assert(normalResult.emergencyWatch.length === 0, "emergencyWatch stays empty when normal mode is used");
+  assert(
+    normalResult.topOpportunities.length === 1 && normalResult.topOpportunities[0].ticker === "GOOD",
+    "normal mode only includes candidates that actually clear the quality bar"
+  );
 
-  // --- 5b. buildTopOpportunities: Emergency Mode engages only when NOTHING clears the bar ---
+  // --- 5a. The normal bar requires >=2 real fundamentals, not just a High/Medium label ---
+  const thinFundamentalsCandidate = makeStock({
+    ticker: "THIN",
+    price: 80,
+    finalScore: 7.5,
+    dataQuality: makeDQ(), // High label, full coverage...
+    profile: { symbol: "THIN", name: "Thin Fundamentals Co" }, // ...but only "name" – zero of marketCap/PE/EPS/margin
+  });
+  const thinResult = buildTopOpportunities([thinFundamentalsCandidate], 3);
+  assert(
+    thinResult.topOpportunities.length === 0,
+    "a High-coverage stock with fewer than 2 real fundamental metrics does NOT clear the normal Top Opportunity bar"
+  );
+
+  // --- 5b. buildTopOpportunities: Emergency Mode engages only when NOTHING clears the bar,
+  // and fills emergencyWatch, never topOpportunities ---
   const degradedA = makeStock({
     ticker: "DEGA",
     price: 60,
@@ -834,27 +971,33 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
   });
   const emergencyResult = buildTopOpportunities([degradedNoPrice, degradedBankrupt, degradedA], 3);
   assert(emergencyResult.emergencyModeActive === true, "Emergency Report Mode activates when no candidate clears the normal quality bar");
+  assert(emergencyResult.topOpportunities.length === 0, "Emergency Mode NEVER populates topOpportunities – only emergencyWatch");
   assert(
-    emergencyResult.stocks.length === 1 && emergencyResult.stocks[0].ticker === "DEGA",
+    emergencyResult.emergencyWatch.length === 1 && emergencyResult.emergencyWatch[0].ticker === "DEGA",
     "Emergency Mode still excludes the no-price and confirmed-bad-news candidates even though they scored higher"
   );
   assert(
-    emergencyResult.stocks.every((s) => s.emergencyMode === true),
+    emergencyResult.emergencyWatch.every((s) => s.emergencyMode === true),
     "every stock promoted through Emergency Mode is explicitly tagged emergencyMode: true"
   );
   assert(
-    emergencyResult.stocks[0].emergencyMode === true && degradedA.emergencyMode === undefined,
+    emergencyResult.emergencyWatch[0].emergencyMode === true && degradedA.emergencyMode === undefined,
     "Emergency Mode never presents a stock as a normal high-confidence pick – it returns a tagged copy, the original candidate object is untouched"
   );
 
   // A run with literally no safety-passing candidate at all stays empty rather than fabricating a pick.
   const allUnsafe = buildTopOpportunities([degradedNoPrice, degradedBankrupt], 3);
-  assert(allUnsafe.stocks.length === 0 && allUnsafe.emergencyModeActive === false, "Emergency Mode never fabricates a candidate when literally nothing passes the safety filter");
+  assert(
+    allUnsafe.topOpportunities.length === 0 && allUnsafe.emergencyWatch.length === 0 && allUnsafe.emergencyModeActive === false,
+    "Emergency Mode never fabricates a candidate when literally nothing passes the safety filter"
+  );
 
-  // --- 6. Emergency candidates are visibly marked across all four render surfaces ---
-  const emergencyStock = emergencyResult.stocks[0];
+  // --- 6. Emergency Watch candidates are visibly marked, and rendered in their
+  // OWN section, across all four render surfaces – never inside Top Opportunities ---
+  const emergencyStock = emergencyResult.emergencyWatch[0];
   const emergencyReportData = makeReportData({
-    topOpportunities: [emergencyStock],
+    topOpportunities: [],
+    emergencyWatch: [emergencyStock],
     topOpportunitiesEmergencyMode: true,
     watchlist: [emergencyStock],
   });
@@ -862,15 +1005,18 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
   const emHtml = generateHtmlReport(emergencyReportData);
   const emEmailHtml = generateEmailHtmlBody(emergencyReportData, "2026-08-07");
   const emEmailText = generateEmailTextBody(emergencyReportData, "2026-08-07");
-  assert(emMd.includes(EMERGENCY_MODE_LABEL), "Markdown attachment visibly labels the Emergency Mode candidate");
-  assert(emHtml.includes(EMERGENCY_MODE_LABEL), "HTML attachment visibly labels the Emergency Mode candidate");
-  assert(emEmailHtml.includes(EMERGENCY_MODE_LABEL), "Email HTML body visibly labels the Emergency Mode candidate");
-  assert(emEmailText.includes(EMERGENCY_MODE_LABEL), "Email text body visibly labels the Emergency Mode candidate");
+  assert(emMd.includes(EMERGENCY_MODE_LABEL), "Markdown attachment visibly labels the Emergency Watch candidate");
+  assert(emHtml.includes(EMERGENCY_MODE_LABEL), "HTML attachment visibly labels the Emergency Watch candidate");
+  assert(emEmailHtml.includes(EMERGENCY_MODE_LABEL), "Email HTML body visibly labels the Emergency Watch candidate");
+  assert(emEmailText.includes(EMERGENCY_MODE_LABEL), "Email text body visibly labels the Emergency Watch candidate");
+  assert(emMd.includes("Reduced-Confidence Watch"), "Markdown attachment renders a distinct Reduced-Confidence Watch section");
+  assert(emHtml.includes("Reduced-Confidence Watch"), "HTML attachment renders a distinct Reduced-Confidence Watch section");
 
-  // Regression guard: a normal-mode report (emergencyModeActive: false, no tagged
-  // stock) must NEVER show the Emergency Mode label anywhere.
+  // Regression guard: a normal-mode report (no emergencyWatch entries) must
+  // NEVER show the Emergency Mode label anywhere.
   const normalReportData = makeReportData({
     topOpportunities: [goodCandidate],
+    emergencyWatch: [],
     topOpportunitiesEmergencyMode: false,
     watchlist: [goodCandidate],
   });
@@ -885,6 +1031,227 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
       !normalEmailText.includes(EMERGENCY_MODE_LABEL),
     "a normal-mode report never shows the Emergency Mode label on a genuinely high-confidence pick"
   );
+}
+
+// ===== Full-market Earnings Calendar discovery + ranking =====
+{
+  const NOW_ISO = "2026-08-07";
+  function rowsFor(dateIso: string, rows: NasdaqEarningsRow[] | null): { dateIso: string; rows: NasdaqEarningsRow[] | null } {
+    return { dateIso, rows };
+  }
+
+  // --- a company outside the watchlist can appear in Upcoming Earnings ---
+  const nonWatchlistRows = deriveEarningsCalendarFromRows(
+    [rowsFor("2026-08-10", [nasdaqRow({ symbol: "COST", name: "Costco Wholesale", marketCap: 400_000_000_000 })])],
+    { nowIso: NOW_ISO, enrichedByTicker: new Map() }
+  );
+  assert(nonWatchlistRows.status === "confirmed", "a real full-market calendar day yields status 'confirmed'");
+  assert(
+    nonWatchlistRows.entries.some((e) => e.ticker === "COST"),
+    "a company outside the watchlist (COST, not in WATCHLIST) appears in Upcoming Earnings on its own merit"
+  );
+
+  // --- ranks meaningful companies from a full-market calendar: watchlist
+  // first, then index-member mega-caps, obscure micro-caps excluded entirely ---
+  const rankedResult = deriveEarningsCalendarFromRows(
+    [
+      rowsFor("2026-08-08", [
+        nasdaqRow({ symbol: "PLTR", name: "Palantir Technologies", marketCap: 300_000_000_000 }), // watchlist
+        nasdaqRow({ symbol: "COST", name: "Costco Wholesale", marketCap: 400_000_000_000 }), // Nasdaq-100 member
+        nasdaqRow({ symbol: "MIDCO", name: "Mid Cap Co", marketCap: 5_000_000_000 }), // qualifies via cap floor only
+        nasdaqRow({ symbol: "TINYX", name: "Tiny Micro Cap", marketCap: 50_000_000 }), // below the ranking floor
+      ]),
+    ],
+    { nowIso: NOW_ISO, enrichedByTicker: new Map() }
+  );
+  const rankedTickers = rankedResult.entries.map((e) => e.ticker);
+  assert(rankedTickers[0] === "PLTR", "watchlist membership always ranks first, regardless of market cap");
+  assert(
+    rankedTickers.indexOf("COST") < rankedTickers.indexOf("MIDCO"),
+    "an index-member mega-cap ranks above a non-index mid-cap of similar or smaller size"
+  );
+  assert(!rankedTickers.includes("TINYX"), "a micro-cap well below the ranking floor and not index/watchlist is excluded entirely – 'not every micro-cap'");
+
+  // --- primary window too thin -> reaches into the secondary (8-14 day) window ---
+  const thinPrimaryRows: Array<{ dateIso: string; rows: NasdaqEarningsRow[] | null }> = [
+    rowsFor("2026-08-08", [nasdaqRow({ symbol: "ONECO", name: "One Co", marketCap: 10_000_000_000 })]),
+  ];
+  for (let i = 0; i < 6; i++) {
+    thinPrimaryRows.push(rowsFor(`2026-08-${10 + i}`, []));
+  }
+  thinPrimaryRows.push(
+    rowsFor("2026-08-17", [nasdaqRow({ symbol: "LATECO", name: "Late Co", marketCap: 20_000_000_000 })])
+  );
+  const secondaryFallback = deriveEarningsCalendarFromRows(thinPrimaryRows, { nowIso: NOW_ISO, enrichedByTicker: new Map() });
+  assert(
+    secondaryFallback.entries.some((e) => e.ticker === "LATECO"),
+    "when the primary 0-7 day window alone is thin, the secondary 8-14 day window is used to reach a normally-useful count"
+  );
+
+  // --- provider failure vs. genuinely no earnings must never collapse into the same status ---
+  const allFailed = deriveEarningsCalendarFromRows(
+    [rowsFor("2026-08-08", null), rowsFor("2026-08-09", null)],
+    { nowIso: NOW_ISO, enrichedByTicker: new Map() }
+  );
+  assert(allFailed.status === "unavailable", "every date's fetch failing across the full-market calendar -> 'unavailable', never 'no companies reporting'");
+}
+
+// ===== News relevance: ETF/leveraged-fund articles cannot become a company Market Story =====
+{
+  const etfNews = makeNews({
+    title: "GraniteShares 2x Long PLTR Daily ETF (PLTU) Sees Unusual Options Activity",
+    publishedAt: "20260807T090000",
+    sentimentScore: 0.4,
+    relevanceScore: 0.9,
+  });
+  assert(isEtfOrLeveragedFundNews(etfNews), "a leveraged-ETF headline mentioning the ticker is detected as ETF/fund news, not company news");
+
+  const genuineNews = makeNews({
+    title: "Palantir Technologies Announces New Government Contract Win",
+    publishedAt: "20260807T090000",
+    sentimentScore: 0.4,
+    relevanceScore: 0.9,
+  });
+  assert(!isEtfOrLeveragedFundNews(genuineNews), "a genuine company headline is not flagged as ETF/fund news");
+
+  const pltrStock = makeStock({
+    ticker: "PLTR",
+    price: 150,
+    profile: { symbol: "PLTR", name: "Palantir Technologies", marketCap: 300_000_000_000, eps: 1, profitMargin: 0.2 },
+    news: [etfNews], // ONLY an ETF article available – no genuine company story
+  });
+  const etfOnlyData: ReportData = makeReportData({ watchlist: [pltrStock] });
+  const storyFromEtfOnly = selectMarketStory(etfOnlyData, Date.parse("2026-08-07T12:00:00Z"));
+  assert(storyFromEtfOnly === null, "when the ONLY available news is a leveraged-ETF article, no Market Story is selected (never fabricated, never an ETF puff piece)");
+
+  const pltrStockWithRealNews = makeStock({
+    ticker: "PLTR",
+    price: 150,
+    profile: { symbol: "PLTR", name: "Palantir Technologies", marketCap: 300_000_000_000, eps: 1, profitMargin: 0.2 },
+    news: [etfNews, genuineNews],
+  });
+  const mixedData: ReportData = makeReportData({ watchlist: [pltrStockWithRealNews] });
+  const storyFromMixed = selectMarketStory(mixedData, Date.parse("2026-08-07T12:00:00Z"));
+  assert(
+    storyFromMixed !== null && storyFromMixed.headline === genuineNews.title,
+    "when a genuine company story exists alongside an ETF article, the real company story wins – the ETF article never outranks it"
+  );
+}
+
+// ===== Technical Watch: Last Close fallback when the quote is unavailable =====
+{
+  const withQuote = resolveTechnicalWatchPrice(150, 2.5, { ticker: "X", name: "X", price: 148, upper: 160, lower: 140, rsi14: 55, widthChangePct: null });
+  assert(withQuote.price === 150 && withQuote.isLastClose === false, "a live/cached quote price is used as-is, not the historical close");
+
+  const noQuoteButTechnical = resolveTechnicalWatchPrice(0, 0, { ticker: "Y", name: "Y", price: 148, upper: 160, lower: 140, rsi14: 55, widthChangePct: null });
+  assert(
+    noQuoteButTechnical.price === 148 && noQuoteButTechnical.isLastClose === true,
+    "when the quote is unavailable but RSI/Bollinger were computed, the same dataset's latest close is used as a labeled 'Last close' fallback – never 'Price unavailable' next to a valid RSI"
+  );
+  assert(noQuoteButTechnical.changePercent === 0, "a Last-close fallback never fabricates a daily % change");
+
+  const noQuoteNoTechnical = resolveTechnicalWatchPrice(0, 0, undefined);
+  assert(
+    noQuoteNoTechnical.price === 0 && noQuoteNoTechnical.isLastClose === false,
+    "when there's genuinely no quote AND no technical history, price stays unavailable rather than fabricating a close"
+  );
+}
+
+// ===== Report Quality Score: recovery trigger + poor-quality diagnostic gate =====
+{
+  const excellentInput = {
+    earningsCalendarStatus: "confirmed" as const,
+    marketOverviewWithValue: 9,
+    marketOverviewTotal: 9,
+    watchlistPriceUsable: 9,
+    watchlistTotal: 9,
+    technicalsAvailable: 9,
+    technicalsTotal: 9,
+    newsAvailableCount: 9,
+    newsTotal: 9,
+    fundamentalsAvailableCount: 9,
+    fundamentalsTotal: 9,
+    topOpportunitiesConfidence: [95, 90, 92],
+    emergencyWatchCount: 0,
+  };
+  const excellent = computeReportQuality(excellentInput);
+  assert(excellent.score >= 90 && excellent.band === "Excellent", "full coverage across every dimension scores Excellent (90-100)");
+  assert(excellent.score >= RECOVERY_THRESHOLD, "an Excellent-quality run never triggers the recovery pass");
+
+  const poorInput = {
+    earningsCalendarStatus: "unavailable" as const,
+    marketOverviewWithValue: 1,
+    marketOverviewTotal: 9,
+    watchlistPriceUsable: 1,
+    watchlistTotal: 9,
+    technicalsAvailable: 1,
+    technicalsTotal: 9,
+    newsAvailableCount: 0,
+    newsTotal: 9,
+    fundamentalsAvailableCount: 0,
+    fundamentalsTotal: 9,
+    topOpportunitiesConfidence: [],
+    emergencyWatchCount: 0,
+  };
+  const poor = computeReportQuality(poorInput);
+  assert(poor.score < RECOVERY_THRESHOLD, "a run with widespread provider failure scores below the recovery threshold");
+  assert(poor.score < SEND_THRESHOLD, "a severely degraded run scores below the send threshold too");
+  assert(poor.band === "Poor", "a severely degraded run is banded 'Poor'");
+
+  // The recovery pass's one concrete action: widening the Market Story news
+  // window finds a real story the normal window would have missed.
+  const oldNews = makeNews({
+    title: "Test Corp Announces New Product Launch",
+    publishedAt: "20260723T090000", // 15 days before "now" below – outside the normal 10-day window
+    sentimentScore: 0.4,
+    relevanceScore: 0.9,
+  });
+  const staleNewsStock = makeStock({ ticker: "OLDNEWS", price: 50, news: [oldNews] });
+  const staleData: ReportData = makeReportData({ watchlist: [staleNewsStock] });
+  const now = Date.parse("2026-08-07T12:00:00Z");
+  const normalWindowStory = selectMarketStory(staleData, now);
+  assert(normalWindowStory === null, "sanity: a 15-day-old story is genuinely outside the normal 10-day window");
+  const recoveredStory = selectMarketStory(staleData, now, RECOVERY_RECENT_DAYS);
+  assert(
+    recoveredStory !== null && recoveredStory.headline === oldNews.title,
+    "the recovery pass's wider news window (RECOVERY_RECENT_DAYS) finds a real story the normal window missed"
+  );
+
+  // Poor-quality reports do not masquerade as normal reports.
+  const goodCandidate = makeStock({ ticker: "GOOD", price: 100, finalScore: 8, dataQuality: makeDQ() });
+  const poorReportData: ReportData = makeReportData({
+    topOpportunities: [goodCandidate],
+    watchlist: [goodCandidate],
+    reportQuality: poor,
+    belowSendThreshold: true,
+  });
+  const diagMd = generateDiagnosticReport(poorReportData);
+  const diagHtml = generateDiagnosticHtmlReport(poorReportData);
+  const diagEmailHtml = generateEmailHtmlBody(poorReportData, "2026-08-07");
+  const diagEmailText = generateEmailTextBody(poorReportData, "2026-08-07");
+  assert(diagMd.includes("לא הופק ברמת האיכות הרגילה"), "the diagnostic Markdown report clearly states normal quality wasn't reached");
+  assert(diagHtml.includes("לא הופק ברמת האיכות הרגילה"), "the diagnostic HTML report clearly states normal quality wasn't reached");
+  assert(
+    diagEmailHtml.includes("לא הופק ברמת האיכות הרגילה") && diagEmailText.includes("לא הופק ברמת האיכות הרגילה"),
+    "generateEmailHtmlBody/generateEmailTextBody automatically switch to the diagnostic body when belowSendThreshold is true"
+  );
+  assert(
+    !diagEmailHtml.includes("Top Opportunities") && !diagEmailText.includes("🎯 Top Opportunities"),
+    "a poor-quality diagnostic email never renders the normal Top Opportunities section, even though goodCandidate would have qualified"
+  );
+
+  // Visual structure remains intact: the normal report still carries its
+  // approved-design markers, and the diagnostic report still uses the same
+  // shell (navy header / RTL / card system), not a bare-bones page.
+  const goodReportData: ReportData = makeReportData({
+    topOpportunities: [goodCandidate],
+    watchlist: [goodCandidate],
+    reportQuality: excellent,
+    belowSendThreshold: false,
+  });
+  const normalHtmlFull = generateHtmlReport(goodReportData);
+  assert(normalHtmlFull.includes('dir="rtl"') && normalHtmlFull.includes("Top Opportunities"), "a normal-quality HTML report preserves the RTL layout and the Top Opportunities section");
+  assert(diagHtml.includes('dir="rtl"') && diagHtml.includes("report-header"), "the diagnostic HTML report reuses the same RTL/header visual shell as the normal report, not a stripped-down page");
 }
 
 console.log(

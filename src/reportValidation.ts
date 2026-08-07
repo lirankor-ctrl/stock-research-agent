@@ -1,4 +1,4 @@
-import { computeReportFingerprint, extractFingerprint } from "./reportFingerprint";
+import { computeProvenance, computeReportFingerprint, extractFingerprint, extractProvenance } from "./reportFingerprint";
 import { ReportData } from "./types";
 
 export interface ConsistencyCheckInputs {
@@ -59,6 +59,15 @@ export function validateReportConsistency(inputs: ConsistencyCheckInputs): strin
     }
   }
 
+  for (const s of data.emergencyWatch) {
+    if (!htmlAttachment.includes(s.ticker)) {
+      violations.push(`Reduced-Confidence Watch entry "${s.ticker}" is missing from the HTML attachment`);
+    }
+    if (!emailHtml.includes(s.ticker)) {
+      violations.push(`Reduced-Confidence Watch entry "${s.ticker}" is missing from the email HTML body`);
+    }
+  }
+
   const expectedFingerprint = computeReportFingerprint(data);
   const outputs: Array<[string, string]> = [
     ["HTML attachment", htmlAttachment],
@@ -73,6 +82,26 @@ export function validateReportConsistency(inputs: ConsistencyCheckInputs): strin
     } else if (found !== expectedFingerprint) {
       violations.push(
         `${label} fingerprint (${found}) does not match the current ReportData (${expectedFingerprint}) – it was generated from a different report-data object`
+      );
+    }
+  }
+
+  // Human-readable companion to the hash above (report date / earnings count
+  // / quality score / first opportunity ticker) – catches, in plain terms,
+  // exactly the failure mode once reported: one renderer (typically the
+  // email) showing stale earnings/catalyst content while the others, from
+  // the same run, show current data.
+  const expectedProvenance = computeProvenance(data);
+  const expectedProvenanceTag =
+    `date=${expectedProvenance.reportDate}|earnings=${expectedProvenance.earningsCount}` +
+    `|quality=${expectedProvenance.reportQualityScore}|firstOpp=${expectedProvenance.firstOpportunityTicker}`;
+  for (const [label, rendered] of outputs) {
+    const found = extractProvenance(rendered);
+    if (found === null) {
+      violations.push(`${label} has no report-provenance tag embedded – cannot verify it came from this run's ReportData`);
+    } else if (found !== expectedProvenanceTag) {
+      violations.push(
+        `${label} provenance (${found}) does not match the current ReportData (${expectedProvenanceTag}) – it was rendered from stale or different data`
       );
     }
   }

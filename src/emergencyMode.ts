@@ -1,6 +1,6 @@
 import { isExcludedSecurity, MIN_PRICE_USD } from "./filters";
 import { meetsRecommendationThreshold } from "./dataQuality";
-import { EnrichedStock } from "./types";
+import { CompanyProfile, EnrichedStock } from "./types";
 
 // Exact label required to appear on every Emergency-Mode-promoted stock, in
 // every render surface (Markdown, HTML, email HTML, email text) – the
@@ -33,6 +33,35 @@ function hasConfirmedMaterialNegativeEvent(stock: EnrichedStock): boolean {
     const title = (n.title ?? "").toLowerCase();
     return MATERIAL_NEGATIVE_EVENT_KEYWORDS.some((k) => title.includes(k));
   });
+}
+
+// How many of the market-cap / P/E / EPS / profit-margin fields are actually
+// populated – the concrete, countable stand-in for "at least TWO meaningful
+// fundamental metrics".
+function countMeaningfulFundamentals(profile: CompanyProfile | undefined): number {
+  if (!profile) return 0;
+  let n = 0;
+  if (profile.marketCap && profile.marketCap > 0) n++;
+  if (profile.peRatio && profile.peRatio > 0) n++;
+  if (profile.eps !== undefined) n++;
+  if (profile.profitMargin !== undefined) n++;
+  return n;
+}
+
+const MIN_FUNDAMENTAL_METRICS = 2;
+
+// The bar for a NORMAL Top Opportunity – stricter than the plain data-quality
+// gate. A stock can carry a "Medium" coverage label (clearing
+// meetsRecommendationThreshold) while still having essentially no usable
+// fundamentals if profile/news happened to be the only genuinely-missing
+// dimensions; this closes that gap explicitly rather than relying on the
+// coverage score alone. A candidate that fails this can still be shown, but
+// only in the separate Reduced-Confidence Watch – never as a normal pick.
+export function meetsNormalTopOpportunityBar(stock: EnrichedStock): boolean {
+  if (!meetsRecommendationThreshold(stock.dataQuality)) return false;
+  if (!stock.profile?.name) return false; // basic company identity
+  if (countMeaningfulFundamentals(stock.profile) < MIN_FUNDAMENTAL_METRICS) return false;
+  return true;
 }
 
 export interface EmergencySafetyResult {
@@ -76,27 +105,33 @@ function selectEmergencyCandidates(
 }
 
 export interface TopOpportunitiesResult {
-  stocks: EnrichedStock[];
-  emergencyModeActive: boolean;
+  // 0-limit normal-quality picks. Allowed to be fewer than `limit` – one
+  // strong idea beats padding the list with weak ones. NEVER contains an
+  // emergency-promoted stock.
+  topOpportunities: EnrichedStock[];
+  // 0-limit reduced-confidence candidates, populated ONLY when
+  // topOpportunities came back empty. Rendered in their own
+  // "⚠️ Reduced-Confidence Watch" block, never merged into Top Opportunities.
+  emergencyWatch: EnrichedStock[];
+  emergencyModeActive: boolean; // true iff emergencyWatch is non-empty
 }
 
 // Single entry point pipeline.ts (and the self-test) use to decide Top
-// Opportunities: normal High/Medium-quality candidates first; only when
-// that yields nothing does Emergency Mode engage, and only over candidates
-// that pass the from-scratch safety filter above. When adequate coverage
-// returns, `normal` is non-empty again and Emergency Mode is bypassed
-// automatically – there is no separate "mode" flag to remember or reset.
+// Opportunities: normal-quality candidates first (see
+// meetsNormalTopOpportunityBar); only when that yields NOTHING does
+// Emergency Mode engage, filling the separate Reduced-Confidence Watch list
+// instead – never the normal one. When adequate coverage returns,
+// `normal` is non-empty again and Emergency Mode is bypassed automatically –
+// there is no separate "mode" flag to remember or reset.
 export function buildTopOpportunities(
   rankedCandidates: EnrichedStock[],
   limit = 3
 ): TopOpportunitiesResult {
-  const normal = rankedCandidates
-    .filter((s) => meetsRecommendationThreshold(s.dataQuality))
-    .slice(0, limit);
+  const normal = rankedCandidates.filter(meetsNormalTopOpportunityBar).slice(0, limit);
   if (normal.length > 0) {
-    return { stocks: normal, emergencyModeActive: false };
+    return { topOpportunities: normal, emergencyWatch: [], emergencyModeActive: false };
   }
 
   const emergency = selectEmergencyCandidates(rankedCandidates, limit);
-  return { stocks: emergency, emergencyModeActive: emergency.length > 0 };
+  return { topOpportunities: [], emergencyWatch: emergency, emergencyModeActive: emergency.length > 0 };
 }

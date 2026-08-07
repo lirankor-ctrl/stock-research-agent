@@ -5,7 +5,7 @@ import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
 import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { visibleOverviewItems, MIN_VISIBLE_INDICATORS } from "./marketOverview";
-import { fingerprintHtmlComment } from "./reportFingerprint";
+import { fingerprintHtmlComment, provenanceHtmlComment } from "./reportFingerprint";
 import { formatOverviewValue } from "./reportPresentation";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
@@ -179,10 +179,9 @@ ${[header, ...rows].join("\n")}`;
 
 function opportunityBlock(s: EnrichedStock, thesis: OpportunityThesis | undefined): string {
   const name = displayName(s);
-  const emergencyBadge = s.emergencyMode ? `\n> ⚠️ **${EMERGENCY_MODE_LABEL}**` : "";
   return `### ${s.ticker} — ${name}
 
-> ⭐ **${s.finalScore.toFixed(1)}/10** · 🧪 ${dqBadge(s)}${emergencyBadge}
+> ⭐ **${s.finalScore.toFixed(1)}/10** · 🧪 ${dqBadge(s)}
 
 - 💰 ${fmtPrice(s.price)} (${s.price > 0 ? fmtChange(s.changePercent) : "—"})
 
@@ -194,21 +193,51 @@ function opportunityBlock(s: EnrichedStock, thesis: OpportunityThesis | undefine
 **מה יפריך את התזה:** ${thesis?.invalidation ?? "—"}`;
 }
 
+// Top Opportunities NEVER contains an Emergency-Mode-promoted stock – when
+// nothing clears the normal bar, this simply shows fewer than 3 (down to 0)
+// rather than backfilling with reduced-confidence picks. See
+// emergencyWatchSection below for where those go instead.
 function topOpportunitiesSection(
   stocks: EnrichedStock[],
-  theses: Map<string, OpportunityThesis>,
-  emergencyModeActive: boolean
+  theses: Map<string, OpportunityThesis>
 ): string {
   if (stocks.length === 0) {
     return `## 🎯 Top Opportunities
 
 _אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו._`;
   }
-  const notice = emergencyModeActive ? `\n_⚠️ ${EMERGENCY_MODE_EXPLANATION_HEBREW}_\n` : "";
   const body = stocks.map((s) => opportunityBlock(s, theses.get(s.ticker))).join("\n\n---\n\n");
   return `## 🎯 Top Opportunities (${stocks.length}/3)
-${notice}
+
 ${body}`;
+}
+
+// ---------- 4b. Reduced-Confidence Watch (Emergency Report Mode only) ----------
+//
+// Renders NOTHING (not even an empty-state heading) when Emergency Mode
+// isn't engaged – this block only exists on the days it's actually needed,
+// never as permanent clutter. A lighter format than Top Opportunities cards
+// on purpose: no structured thesis, just the real numbers we do have plus an
+// explicit reliability caveat, so it can never be mistaken for a normal pick.
+function emergencyWatchSection(stocks: EnrichedStock[]): string {
+  if (stocks.length === 0) return "";
+  const rows = stocks
+    .map((s) => {
+      const name = displayName(s);
+      const reliability = s.dataQuality?.reliabilityHebrew ?? "";
+      return `### ${s.ticker} — ${name}
+
+> ⚠️ **${EMERGENCY_MODE_LABEL}** · ⭐ ${s.finalScore.toFixed(1)}/10 · 🧪 ${dqBadge(s)}
+
+- 💰 ${fmtPrice(s.price)} (${s.price > 0 ? fmtChange(s.changePercent) : "—"})
+- ${reliability}`;
+    })
+    .join("\n\n---\n\n");
+  return `## ⚠️ Reduced-Confidence Watch (${stocks.length})
+
+_${EMERGENCY_MODE_EXPLANATION_HEBREW}_
+
+${rows}`;
 }
 
 // ---------- 5. Technical Watch ----------
@@ -223,7 +252,9 @@ _נתונים טכניים (RSI / Bollinger Bands, מחושבים מקומית) 
     "| Symbol | Price | Change | RSI(14) | Status |\n" + "| ------ | ----- | ------ | ------- | ------ |";
   const rows = items.map((i) => {
     const rsi = i.rsi14 !== null ? `${Math.round(i.rsi14)} (${rsiInterpretation(i.rsi14).label})` : "—";
-    return `| **${i.ticker}** | ${fmtPrice(i.price)} | ${i.price > 0 ? fmtChange(i.changePercent) : "—"} | ${rsi} | ${i.statusHebrew} |`;
+    const priceCell = i.price > 0 ? `${fmtPrice(i.price)}${i.isLastClose ? " (Last close)" : ""}` : "Unavailable";
+    const changeCell = i.price > 0 && !i.isLastClose ? fmtChange(i.changePercent) : "—";
+    return `| **${i.ticker}** | ${priceCell} | ${changeCell} | ${rsi} | ${i.statusHebrew} |`;
   });
   return `## 📊 Technical Watch
 
@@ -329,8 +360,9 @@ Live: ${status.liveCount} · Cached: ${status.cachedCount} · Unavailable: ${sta
 //  10. This Week To Watch
 //  11. Data Diagnostics
 export function generateReport(data: ReportData): string {
-  const now = new Date();
+  const now = new Date(data.generatedAt);
   const { earningsCalendar, earningsCalendarStatus, marketCatalyst } = data;
+  const emergencyWatch = emergencyWatchSection(data.emergencyWatch);
 
   return `# 📈 דוח מניות למשקיע לטווח ארוך
 
@@ -366,8 +398,8 @@ ${earningsFollowUpSection(data.earningsFollowUp)}
 
 ---
 
-${topOpportunitiesSection(data.topOpportunities, data.opportunityTheses, data.topOpportunitiesEmergencyMode)}
-
+${topOpportunitiesSection(data.topOpportunities, data.opportunityTheses)}
+${emergencyWatch ? `\n---\n\n${emergencyWatch}\n` : ""}
 ---
 
 ${dividendsSection(data.dividends, data.dividendsStatus)}
@@ -389,6 +421,90 @@ ${diagnosticsSection(data)}
 _Generated by stock-agent · ${now.toISOString()}_
 
 ${fingerprintHtmlComment(data)}
+${provenanceHtmlComment(data)}
+`;
+}
+
+// ===== Diagnostic-only report (Report Quality Score below SEND_THRESHOLD) =====
+//
+// Rendered INSTEAD of the normal newsletter when quality stayed poor even
+// after the recovery pass – see src/reportQuality.ts and pipeline.ts. Never
+// pretends to be a normal report: short, explicit about what's missing, and
+// built only from data we DO have (Market Overview + Earnings Calendar
+// already have their own honest empty/unavailable states).
+
+function providerIssuesSection(data: ReportData): string {
+  const failing = data.reportQuality.dimensions.filter((d) => d.scorePct < 60);
+  if (failing.length === 0) {
+    return `## ⚠️ Provider Issues
+
+_לא זוהה כשל ספק בודד וחמור – הציון ירד משילוב של כמה פערי כיסוי חלקיים, ראו טבלה למטה._`;
+  }
+  const lines = failing.map((d) => `- **${d.label}**: ${d.scorePct}% (${d.detail})`);
+  return `## ⚠️ Provider Issues
+
+${lines.join("\n")}`;
+}
+
+function lastVerifiedSection(data: ReportData): string {
+  const lines = data.watchlist.map((s) => {
+    const src = s.quoteSource;
+    const label =
+      !src || src.source === "unavailable"
+        ? "לא זמין"
+        : src.source === "live"
+        ? "עדכני (נשלף כעת)"
+        : `במטמון (${src.ageHours ?? "?"} שעות)`;
+    return `- **${s.ticker}**: ${label}`;
+  });
+  return `## 🕒 Last Verified Data
+
+${lines.join("\n")}`;
+}
+
+export function generateDiagnosticReport(data: ReportData): string {
+  const now = new Date(data.generatedAt);
+  const q = data.reportQuality;
+  return `# 📈 דוח מניות למשקיע לטווח ארוך — מצב מוגבל
+
+> **Generated:** ${fmtDateTime(now)}
+
+---
+
+## ⚠️ הדוח היום לא הופק ברמת האיכות הרגילה
+
+_Today's market report could not be produced at normal quality (Report Quality Score: ${q.score}/100 – ${q.band}). Rather than send a misleading or near-empty newsletter, this is a short diagnostic summary of what we do know right now. The full report resumes automatically once data coverage recovers._
+
+---
+
+${marketOverviewSection(data.marketOverview)}
+
+---
+
+${earningsCalendarSection(data.earningsCalendar, data.earningsCalendarStatus)}
+
+---
+
+${providerIssuesSection(data)}
+
+---
+
+${lastVerifiedSection(data)}
+
+---
+
+${diagnosticsSection(data)}
+
+---
+
+## Disclaimer
+
+**Research only. Not investment advice.** מסחר במניות כרוך בסיכון לאובדן ההון – כל החלטה על אחריותך בלבד.
+
+_Generated by stock-agent · ${now.toISOString()}_
+
+${fingerprintHtmlComment(data)}
+${provenanceHtmlComment(data)}
 `;
 }
 

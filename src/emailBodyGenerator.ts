@@ -9,7 +9,12 @@ import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
 import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
-import { fingerprintHtmlComment, fingerprintTextTag } from "./reportFingerprint";
+import {
+  fingerprintHtmlComment,
+  fingerprintTextTag,
+  provenanceHtmlComment,
+  provenanceTextTag,
+} from "./reportFingerprint";
 import {
   catalystWhyItMattersHebrew,
   dataFreshnessLine,
@@ -259,7 +264,7 @@ function htmlTechnicalWatch(items: ReportData["technicalWatch"], dataUnavailable
       const hasPrice = i.price > 0;
       const rsi = i.rsi14 !== null ? `${Math.round(i.rsi14)} (${esc(rsiInterpretation(i.rsi14).label)})` : "—";
       const priceCell = hasPrice
-        ? ltr(esc(fmtPrice(i.price)))
+        ? `${ltr(esc(fmtPrice(i.price)))}${i.isLastClose ? ` <span style="color:${PALETTE.mutedSoft};font-size:11px;">(Last close)</span>` : ""}`
         : `<span style="color:${PALETTE.mutedSoft};font-style:italic;">Price unavailable</span>`;
       return `<tr>
         <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:13px;"><strong style="color:${PALETTE.navy};">${ltr(esc(i.ticker))}</strong></td>
@@ -336,7 +341,6 @@ function opportunityCardHtml(rank: number, s: EnrichedStock, thesis: Opportunity
         ${changeHtml}
       </td>
     </tr></table>
-    ${s.emergencyMode ? `<div style="margin-top:8px;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:800;font-size:11.5px;display:inline-block;">⚠️ ${EMERGENCY_MODE_LABEL}</div>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:10px;"><tr>
       ${metricChipHtml("Coverage", dq ? `${dq.coverageScore}` : "—")}
       ${metricChipHtml("Confidence", dq ? `${dq.confidenceScore}` : "—")}
@@ -352,17 +356,55 @@ function opportunityCardHtml(rank: number, s: EnrichedStock, thesis: Opportunity
   return `<tr><td style="padding-bottom:14px;">${card(inner, `border-right:4px solid ${PALETTE.blue};`, "opportunity-card")}</td></tr>`;
 }
 
-function htmlTopOpportunities(
-  stocks: EnrichedStock[],
-  theses: Map<string, OpportunityThesis>,
-  emergencyModeActive: boolean
-): string {
+// Top Opportunities NEVER contains an Emergency-Mode-promoted stock – when
+// nothing clears the normal bar this simply shows fewer than 3 (down to 0)
+// rather than backfilling. See htmlEmergencyWatch below for where those go.
+function htmlTopOpportunities(stocks: EnrichedStock[], theses: Map<string, OpportunityThesis>): string {
   if (stocks.length === 0) {
     return sectionWrap(`${h("Top Opportunities")}${emptyNotice("אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו.")}`);
   }
-  const notice = emergencyModeActive ? emptyNotice(`⚠️ ${EMERGENCY_MODE_EXPLANATION_HEBREW}`) : "";
   const rows = stocks.map((s, idx) => opportunityCardHtml(idx + 1, s, theses.get(s.ticker))).join("");
-  return sectionWrap(`${h("Top Opportunities")}${notice}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`);
+  return sectionWrap(`${h("Top Opportunities")}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`);
+}
+
+// ===== 8b. Reduced-Confidence Watch (Emergency Report Mode only) =====
+//
+// Renders nothing at all when Emergency Mode isn't engaged. A lighter card
+// than a normal opportunity – no structured thesis, just the real numbers
+// plus an explicit reliability caveat and badge – so it can never be
+// mistaken for a normal high-confidence pick.
+function emergencyWatchCardHtml(s: EnrichedStock): string {
+  const dq = s.dataQuality;
+  const changeHtml =
+    s.price > 0
+      ? `<span style="font-size:12.5px;font-weight:700;color:${CHANGE_COLOR[changeClass(s.changePercent)]};">${ltr(esc(fmtChange(s.changePercent)))}</span>`
+      : "";
+  const inner = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <strong style="font-size:17px;color:${PALETTE.navy};">${ltr(esc(s.ticker))}</strong>
+        <div style="font-size:12.5px;color:${PALETTE.muted};margin-top:2px;">${esc(displayName(s))}</div>
+      </td>
+      <td valign="top" align="right" style="white-space:nowrap;">
+        <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${PALETTE.pageBg};color:${PALETTE.muted};font-weight:800;font-size:14px;">${s.finalScore.toFixed(1)}/10</span><br>
+        ${changeHtml}
+      </td>
+    </tr></table>
+    <div style="margin-top:8px;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:800;font-size:11.5px;display:inline-block;">⚠️ ${EMERGENCY_MODE_LABEL}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:10px;"><tr>
+      ${metricChipHtml("Coverage", dq ? `${dq.coverageScore}` : "—")}
+      ${metricChipHtml("Confidence", dq ? `${dq.confidenceScore}` : "—")}
+    </tr></table>
+    <p style="margin-top:10px;font-size:12px;color:${PALETTE.muted};">${esc(dq?.reliabilityHebrew ?? "")}</p>`;
+
+  return `<tr><td style="padding-bottom:14px;">${card(inner, `border-right:4px solid ${PALETTE.amber};`, "opportunity-card")}</td></tr>`;
+}
+
+function htmlEmergencyWatch(stocks: EnrichedStock[]): string {
+  if (stocks.length === 0) return "";
+  const notice = emptyNotice(EMERGENCY_MODE_EXPLANATION_HEBREW);
+  const rows = stocks.map((s) => emergencyWatchCardHtml(s)).join("");
+  return sectionWrap(`${h("⚠️ Reduced-Confidence Watch")}${notice}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`);
 }
 
 // ===== 9. Dividend Information (secondary, visually smaller) =====
@@ -449,7 +491,74 @@ const EMAIL_MEDIA_STYLE = `
   }
 `;
 
+// ===== Diagnostic-only email body (Report Quality Score below SEND_THRESHOLD) =====
+//
+// Rendered INSTEAD of the normal email body – see src/reportQuality.ts and
+// pipeline.ts. Reuses the same header/palette/680px shell as the normal
+// email (same visual system), just with a short, honest body.
+
+function diagnosticProviderIssuesHtml(data: ReportData): string {
+  const failing = data.reportQuality.dimensions.filter((d) => d.scorePct < 60);
+  const rows =
+    failing.length > 0
+      ? failing.map((d) => `<div style="margin-top:4px;font-size:12.5px;">• <strong>${esc(d.label)}</strong>: ${d.scorePct}% (${esc(d.detail)})</div>`).join("")
+      : `<div style="font-size:12.5px;">לא זוהה כשל ספק בודד וחמור – הציון ירד משילוב של כמה פערי כיסוי חלקיים.</div>`;
+  return sectionWrap(`${h("Provider Issues")}${card(rows)}`);
+}
+
+function diagnosticLastVerifiedHtml(data: ReportData): string {
+  const rows = data.watchlist
+    .map((s) => {
+      const src = s.quoteSource;
+      const label =
+        !src || src.source === "unavailable"
+          ? "לא זמין"
+          : src.source === "live"
+          ? "עדכני (נשלף כעת)"
+          : `במטמון (${src.ageHours ?? "?"} שעות)`;
+      return `<div style="margin-top:4px;font-size:12.5px;">• <strong>${ltr(esc(s.ticker))}</strong>: ${esc(label)}</div>`;
+    })
+    .join("");
+  return sectionWrap(`${h("Last Verified Data")}${card(rows)}`);
+}
+
+function generateDiagnosticEmailHtmlBody(data: ReportData, today: string): string {
+  const q = data.reportQuality;
+  const notice = sectionWrap(
+    card(
+      `<div style="font-weight:800;color:${PALETTE.amber};margin-bottom:6px;">⚠️ הדוח היום לא הופק ברמת האיכות הרגילה</div>` +
+        `<div style="font-size:13px;color:${PALETTE.navy};">Today's market report could not be produced at normal quality (Report Quality Score: ${q.score}/100 – ${esc(q.band)}). This is a short diagnostic summary instead of the full newsletter.</div>`,
+      `border-right:4px solid ${PALETTE.amber};`
+    )
+  );
+
+  const sections = [
+    notice,
+    htmlMarketOverview(data.marketOverview),
+    htmlEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
+    diagnosticProviderIssuesHtml(data),
+    diagnosticLastVerifiedHtml(data),
+    htmlDiagnostics(data),
+    htmlFooter(),
+  ].join("\n");
+
+  return `<style>${EMAIL_MEDIA_STYLE}</style>
+  <div dir="rtl" lang="he" style="font-family:Arial,Helvetica,sans-serif;background:${PALETTE.pageBg};padding:16px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:${EMAIL_MAX_WIDTH}px;margin:0 auto;background:${PALETTE.pageBg};">
+      <tr><td>
+        ${htmlHeader(data, today)}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:20px;">
+          <tr><td>${sections}</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </div>
+  ${fingerprintHtmlComment(data)}
+  ${provenanceHtmlComment(data)}`;
+}
+
 export function generateEmailHtmlBody(data: ReportData, today: string): string {
+  if (data.belowSendThreshold) return generateDiagnosticEmailHtmlBody(data, today);
   const sections = [
     htmlEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
     htmlMarketCatalyst(data.marketCatalyst),
@@ -458,7 +567,8 @@ export function generateEmailHtmlBody(data: ReportData, today: string): string {
     htmlMarketOverview(data.marketOverview),
     htmlTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
     htmlEarningsFollowUp(data.earningsFollowUp),
-    htmlTopOpportunities(data.topOpportunities, data.opportunityTheses, data.topOpportunitiesEmergencyMode),
+    htmlTopOpportunities(data.topOpportunities, data.opportunityTheses),
+    htmlEmergencyWatch(data.emergencyWatch),
     htmlDividends(data.dividends, data.dividendsStatus),
     htmlWeekAhead(data),
     htmlDiagnostics(data),
@@ -476,7 +586,8 @@ export function generateEmailHtmlBody(data: ReportData, today: string): string {
       </td></tr>
     </table>
   </div>
-  ${fingerprintHtmlComment(data)}`;
+  ${fingerprintHtmlComment(data)}
+  ${provenanceHtmlComment(data)}`;
 }
 
 // ===== Plain-text body =====
@@ -532,7 +643,10 @@ function textMarketOverview(items: MarketOverviewItem[]): string {
 function textTechnicalWatch(items: ReportData["technicalWatch"], dataUnavailable: boolean): string {
   if (dataUnavailable || items.length === 0) return `📊 Technical Watch:\n  נתונים טכניים אינם זמינים כרגע.`;
   const lines = items
-    .map((i) => `  • ${i.ticker} – ${i.price > 0 ? fmtPrice(i.price) : "Price unavailable"} · ${i.statusHebrew}`)
+    .map((i) => {
+      const priceLabel = i.price > 0 ? `${fmtPrice(i.price)}${i.isLastClose ? " (Last close)" : ""}` : "Price unavailable";
+      return `  • ${i.ticker} – ${priceLabel} · ${i.statusHebrew}`;
+    })
     .join("\n");
   return `📊 Technical Watch:\n${lines}`;
 }
@@ -548,17 +662,26 @@ function textEarningsFollowUp(followUp: EarningsFollowUpResult): string {
   return `📮 Earnings Follow-up:\n${lines}`;
 }
 
-function textTopOpportunities(stocks: EnrichedStock[], emergencyModeActive: boolean): string {
+// Top Opportunities NEVER contains an Emergency-Mode-promoted stock – see
+// textEmergencyWatch below for where those go instead.
+function textTopOpportunities(stocks: EnrichedStock[]): string {
   if (stocks.length === 0) return `🎯 Top Opportunities (0/3):\n  —`;
-  const notice = emergencyModeActive ? `  ⚠️ ${EMERGENCY_MODE_EXPLANATION_HEBREW}\n` : "";
+  const lines = stocks
+    .map((s) => `  • ${s.ticker} – ${displayName(s)} (ציון ${s.finalScore.toFixed(1)}/10${s.price > 0 ? `, ${fmtChange(s.changePercent)}` : ""})`)
+    .join("\n");
+  return `🎯 Top Opportunities (${stocks.length}/3):\n${lines}`;
+}
+
+// Renders nothing at all when Emergency Mode isn't engaged.
+function textEmergencyWatch(stocks: EnrichedStock[]): string {
+  if (stocks.length === 0) return "";
   const lines = stocks
     .map(
       (s) =>
-        `  • ${s.ticker} – ${displayName(s)} (ציון ${s.finalScore.toFixed(1)}/10${s.price > 0 ? `, ${fmtChange(s.changePercent)}` : ""})` +
-        (s.emergencyMode ? ` [⚠️ ${EMERGENCY_MODE_LABEL}]` : "")
+        `  • ${s.ticker} – ${displayName(s)} (ציון ${s.finalScore.toFixed(1)}/10) [⚠️ ${EMERGENCY_MODE_LABEL}]`
     )
     .join("\n");
-  return `🎯 Top Opportunities (${stocks.length}/3):\n${notice}${lines}`;
+  return `⚠️ Reduced-Confidence Watch (${stocks.length}):\n  ${EMERGENCY_MODE_EXPLANATION_HEBREW}\n${lines}`;
 }
 
 function textDividends(items: DividendInfoItem[], status: DividendsStatus): string {
@@ -588,7 +711,54 @@ function textDiagnostics(data: ReportData): string {
   Scanned: ${scanned} · Qualified: ${qualified}${status.rateLimitHit ? "\n  ⚠️ הופעלה מגבלת ה-API בריצה זו." : ""}`;
 }
 
+function diagnosticProviderIssuesText(data: ReportData): string {
+  const failing = data.reportQuality.dimensions.filter((d) => d.scorePct < 60);
+  if (failing.length === 0) return `⚠️ Provider Issues:\n  לא זוהה כשל ספק בודד וחמור.`;
+  const lines = failing.map((d) => `  • ${d.label}: ${d.scorePct}% (${d.detail})`).join("\n");
+  return `⚠️ Provider Issues:\n${lines}`;
+}
+
+function diagnosticLastVerifiedText(data: ReportData): string {
+  const lines = data.watchlist
+    .map((s) => {
+      const src = s.quoteSource;
+      const label =
+        !src || src.source === "unavailable"
+          ? "לא זמין"
+          : src.source === "live"
+          ? "עדכני"
+          : `במטמון (${src.ageHours ?? "?"} שעות)`;
+      return `  • ${s.ticker}: ${label}`;
+    })
+    .join("\n");
+  return `🕒 Last Verified Data:\n${lines}`;
+}
+
+function generateDiagnosticEmailTextBody(data: ReportData, today: string): string {
+  const q = data.reportQuality;
+  const sections = [
+    `⚠️ הדוח היום לא הופק ברמת האיכות הרגילה (Report Quality Score: ${q.score}/100 – ${q.band})`,
+    textMarketOverview(data.marketOverview),
+    textEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
+    diagnosticProviderIssuesText(data),
+    diagnosticLastVerifiedText(data),
+    textDiagnostics(data),
+  ].join("\n\n");
+
+  return `שלום,
+
+הדוח היומי לתאריך ${today} לא הופק ברמת האיכות הרגילה – זהו סיכום דיאגנוסטי קצר במקום זאת.
+
+${sections}
+
+—
+דוח אוטומטי שנוצר על ידי stock-agent. ${fingerprintTextTag(data)} ${provenanceTextTag(data)}
+המידע הוא למטרות מחקר ולמידה בלבד – אינו ייעוץ השקעות.
+`;
+}
+
 export function generateEmailTextBody(data: ReportData, today: string): string {
+  if (data.belowSendThreshold) return generateDiagnosticEmailTextBody(data, today);
   const sections = [
     textEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
     textMarketCatalyst(data.marketCatalyst),
@@ -597,11 +767,14 @@ export function generateEmailTextBody(data: ReportData, today: string): string {
     textMarketOverview(data.marketOverview),
     textTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
     textEarningsFollowUp(data.earningsFollowUp),
-    textTopOpportunities(data.topOpportunities, data.topOpportunitiesEmergencyMode),
+    textTopOpportunities(data.topOpportunities),
+    textEmergencyWatch(data.emergencyWatch),
     textDividends(data.dividends, data.dividendsStatus),
     textWeekAhead(data.weekAhead),
     textDiagnostics(data),
-  ].join("\n\n");
+  ]
+    .filter((s) => s.length > 0)
+    .join("\n\n");
 
   return `שלום,
 
@@ -614,7 +787,7 @@ ${sections}
   - daily-stock-report.md    (גרסת טקסט)
 
 —
-דוח אוטומטי שנוצר על ידי stock-agent. ${fingerprintTextTag(data)}
+דוח אוטומטי שנוצר על ידי stock-agent. ${fingerprintTextTag(data)} ${provenanceTextTag(data)}
 המידע הוא למטרות מחקר ולמידה בלבד – אינו ייעוץ השקעות.
 `;
 }

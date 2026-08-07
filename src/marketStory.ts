@@ -1,4 +1,4 @@
-import { isPromotionalOrLegalNews, isSubstantiveNews } from "./newsFilter";
+import { isDirectlyAboutCompany, isPromotionalOrLegalNews, isSubstantiveNews } from "./newsFilter";
 import { EnrichedStock, MarketStory, NewsItem, ReportData } from "./types";
 import { watchlistName } from "./universe";
 
@@ -41,29 +41,56 @@ interface ScoredNews {
   score: number;
 }
 
-// Only consider news published within the last `RECENT_DAYS` days.
+// Only consider news published within the last `RECENT_DAYS` days. Widened
+// to `RECOVERY_RECENT_DAYS` by the Report Quality recovery pass when the
+// normal window turned up nothing and overall report quality is degraded –
+// see reportQuality.ts / pipeline.ts.
 const RECENT_DAYS = 10;
+export const RECOVERY_RECENT_DAYS = 20;
 // Minimum meaningfulness score for a story to be worth featuring.
 const MIN_SCORE = 0.18;
 
-// Rank a single news item: relevance + sentiment strength + recency. We do NOT
-// invent anything – every field comes straight from the feed.
-function scoreNews(stock: EnrichedStock, item: NewsItem, now: number): ScoredNews | null {
+// Genuinely market-wide / macro developments – used ONLY as a fallback pool
+// when no candidate is directly about a specific company, so the hero slot
+// never sits empty on a day where the real story is systemic (a Fed
+// decision, a broad rally/selloff) rather than company-specific. Every
+// matched item is still a real, already-fetched article – nothing here
+// fabricates content, it only widens WHICH real articles are eligible.
+const MACRO_KEYWORDS =
+  /\bfederal reserve\b|\bfed\b.{0,15}\brate\b|interest rate decision|inflation (?:data|report)|\bcpi\b (?:data|report)|jobs report|unemployment report|market (?:rally|selloff|sell-off)|stocks? (?:rally|surge|tumble|sink|plunge)\b|\bs&p ?500\b|\bnasdaq (?:composite|index)\b|broader? market/i;
+
+// Rank a single news item: relevance + sentiment strength + recency. We do
+// NOT invent anything – every field comes straight from the feed.
+// `requireDirectRelevance` gates the company-story pool (headline must
+// actually be about the company, not merely tagged relevant by the
+// provider) vs. the macro fallback pool (gated by MACRO_KEYWORDS instead,
+// in scoreAllCandidates below).
+function scoreNews(
+  stock: EnrichedStock,
+  item: NewsItem,
+  now: number,
+  recentDays: number,
+  requireDirectRelevance: boolean
+): ScoredNews | null {
   if (!item.title || !item.url) return null; // need a real headline + link
-  // Promotional / law-firm solicitation headlines carry ~zero investment
-  // value and are never material company developments – hard exclude rather
-  // than merely down-rank, so they can never win a story slot.
+  // Promotional / law-firm solicitation / ETF / automated-move headlines
+  // carry ~zero investment value and are never material company
+  // developments – hard exclude rather than merely down-rank, so they can
+  // never win a story slot.
   if (isPromotionalOrLegalNews(item)) return null;
+  if (requireDirectRelevance && !isDirectlyAboutCompany(stock.ticker, displayName(stock), item)) {
+    return null;
+  }
 
   const date = parsePublished(item.publishedAt);
   if (!date) return null;
 
   const hoursAgo = (now - date.getTime()) / 3_600_000;
-  if (hoursAgo < 0 || hoursAgo > RECENT_DAYS * 24) return null; // not recent
+  if (hoursAgo < 0 || hoursAgo > recentDays * 24) return null; // not recent
 
   const relevance = item.relevanceScore ?? 0.3;
   const impact = Math.min(Math.abs(item.sentimentScore ?? 0), 1);
-  const recency = Math.max(0, 1 - hoursAgo / (RECENT_DAYS * 24));
+  const recency = Math.max(0, 1 - hoursAgo / (recentDays * 24));
   // Small, deliberate boost for substantive categories (earnings, guidance,
   // product news, regulation, M&A, leadership, analyst calls) so they win
   // ties against generic market-noise headlines – never a hard requirement.
@@ -137,42 +164,80 @@ function toMarketStory(s: ScoredNews): MarketStory {
   };
 }
 
-// Every candidate item across the report's stocks, scored and sorted
-// (best first), deduped by ticker so one company can't occupy every slot.
-function scoreAllCandidates(data: ReportData, nowMs: number): ScoredNews[] {
+// The report's stocks with any news/technical signal at all – shared by
+// both the company-story pool and the macro-fallback pool below.
+function candidatePool(data: ReportData): EnrichedStock[] {
   const techTickers = new Set([
     ...data.technicalAlerts.aboveUpper.map((a) => a.ticker),
     ...data.technicalAlerts.belowLower.map((a) => a.ticker),
   ]);
-
-  const pool = dedupe([
+  return dedupe([
     ...data.topOpportunities,
     ...data.core,
     ...data.growth,
     ...data.speculative,
     ...data.watchlist,
   ]).filter((s) => s.news.length > 0 || techTickers.has(s.ticker));
+}
 
+// Company-specific candidates: the headline must genuinely be about that
+// stock (see isDirectlyAboutCompany) – this is what keeps an ETF article or
+// an unrelated-company headline from ever winning a "Market Story" slot just
+// because the provider tagged it relevant.
+function scoreCompanyCandidates(data: ReportData, nowMs: number, recentDays: number): ScoredNews[] {
   const bestPerStock: ScoredNews[] = [];
-  for (const stock of pool) {
+  for (const stock of candidatePool(data)) {
     let best: ScoredNews | null = null;
     for (const item of stock.news) {
-      const scored = scoreNews(stock, item, nowMs);
+      const scored = scoreNews(stock, item, nowMs, recentDays, true);
       if (scored && (!best || scored.score > best.score)) best = scored;
     }
     if (best && best.score >= MIN_SCORE) bestPerStock.push(best);
   }
-
   bestPerStock.sort((a, b) => b.score - a.score);
   return bestPerStock;
+}
+
+// Market-wide/macro fallback – used ONLY when no company-specific candidate
+// qualifies (see scoreAllCandidates). Still a real, already-fetched article;
+// this never invents content, only widens which real article can fill the
+// hero slot.
+function scoreMacroCandidates(data: ReportData, nowMs: number, recentDays: number): ScoredNews[] {
+  const macro: ScoredNews[] = [];
+  for (const stock of candidatePool(data)) {
+    for (const item of stock.news) {
+      if (!MACRO_KEYWORDS.test(item.title ?? "")) continue;
+      const scored = scoreNews(stock, item, nowMs, recentDays, false);
+      if (scored && scored.score >= MIN_SCORE) macro.push(scored);
+    }
+  }
+  macro.sort((a, b) => b.score - a.score);
+  return macro;
+}
+
+// Company story first; only when NOTHING there qualifies does a genuine
+// market-wide development fill the slot instead. Both pools can legitimately
+// come back empty – the caller then shows an honest "no story today"
+// message rather than padding the hero slot with low-value news.
+function scoreAllCandidates(data: ReportData, nowMs: number, recentDays = RECENT_DAYS): ScoredNews[] {
+  const company = scoreCompanyCandidates(data, nowMs, recentDays);
+  if (company.length > 0) return company;
+  return scoreMacroCandidates(data, nowMs, recentDays);
 }
 
 // ===== public API =====
 
 // Pick the single most meaningful recent news story across the report's
 // stocks. Returns null when nothing recent/meaningful is available.
-export function selectMarketStory(data: ReportData, nowMs: number): MarketStory | null {
-  const candidates = scoreAllCandidates(data, nowMs);
+// `recentDays` is widened by the Report Quality recovery pass (see
+// reportQuality.ts) when the normal window found nothing and overall
+// quality is degraded.
+export function selectMarketStory(
+  data: ReportData,
+  nowMs: number,
+  recentDays = RECENT_DAYS
+): MarketStory | null {
+  const candidates = scoreAllCandidates(data, nowMs, recentDays);
   return candidates.length > 0 ? toMarketStory(candidates[0]) : null;
 }
 
@@ -181,9 +246,10 @@ export function selectMarketStory(data: ReportData, nowMs: number): MarketStory 
 export function selectAdditionalHeadlines(
   data: ReportData,
   nowMs: number,
-  count = 2
+  count = 2,
+  recentDays = RECENT_DAYS
 ): MarketStory[] {
-  const candidates = scoreAllCandidates(data, nowMs);
+  const candidates = scoreAllCandidates(data, nowMs, recentDays);
   if (candidates.length === 0) return [];
   const [hero, ...rest] = candidates;
   return rest

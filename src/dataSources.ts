@@ -10,6 +10,7 @@ import {
   RateLimitError,
 } from "./alphaVantage";
 import { readCache, TTL, writeCache } from "./cache";
+import { fetchFinnhubEarningsForDate } from "./finnhubEarnings";
 import { fetchYahooDailyCloses, fetchYahooQuote, YahooQuote } from "./marketData";
 import { fetchNasdaqEarningsForDate, NasdaqEarningsRow } from "./nasdaqEarnings";
 import {
@@ -199,6 +200,25 @@ export async function getYahooDailyCloses(
 // calendar date, 24h cache so a run only re-fetches dates it hasn't already
 // seen today) =====
 
+// Provider chain for a single calendar date: Nasdaq (primary) -> Finnhub
+// (secondary, only when Nasdaq's fetch itself fails) -> [cacheFirst below
+// then also tries stale cache] -> unavailable. A date genuinely having zero
+// reporting companies (Nasdaq returns []) is NOT a failure and never
+// triggers the secondary provider – only a real fetch error does.
+async function fetchEarningsWithFallback(
+  dateIso: string,
+  onNote: (msg: string) => void
+): Promise<NasdaqEarningsRow[] | null> {
+  const primary = await fetchNasdaqEarningsForDate(dateIso);
+  if (primary !== null) return primary;
+
+  onNote(`Nasdaq earnings calendar unavailable for ${dateIso} – trying secondary provider (Finnhub)`);
+  const secondary = await fetchFinnhubEarningsForDate(dateIso);
+  if (secondary !== null) return secondary;
+
+  return null; // both providers failed – cacheFirst falls through to stale cache, then "unavailable"
+}
+
 export async function getNasdaqEarningsForDate(
   dateIso: string,
   onNote: (msg: string) => void = () => {}
@@ -206,7 +226,7 @@ export async function getNasdaqEarningsForDate(
   return cacheFirst<NasdaqEarningsRow[]>(
     `nasdaq_earnings_${dateIso}`,
     TTL.HOURS_24,
-    () => fetchNasdaqEarningsForDate(dateIso),
+    () => fetchEarningsWithFallback(dateIso, onNote),
     onNote
   );
 }
