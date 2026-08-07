@@ -142,10 +142,14 @@ export async function enrichStocks(
 
     const profile = profileRes.value ?? undefined;
     const news = newsRes.value ?? [];
+    const profileFetchFailed = profileRes.source.source === "unavailable";
 
-    if (!passesLongTermFilter(s, profile)) {
+    if (!passesLongTermFilter(s, profile, profileFetchFailed)) {
       onProgress(`     ⛔  filtered out (long-term rules): ${s.ticker}`);
       continue;
+    }
+    if (!profile) {
+      onProgress(`     ⚠️  ${s.ticker}: profile unavailable from every provider – kept with reduced confidence`);
     }
 
     enriched.push(buildEnriched(s, profile, news, profileRes.source, newsRes.source));

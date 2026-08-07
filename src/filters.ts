@@ -54,23 +54,42 @@ export function passesPreFilter(raw: RawMover): boolean {
 
 // Full long-term suitability filter, applied after enrichment when we know the
 // company profile. Watchlist names bypass the exclusions (hand-picked quality).
+//
+// `profile` is undefined in two very different situations, and conflating
+// them is exactly the "gives up too early" bug this function used to have:
+//   1. The OVERVIEW call was rate-limited / errored (a provider outage) –
+//      we simply don't know this candidate's exchange/market-cap yet.
+//   2. The OVERVIEW call succeeded (live or cached) and genuinely returned
+//      nothing – Alpha Vantage has no profile for this symbol at all.
+// A live, real price from the movers feed is still real signal. A provider
+// outage must never by itself discard a candidate – that's a confidence
+// problem for computeDataQuality to reflect (lower coverage/confidence,
+// keeping it out of Top Opportunities unless everything else checks out),
+// not a reason to pretend the candidate never existed. Only case 2 – or a
+// profile that actively disqualifies the stock – is grounds to drop it here.
 export function passesLongTermFilter(
   stock: Stock,
-  profile?: CompanyProfile
+  profile?: CompanyProfile,
+  profileFetchFailed = false
 ): boolean {
   if (stock.origin === "watchlist") return true;
 
   if (stock.price < MIN_PRICE_USD) return false;
   if (isExcludedSecurity(stock.ticker)) return false;
 
-  // Extreme daily move is only tolerated for mega-caps (> $10B).
+  // Extreme daily move is only tolerated for confirmed mega-caps (> $10B).
+  // With no profile we can't confirm the exemption, but if that's because
+  // the provider failed (not because we checked and it's a small-cap) we
+  // still don't reject – dataQuality will already mark it low-confidence.
   const cap = profile?.marketCap ?? 0;
-  if (Math.abs(stock.changePercent) > MAX_DAILY_MOVE && cap < LARGE_CAP) {
+  if (Math.abs(stock.changePercent) > MAX_DAILY_MOVE && cap < LARGE_CAP && !profileFetchFailed) {
     return false;
   }
 
-  // Without a verified profile we can't confirm quality – drop the candidate.
-  if (!profile) return false;
+  // No profile at all: keep the candidate when every provider simply failed
+  // (unknown, not disqualified) – drop it only when we actually reached the
+  // source and it confirmed there's nothing there.
+  if (!profile) return profileFetchFailed;
 
   if (profile.exchange) {
     const ex = profile.exchange.toUpperCase();

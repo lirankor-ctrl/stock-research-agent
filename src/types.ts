@@ -148,6 +148,11 @@ export interface EnrichedStock extends Stock {
   profileSource: SourceInfo;
   newsSource: SourceInfo;
   dataQuality?: DataQuality; // attached after the technical phase in the pipeline
+  // true only when this stock was promoted into Top Opportunities by
+  // Emergency Report Mode (see src/emergencyMode.ts) rather than clearing
+  // the normal High/Medium quality bar. Every renderer MUST show the
+  // "Reduced Confidence / Emergency Mode" label when this is true.
+  emergencyMode?: boolean;
 }
 
 // CNN Fear & Greed Index – overall market sentiment.
@@ -336,6 +341,11 @@ export interface DividendInfoItem {
   dividendDate?: string;
 }
 
+// Same tri-state reasoning as EarningsCalendarStatus – "confirmed no
+// dividend-paying names" and "couldn't verify (every profile fetch failed)"
+// must never render the same "no dividends" message.
+export type DividendsStatus = "confirmed" | "unavailable";
+
 // ===== Week ahead =====
 
 export interface WeekAhead {
@@ -381,6 +391,10 @@ export interface ReportData {
   growth: EnrichedStock[];
   speculative: EnrichedStock[]; // max 1
   topOpportunities: EnrichedStock[];   // max 3 – quality-gated, ranked across tiers
+  // true when 0 candidates cleared the normal High/Medium quality bar and
+  // Emergency Report Mode had to fill topOpportunities from safety-filtered,
+  // reduced-confidence candidates instead of rendering an empty section.
+  topOpportunitiesEmergencyMode: boolean;
   opportunityTheses: Map<string, OpportunityThesis>; // ticker -> structured thesis
   watchlist: EnrichedStock[];   // fixed list, in WATCHLIST order
   technicalWatch: TechnicalWatchItem[];
@@ -395,6 +409,7 @@ export interface ReportData {
   marketOverview: MarketOverviewItem[];
   earningsFollowUp: EarningsFollowUpResult;
   dividends: DividendInfoItem[];
+  dividendsStatus: DividendsStatus;
   weekAhead: WeekAhead;
 }
 

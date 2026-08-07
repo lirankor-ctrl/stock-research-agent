@@ -6,6 +6,7 @@
 // WHICH data to show.
 import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
 import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
+import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import { fingerprintHtmlComment, fingerprintTextTag } from "./reportFingerprint";
@@ -27,6 +28,7 @@ import { displayName, fmtChange, fmtPrice } from "./reportGenerator";
 import { rsiInterpretation } from "./technicals";
 import {
   DividendInfoItem,
+  DividendsStatus,
   EarningsCalendarEntry,
   EarningsFollowUpResult,
   EnrichedStock,
@@ -334,6 +336,7 @@ function opportunityCardHtml(rank: number, s: EnrichedStock, thesis: Opportunity
         ${changeHtml}
       </td>
     </tr></table>
+    ${s.emergencyMode ? `<div style="margin-top:8px;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:800;font-size:11.5px;display:inline-block;">⚠️ ${EMERGENCY_MODE_LABEL}</div>` : ""}
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:10px;"><tr>
       ${metricChipHtml("Coverage", dq ? `${dq.coverageScore}` : "—")}
       ${metricChipHtml("Confidence", dq ? `${dq.confidenceScore}` : "—")}
@@ -349,20 +352,29 @@ function opportunityCardHtml(rank: number, s: EnrichedStock, thesis: Opportunity
   return `<tr><td style="padding-bottom:14px;">${card(inner, `border-right:4px solid ${PALETTE.blue};`, "opportunity-card")}</td></tr>`;
 }
 
-function htmlTopOpportunities(stocks: EnrichedStock[], theses: Map<string, OpportunityThesis>): string {
+function htmlTopOpportunities(
+  stocks: EnrichedStock[],
+  theses: Map<string, OpportunityThesis>,
+  emergencyModeActive: boolean
+): string {
   if (stocks.length === 0) {
     return sectionWrap(`${h("Top Opportunities")}${emptyNotice("אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו.")}`);
   }
+  const notice = emergencyModeActive ? emptyNotice(`⚠️ ${EMERGENCY_MODE_EXPLANATION_HEBREW}`) : "";
   const rows = stocks.map((s, idx) => opportunityCardHtml(idx + 1, s, theses.get(s.ticker))).join("");
-  return sectionWrap(`${h("Top Opportunities")}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`);
+  return sectionWrap(`${h("Top Opportunities")}${notice}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`);
 }
 
 // ===== 9. Dividend Information (secondary, visually smaller) =====
 
-function htmlDividends(items: DividendInfoItem[]): string {
+function htmlDividends(items: DividendInfoItem[], status: DividendsStatus): string {
   const smallHeading = `<div style="font-size:13px;font-weight:700;color:${PALETTE.muted};text-transform:uppercase;letter-spacing:.02em;margin:0 0 8px;">Dividend Information</div>`;
   if (items.length === 0) {
-    return sectionWrap(`${smallHeading}${emptyNotice("אף אחת מהמניות המדווחות אינה מחלקת דיבידנד כרגע.")}`);
+    const msg =
+      status === "unavailable"
+        ? "לא ניתן היה לאמת נתוני דיבידנד בריצה הזו – פרופיל החברה לא היה זמין מאף ספק."
+        : "אף אחת מהמניות המדווחות אינה מחלקת דיבידנד כרגע.";
+    return sectionWrap(`${smallHeading}${emptyNotice(msg)}`);
   }
   const rows = items
     .map(
@@ -446,8 +458,8 @@ export function generateEmailHtmlBody(data: ReportData, today: string): string {
     htmlMarketOverview(data.marketOverview),
     htmlTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
     htmlEarningsFollowUp(data.earningsFollowUp),
-    htmlTopOpportunities(data.topOpportunities, data.opportunityTheses),
-    htmlDividends(data.dividends),
+    htmlTopOpportunities(data.topOpportunities, data.opportunityTheses, data.topOpportunitiesEmergencyMode),
+    htmlDividends(data.dividends, data.dividendsStatus),
     htmlWeekAhead(data),
     htmlDiagnostics(data),
     htmlFooter(),
@@ -536,16 +548,25 @@ function textEarningsFollowUp(followUp: EarningsFollowUpResult): string {
   return `📮 Earnings Follow-up:\n${lines}`;
 }
 
-function textTopOpportunities(stocks: EnrichedStock[]): string {
+function textTopOpportunities(stocks: EnrichedStock[], emergencyModeActive: boolean): string {
   if (stocks.length === 0) return `🎯 Top Opportunities (0/3):\n  —`;
+  const notice = emergencyModeActive ? `  ⚠️ ${EMERGENCY_MODE_EXPLANATION_HEBREW}\n` : "";
   const lines = stocks
-    .map((s) => `  • ${s.ticker} – ${displayName(s)} (ציון ${s.finalScore.toFixed(1)}/10${s.price > 0 ? `, ${fmtChange(s.changePercent)}` : ""})`)
+    .map(
+      (s) =>
+        `  • ${s.ticker} – ${displayName(s)} (ציון ${s.finalScore.toFixed(1)}/10${s.price > 0 ? `, ${fmtChange(s.changePercent)}` : ""})` +
+        (s.emergencyMode ? ` [⚠️ ${EMERGENCY_MODE_LABEL}]` : "")
+    )
     .join("\n");
-  return `🎯 Top Opportunities (${stocks.length}/3):\n${lines}`;
+  return `🎯 Top Opportunities (${stocks.length}/3):\n${notice}${lines}`;
 }
 
-function textDividends(items: DividendInfoItem[]): string {
-  if (items.length === 0) return `💵 Dividend Information:\n  אף מניה כרגע אינה מחלקת דיבידנד.`;
+function textDividends(items: DividendInfoItem[], status: DividendsStatus): string {
+  if (items.length === 0) {
+    return status === "unavailable"
+      ? `💵 Dividend Information:\n  לא ניתן היה לאמת נתוני דיבידנד בריצה הזו (פרופיל חברה לא זמין).`
+      : `💵 Dividend Information:\n  אף מניה כרגע אינה מחלקת דיבידנד.`;
+  }
   const lines = items
     .map((d) => `  • ${d.ticker} – $${d.dividendPerShare.toFixed(2)}/share${d.dividendYieldPct !== null ? ` (${d.dividendYieldPct.toFixed(2)}% yield)` : ""}`)
     .join("\n");
@@ -576,8 +597,8 @@ export function generateEmailTextBody(data: ReportData, today: string): string {
     textMarketOverview(data.marketOverview),
     textTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
     textEarningsFollowUp(data.earningsFollowUp),
-    textTopOpportunities(data.topOpportunities),
-    textDividends(data.dividends),
+    textTopOpportunities(data.topOpportunities, data.topOpportunitiesEmergencyMode),
+    textDividends(data.dividends, data.dividendsStatus),
     textWeekAhead(data.weekAhead),
     textDiagnostics(data),
   ].join("\n\n");

@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
 import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
+import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { visibleOverviewItems, MIN_VISIBLE_INDICATORS } from "./marketOverview";
 import { fingerprintHtmlComment } from "./reportFingerprint";
@@ -11,6 +12,7 @@ import { watchlistName } from "./universe";
 import {
   DataQualityLabel,
   DividendInfoItem,
+  DividendsStatus,
   EarningsCalendarEntry,
   EarningsCalendarStatus,
   EarningsFollowUpResult,
@@ -177,9 +179,10 @@ ${[header, ...rows].join("\n")}`;
 
 function opportunityBlock(s: EnrichedStock, thesis: OpportunityThesis | undefined): string {
   const name = displayName(s);
+  const emergencyBadge = s.emergencyMode ? `\n> ⚠️ **${EMERGENCY_MODE_LABEL}**` : "";
   return `### ${s.ticker} — ${name}
 
-> ⭐ **${s.finalScore.toFixed(1)}/10** · 🧪 ${dqBadge(s)}
+> ⭐ **${s.finalScore.toFixed(1)}/10** · 🧪 ${dqBadge(s)}${emergencyBadge}
 
 - 💰 ${fmtPrice(s.price)} (${s.price > 0 ? fmtChange(s.changePercent) : "—"})
 
@@ -193,16 +196,18 @@ function opportunityBlock(s: EnrichedStock, thesis: OpportunityThesis | undefine
 
 function topOpportunitiesSection(
   stocks: EnrichedStock[],
-  theses: Map<string, OpportunityThesis>
+  theses: Map<string, OpportunityThesis>,
+  emergencyModeActive: boolean
 ): string {
   if (stocks.length === 0) {
     return `## 🎯 Top Opportunities
 
 _אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו._`;
   }
+  const notice = emergencyModeActive ? `\n_⚠️ ${EMERGENCY_MODE_EXPLANATION_HEBREW}_\n` : "";
   const body = stocks.map((s) => opportunityBlock(s, theses.get(s.ticker))).join("\n\n---\n\n");
   return `## 🎯 Top Opportunities (${stocks.length}/3)
-
+${notice}
 ${body}`;
 }
 
@@ -255,11 +260,15 @@ ${[header, ...rows].join("\n")}`;
 
 // ---------- 5c. Dividend Information ----------
 
-function dividendsSection(items: DividendInfoItem[]): string {
+function dividendsSection(items: DividendInfoItem[], status: DividendsStatus): string {
   if (items.length === 0) {
+    const msg =
+      status === "unavailable"
+        ? "_לא ניתן היה לאמת נתוני דיבידנד לרשימת המעקב או להזדמנויות המובילות בריצה הזו – פרופיל החברה לא היה זמין מאף ספק, כך שלא ידוע אם קיים דיבידנד._"
+        : "_אף אחת מהמניות המדווחות ברשימת המעקב או בהזדמנויות המובילות אינה מחלקת דיבידנד כרגע._";
     return `## 💵 Dividend Information
 
-_אף אחת מהמניות המדווחות ברשימת המעקב או בהזדמנויות המובילות אינה מחלקת דיבידנד כרגע._`;
+${msg}`;
   }
   const header = "| Symbol | Div/Share | Yield | Ex-Div Date | Pay Date |\n| ------ | --------- | ----- | ----------- | -------- |";
   const rows = items.map(
@@ -357,11 +366,11 @@ ${earningsFollowUpSection(data.earningsFollowUp)}
 
 ---
 
-${topOpportunitiesSection(data.topOpportunities, data.opportunityTheses)}
+${topOpportunitiesSection(data.topOpportunities, data.opportunityTheses, data.topOpportunitiesEmergencyMode)}
 
 ---
 
-${dividendsSection(data.dividends)}
+${dividendsSection(data.dividends, data.dividendsStatus)}
 
 ---
 

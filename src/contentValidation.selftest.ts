@@ -7,6 +7,8 @@ import { computeDataQuality } from "./dataQuality";
 import { deriveEarningsCalendarFromRows } from "./earningsCalendar";
 import { deriveEarningsFollowUpFromRows } from "./earningsFollowUp";
 import { generateEmailHtmlBody, generateEmailTextBody } from "./emailBodyGenerator";
+import { buildTopOpportunities, EMERGENCY_MODE_LABEL, passesEmergencySafetyFilter } from "./emergencyMode";
+import { passesLongTermFilter } from "./filters";
 import { generateHtmlReport } from "./htmlReportGenerator";
 import { selectMarketStory } from "./marketStory";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
@@ -18,7 +20,7 @@ import { generateReport } from "./reportGenerator";
 import { EMAIL_MAX_WIDTH, formatOverviewValue, weekAheadExtraEarnings } from "./reportPresentation";
 import { validateReportConsistency } from "./reportValidation";
 import { computeTechnicals } from "./technicals";
-import { EnrichedStock, MarketOverviewItem, NewsItem, ReportData } from "./types";
+import { DataQuality, EnrichedStock, MarketOverviewItem, NewsItem, ReportData } from "./types";
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {
@@ -170,6 +172,7 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     growth: [],
     speculative: [],
     topOpportunities: [],
+    topOpportunitiesEmergencyMode: false,
     opportunityTheses: new Map(),
     watchlist: [stockWithOnlyInstitutionalNews],
     technicalWatch: [],
@@ -199,6 +202,7 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     marketOverview: [],
     earningsFollowUp: { entries: [], status: "noneFound" },
     dividends: [],
+    dividendsStatus: "confirmed",
     weekAhead: {
       earnings: [],
       earningsStatus: "noneFound",
@@ -405,6 +409,7 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     growth: [],
     speculative: [],
     topOpportunities: [opp],
+    topOpportunitiesEmergencyMode: false,
     opportunityTheses: new Map(),
     watchlist: [opp],
     technicalWatch: [],
@@ -444,6 +449,7 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     marketOverview: [],
     earningsFollowUp: { entries: [], status: "noneFound" },
     dividends: [],
+    dividendsStatus: "confirmed",
     weekAhead: {
       earnings: [],
       earningsStatus: "noneFound",
@@ -556,6 +562,7 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     growth: [oppB],
     speculative: [],
     topOpportunities: [oppA, oppB],
+    topOpportunitiesEmergencyMode: false,
     opportunityTheses: new Map(),
     watchlist: [oppA, oppB],
     technicalWatch: [
@@ -605,6 +612,7 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
     ],
     earningsFollowUp: { entries: [], status: "noneFound" },
     dividends: [{ ticker: "OPPA", name: "Opportunity A", dividendPerShare: 2.5, dividendYieldPct: 1.8 }],
+    dividendsStatus: "confirmed",
     weekAhead: {
       // Same ticker+date already shown in earningsCalendar above -> a pure
       // duplicate, must NOT be shown again.
@@ -678,6 +686,205 @@ function nasdaqRow(overrides: Partial<NasdaqEarningsRow> = {}): NasdaqEarningsRo
   );
   const dedupViolations = validatePresentation({ data: richData, htmlAttachment: duplicatedWeekAheadHtml, emailHtml });
   assert(dedupViolations.some((v) => v.includes("duplicated This Week To Watch")), "a reintroduced duplicate This Week To Watch earnings block is caught");
+}
+
+// ===== Emergency Report Mode: safety validation =====
+{
+  function makeDQ(overrides: Partial<DataQuality> = {}): DataQuality {
+    return {
+      statuses: {
+        price: "available",
+        volume: "available",
+        marketCap: "available",
+        profile: "available",
+        news: "available",
+        technical: "available",
+      },
+      coverageScore: 100,
+      confidenceScore: 100,
+      label: "High",
+      excluded: false,
+      missing: [],
+      rateLimited: [],
+      reliabilityHebrew: "",
+      ...overrides,
+    };
+  }
+
+  function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
+    return {
+      marketStory: null,
+      additionalHeadlines: [],
+      core: [],
+      growth: [],
+      speculative: [],
+      topOpportunities: [],
+      topOpportunitiesEmergencyMode: false,
+      opportunityTheses: new Map(),
+      watchlist: [],
+      technicalWatch: [],
+      technicalAlerts: {
+        aboveUpper: [],
+        belowLower: [],
+        closestToUpper: [],
+        closestToLower: [],
+        expansion: [],
+        dataUnavailable: false,
+      },
+      status: {
+        movers: { source: "live" },
+        enriched: { source: "live" },
+        rateLimitHit: false,
+        notes: [],
+        liveCount: 0,
+        cachedCount: 0,
+        missingCount: 0,
+      },
+      scanned: 0,
+      qualified: 0,
+      fearGreed: null,
+      earningsCalendar: [],
+      earningsCalendarStatus: "noneFound",
+      marketCatalyst: { catalyst: null, status: "noneFound" },
+      marketOverview: [],
+      earningsFollowUp: { entries: [], status: "noneFound" },
+      dividends: [],
+      dividendsStatus: "confirmed",
+      weekAhead: {
+        earnings: [],
+        earningsStatus: "noneFound",
+        economicReadings: [],
+        economicUnavailableCount: 0,
+        unavailableNoticeHebrew: "",
+      },
+      ...overrides,
+    };
+  }
+
+  // --- 1. Provider failure alone must never silently remove a valid candidate ---
+  const moverStock = makeStock({ ticker: "NEWCO", price: 42, changePercent: 3, origin: "mover" });
+  assert(
+    passesLongTermFilter(moverStock, undefined, /* profileFetchFailed */ true) === true,
+    "provider failure (profile fetch failed) does not silently remove a valid candidate"
+  );
+  assert(
+    passesLongTermFilter(moverStock, undefined, /* profileFetchFailed */ false) === false,
+    "a profile that was actually fetched (live/cached) and came back empty is still excluded – not the same as a provider failure"
+  );
+
+  // --- 2. Missing current/cached price still excludes the candidate ---
+  const noPriceStock = makeStock({ ticker: "NOPRICE", price: 0 });
+  const noPriceResult = passesEmergencySafetyFilter(noPriceStock);
+  assert(noPriceResult.ok === false && !!noPriceResult.reason?.includes("price"), "missing current/cached price still excludes an Emergency Mode candidate");
+
+  // --- 3. Penny / OTC / warrant rules still apply under Emergency Mode ---
+  const warrantStock = makeStock({ ticker: "ABCDW", price: 15 });
+  assert(passesEmergencySafetyFilter(warrantStock).ok === false, "a warrant ticker is still excluded under Emergency Mode");
+  const otcStock = makeStock({ ticker: "ABCDF", price: 15 });
+  assert(passesEmergencySafetyFilter(otcStock).ok === false, "a likely-OTC ticker is still excluded under Emergency Mode");
+  const pennyStock = makeStock({ ticker: "PENNY", price: 2 });
+  assert(passesEmergencySafetyFilter(pennyStock).ok === false, "below-minimum-price penny stock is still excluded under Emergency Mode");
+
+  // --- 4. A confirmed material negative fundamental event still excludes the candidate ---
+  const bankruptStock = makeStock({
+    ticker: "BKRT",
+    price: 30,
+    news: [makeNews({ title: "BKRT Files for Chapter 11 Bankruptcy Protection" })],
+  });
+  const bankruptResult = passesEmergencySafetyFilter(bankruptStock);
+  assert(
+    bankruptResult.ok === false && !!bankruptResult.reason?.includes("material negative"),
+    "a confirmed material negative fundamental event (e.g. bankruptcy filing) still excludes the candidate under Emergency Mode"
+  );
+  // A safe candidate with ordinary (non-material) negative news is NOT excluded by this rule.
+  const routineDipStock = makeStock({
+    ticker: "DIP",
+    price: 30,
+    news: [makeNews({ title: "DIP shares decline after modest earnings miss" })],
+  });
+  assert(passesEmergencySafetyFilter(routineDipStock).ok === true, "routine negative news (a miss/decline) is NOT treated as a material negative event");
+
+  // --- 5. buildTopOpportunities: normal mode is used automatically when adequate data coverage exists ---
+  const goodCandidate = makeStock({ ticker: "GOOD", price: 100, finalScore: 8, dataQuality: makeDQ() });
+  const weakCandidate = makeStock({ ticker: "WEAK", price: 50, finalScore: 5, dataQuality: makeDQ({ label: "Low", coverageScore: 40, confidenceScore: 30 }) });
+  const normalResult = buildTopOpportunities([goodCandidate, weakCandidate], 3);
+  assert(normalResult.emergencyModeActive === false, "normal mode is used automatically when at least one candidate meets the quality bar");
+  assert(!normalResult.stocks.some((s) => s.emergencyMode), "no stock is marked emergencyMode when normal mode is used");
+  assert(normalResult.stocks.length === 1 && normalResult.stocks[0].ticker === "GOOD", "normal mode only includes candidates that actually clear the quality bar");
+
+  // --- 5b. buildTopOpportunities: Emergency Mode engages only when NOTHING clears the bar ---
+  const degradedA = makeStock({
+    ticker: "DEGA",
+    price: 60,
+    finalScore: 7,
+    dataQuality: makeDQ({ label: "Low", coverageScore: 40, confidenceScore: 25, excluded: false }),
+  });
+  const degradedNoPrice = makeStock({
+    ticker: "DEGB",
+    price: 0,
+    finalScore: 9, // best score, but MUST be excluded – no usable price
+    dataQuality: makeDQ({ label: "Low", coverageScore: 20, confidenceScore: 10, excluded: true }),
+  });
+  const degradedBankrupt = makeStock({
+    ticker: "DEGC",
+    price: 20,
+    finalScore: 8.5, // second-best score, but MUST be excluded – confirmed bad news
+    dataQuality: makeDQ({ label: "Low", coverageScore: 40, confidenceScore: 25 }),
+    news: [makeNews({ title: "DEGC warns of going concern doubt in latest filing" })],
+  });
+  const emergencyResult = buildTopOpportunities([degradedNoPrice, degradedBankrupt, degradedA], 3);
+  assert(emergencyResult.emergencyModeActive === true, "Emergency Report Mode activates when no candidate clears the normal quality bar");
+  assert(
+    emergencyResult.stocks.length === 1 && emergencyResult.stocks[0].ticker === "DEGA",
+    "Emergency Mode still excludes the no-price and confirmed-bad-news candidates even though they scored higher"
+  );
+  assert(
+    emergencyResult.stocks.every((s) => s.emergencyMode === true),
+    "every stock promoted through Emergency Mode is explicitly tagged emergencyMode: true"
+  );
+  assert(
+    emergencyResult.stocks[0].emergencyMode === true && degradedA.emergencyMode === undefined,
+    "Emergency Mode never presents a stock as a normal high-confidence pick – it returns a tagged copy, the original candidate object is untouched"
+  );
+
+  // A run with literally no safety-passing candidate at all stays empty rather than fabricating a pick.
+  const allUnsafe = buildTopOpportunities([degradedNoPrice, degradedBankrupt], 3);
+  assert(allUnsafe.stocks.length === 0 && allUnsafe.emergencyModeActive === false, "Emergency Mode never fabricates a candidate when literally nothing passes the safety filter");
+
+  // --- 6. Emergency candidates are visibly marked across all four render surfaces ---
+  const emergencyStock = emergencyResult.stocks[0];
+  const emergencyReportData = makeReportData({
+    topOpportunities: [emergencyStock],
+    topOpportunitiesEmergencyMode: true,
+    watchlist: [emergencyStock],
+  });
+  const emMd = generateReport(emergencyReportData);
+  const emHtml = generateHtmlReport(emergencyReportData);
+  const emEmailHtml = generateEmailHtmlBody(emergencyReportData, "2026-08-07");
+  const emEmailText = generateEmailTextBody(emergencyReportData, "2026-08-07");
+  assert(emMd.includes(EMERGENCY_MODE_LABEL), "Markdown attachment visibly labels the Emergency Mode candidate");
+  assert(emHtml.includes(EMERGENCY_MODE_LABEL), "HTML attachment visibly labels the Emergency Mode candidate");
+  assert(emEmailHtml.includes(EMERGENCY_MODE_LABEL), "Email HTML body visibly labels the Emergency Mode candidate");
+  assert(emEmailText.includes(EMERGENCY_MODE_LABEL), "Email text body visibly labels the Emergency Mode candidate");
+
+  // Regression guard: a normal-mode report (emergencyModeActive: false, no tagged
+  // stock) must NEVER show the Emergency Mode label anywhere.
+  const normalReportData = makeReportData({
+    topOpportunities: [goodCandidate],
+    topOpportunitiesEmergencyMode: false,
+    watchlist: [goodCandidate],
+  });
+  const normalMd = generateReport(normalReportData);
+  const normalHtml = generateHtmlReport(normalReportData);
+  const normalEmailHtml = generateEmailHtmlBody(normalReportData, "2026-08-07");
+  const normalEmailText = generateEmailTextBody(normalReportData, "2026-08-07");
+  assert(
+    !normalMd.includes(EMERGENCY_MODE_LABEL) &&
+      !normalHtml.includes(EMERGENCY_MODE_LABEL) &&
+      !normalEmailHtml.includes(EMERGENCY_MODE_LABEL) &&
+      !normalEmailText.includes(EMERGENCY_MODE_LABEL),
+    "a normal-mode report never shows the Emergency Mode label on a genuinely high-confidence pick"
+  );
 }
 
 console.log(

@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { categorize } from "./categorizer";
-import { computeDataQuality, dataQualityDebugSummary, meetsRecommendationThreshold } from "./dataQuality";
+import { computeDataQuality, dataQualityDebugSummary } from "./dataQuality";
 import { getTopMovers } from "./dataSources";
+import { buildTopOpportunities, EMERGENCY_MODE_LABEL } from "./emergencyMode";
 import {
   buildSkeletonEnriched,
   buildWatchlistStocks,
@@ -20,6 +21,7 @@ import { selectMarketCatalyst } from "./marketCatalyst";
 import { buildMarketOverview } from "./marketOverview";
 import { selectAdditionalHeadlines, selectMarketStory } from "./marketStory";
 import { buildOpportunityThesis } from "./opportunityThesis";
+import { buildPreflightAudit, formatPreflightAudit } from "./preflightAudit";
 import { preRank } from "./ranker";
 import { generateReport, writeReport } from "./reportGenerator";
 import { buildTechnicalAlerts } from "./technicalAlerts";
@@ -246,12 +248,25 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   }
 
   // Top opportunities: ranked across tiers, only stocks that clear the quality
-  // threshold (no Excluded / Low), capped at 3 – quality over quantity.
-  const topOpportunities = [...cats.core, ...cats.growth, ...cats.speculative]
-    .filter((s) => s.price > 0 && meetsRecommendationThreshold(s.dataQuality))
-    .sort((a, b) => b.finalScore - a.finalScore)
-    .slice(0, 3);
+  // threshold (no Excluded / Low), capped at 3 – quality over quantity. When
+  // nothing clears that bar, buildTopOpportunities falls back to Emergency
+  // Report Mode: best-available candidates re-checked from scratch against
+  // core safety rules (price, liquidity/OTC, confirmed bad news) – see
+  // src/emergencyMode.ts. Never presented as normal high-confidence picks.
+  const rankedCandidates = [...cats.core, ...cats.growth, ...cats.speculative]
+    .filter((s) => s.price > 0)
+    .sort((a, b) => b.finalScore - a.finalScore);
+  const topOppResult = buildTopOpportunities(rankedCandidates, 3);
+  const topOpportunities = topOppResult.stocks;
   log(`   top opportunities: ${topOpportunities.length}/3`);
+  if (topOppResult.emergencyModeActive) {
+    log(
+      `   ⚠️  Emergency Report Mode: no candidate met the High/Medium quality bar – ` +
+        `showing ${topOpportunities.length} best-available, safety-checked candidate(s) marked "${EMERGENCY_MODE_LABEL}".`
+    );
+  } else if (topOpportunities.length === 0) {
+    log("   ⚠️  No usable candidate at all (every price is unavailable) – Top Opportunities stays empty.");
+  }
 
   // Technical Watch – one compact row per tracked watchlist stock.
   const technicalWatch: TechnicalWatchItem[] = watchlist.map((s) => {
@@ -358,8 +373,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     `   earnings follow-up (last 7d): ${earningsFollowUp.status} · ${earningsFollowUp.entries.length} companies`
   );
 
-  const dividends = buildDividendInfo([...watchlist, ...topOpportunities]);
-  log(`   dividend info: ${dividends.length} dividend-paying names`);
+  const dividendInfo = buildDividendInfo([...watchlist, ...topOpportunities]);
+  log(`   dividend info: ${dividendInfo.items.length} dividend-paying names (status: ${dividendInfo.status})`);
 
   const economicReadings = await buildEconomicReadings({
     apiKey,
@@ -388,6 +403,25 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     opportunityTheses.set(s.ticker, buildOpportunityThesis(s, earningsCalendar));
   }
 
+  // ===== Preflight Quality Audit – final rollup of the Data Investigation
+  // phase, printed before rendering so degraded runs are visible in the logs
+  // even though the report itself still renders (recovery already applied
+  // above for Top Opportunities; every other section has its own honest
+  // tri-state fallback already). =====
+  const preflight = buildPreflightAudit({
+    moversAvailable: status.movers.source !== "unavailable",
+    watchlistUsable: wlQuotes.tally.live + wlQuotes.tally.cached,
+    watchlistTotal: WATCHLIST.length,
+    technicalsAvailable: techResult.available.size,
+    technicalsTotal: technicalUniverse.length,
+    earningsCalendarStatus: earningsCalendarRes.status,
+    marketOverviewWithValue: marketOverview.filter((i) => i.value !== null).length,
+    marketOverviewTotal: marketOverview.length,
+    fearGreedAvailable: !!fearGreed,
+    topOpportunitiesCount: topOpportunities.length,
+  });
+  for (const line of formatPreflightAudit(preflight)) log(line);
+
   log("📝 Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
     marketStory: null, // filled in below, once the report stocks are known
@@ -396,6 +430,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     growth: cats.growth,
     speculative: cats.speculative,
     topOpportunities,
+    topOpportunitiesEmergencyMode: topOppResult.emergencyModeActive,
     opportunityTheses,
     watchlist,
     technicalWatch,
@@ -409,7 +444,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     marketCatalyst,
     marketOverview,
     earningsFollowUp,
-    dividends,
+    dividends: dividendInfo.items,
+    dividendsStatus: dividendInfo.status,
     weekAhead,
   };
 

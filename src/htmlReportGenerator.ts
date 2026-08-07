@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
 import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
+import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import {
@@ -21,6 +22,7 @@ import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
   DividendInfoItem,
+  DividendsStatus,
   EarningsCalendarEntry,
   EarningsCalendarStatus,
   EarningsFollowUpResult,
@@ -451,6 +453,8 @@ function renderOpportunityCard(rank: number, s: EnrichedStock, thesis: Opportuni
         </div>
       </div>
 
+      ${s.emergencyMode ? `<div style="margin:6px 0 0;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:800;font-size:11.5px;display:inline-block;">⚠️ ${EMERGENCY_MODE_LABEL}</div>` : ""}
+
       <div class="metrics-row">
         ${metricChip("Coverage", dq ? `${dq.coverageScore}` : "—")}
         ${metricChip("Confidence", dq ? `${dq.confidenceScore}` : "—")}
@@ -466,10 +470,17 @@ function renderOpportunityCard(rank: number, s: EnrichedStock, thesis: Opportuni
     </article>`;
 }
 
-function renderTopOpportunities(stocks: EnrichedStock[], theses: Map<string, OpportunityThesis>): string {
+function renderTopOpportunities(
+  stocks: EnrichedStock[],
+  theses: Map<string, OpportunityThesis>,
+  emergencyModeActive: boolean
+): string {
+  const notice = emergencyModeActive
+    ? `<p class="empty" style="margin-bottom:14px;">⚠️ ${esc(EMERGENCY_MODE_EXPLANATION_HEBREW)}</p>`
+    : "";
   const inner =
     stocks.length > 0
-      ? `<div class="opportunities">${stocks.map((s, idx) => renderOpportunityCard(idx + 1, s, theses.get(s.ticker))).join("\n")}</div>`
+      ? `${notice}<div class="opportunities">${stocks.map((s, idx) => renderOpportunityCard(idx + 1, s, theses.get(s.ticker))).join("\n")}</div>`
       : `<p class="empty">אין הזדמנויות שעברו את סף איכות הנתונים בריצה הזו.</p>`;
   return `
   <section>
@@ -480,12 +491,16 @@ function renderTopOpportunities(stocks: EnrichedStock[], theses: Map<string, Opp
 
 // ===== 9. Dividend Information (secondary, visually smaller) =====
 
-function renderDividends(items: DividendInfoItem[]): string {
+function renderDividends(items: DividendInfoItem[], status: DividendsStatus): string {
   if (items.length === 0) {
+    const msg =
+      status === "unavailable"
+        ? "לא ניתן היה לאמת נתוני דיבידנד בריצה הזו – פרופיל החברה לא היה זמין מאף ספק."
+        : "אף אחת מהמניות המדווחות אינה מחלקת דיבידנד כרגע.";
     return `
   <section class="secondary-section">
     <h3 class="section-title-sm">Dividend Information</h3>
-    <p class="empty empty-sm">אף אחת מהמניות המדווחות אינה מחלקת דיבידנד כרגע.</p>
+    <p class="empty empty-sm">${msg}</p>
   </section>`;
   }
 
@@ -911,11 +926,13 @@ export function generateHtmlReport(data: ReportData): string {
     marketCatalyst,
     marketOverview,
     topOpportunities,
+    topOpportunitiesEmergencyMode,
     opportunityTheses,
     technicalWatch,
     technicalAlerts,
     earningsFollowUp,
     dividends,
+    dividendsStatus,
   } = data;
 
   const body = [
@@ -928,8 +945,8 @@ export function generateHtmlReport(data: ReportData): string {
     renderMarketOverview(marketOverview),
     renderTechnicalWatch(technicalWatch, technicalAlerts.dataUnavailable),
     renderEarningsFollowUp(earningsFollowUp),
-    renderTopOpportunities(topOpportunities, opportunityTheses),
-    renderDividends(dividends),
+    renderTopOpportunities(topOpportunities, opportunityTheses, topOpportunitiesEmergencyMode),
+    renderDividends(dividends, dividendsStatus),
     renderWeekAhead(data),
     renderDiagnostics(data),
     renderDisclaimer(),
