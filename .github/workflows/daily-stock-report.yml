@@ -41,6 +41,12 @@ jobs:
   email-report:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Required for the "Persist rolling state" step below to push a commit
+    # back to this repo (data/earnings-tracker.json, reports/performance/).
+    # Some orgs default GITHUB_TOKEN to read-only, which would otherwise
+    # make that step fail silently on push.
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -88,3 +94,49 @@ jobs:
           path: reports/
           if-no-files-found: ignore
           retention-days: 14
+
+      # Persists the earnings tracker (data/earnings-tracker.json) and the
+      # pre-existing performance ledger (reports/performance/) — BOTH are
+      # rolling state that must survive GitHub Actions' fresh checkout every
+      # run. Neither had a persistence mechanism before this commit (a
+      # pre-existing gap for the performance ledger, confirmed by inspecting
+      # this workflow and this repo's .gitignore before writing this step —
+      # there was no actions/cache, no commit-back, nothing). This is the
+      # one mechanism now used for both, rather than inventing a second one.
+      #
+      # Requirements this step satisfies:
+      #  - scheduled runs only (`github.event_name == 'schedule'`) — a
+      #    manual/test run (workflow_dispatch, including one-off
+      #    test_recipient sends) NEVER commits to the shared tracked state,
+      #    so testing never pollutes production data. The report for a
+      #    manual run still reads/writes these files locally during
+      #    generation (so it renders correctly), it just never pushes that
+      #    back.
+      #  - `always()` so state is persisted even if the email SEND step
+      #    failed (report generation — and the tracker/ledger writes it
+      #    does — happens before the send; losing that work because SMTP
+      #    hiccuped would be wasteful and wrong).
+      #  - only commits when something actually changed (`git diff --cached
+      #    --quiet` short-circuits to a no-op commit-free run on days with
+      #    no new tracked/reported earnings and no ledger change).
+      #  - only ever stages these two paths — never reports/*.md,
+      #    reports/*.html, reports/latest.json, or reports/email-preview.html.
+      #  - cannot create an infinite loop: this workflow's only triggers are
+      #    `schedule` and `workflow_dispatch` — there is no `on: push`
+      #    anywhere in this repo (verified: this is the only workflow file),
+      #    so a commit pushed here can never re-trigger this (or any) run.
+      #    `[skip ci]` is included anyway as a harmless, standard defensive
+      #    convention in case a push-triggered workflow is ever added later.
+      - name: Persist rolling state (earnings tracker + performance ledger)
+        if: always() && github.event_name == 'schedule'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/earnings-tracker.json reports/performance/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No rolling-state changes to commit."
+          else
+            git commit -m "chore: persist earnings tracker / performance state [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi

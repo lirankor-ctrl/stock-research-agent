@@ -261,7 +261,10 @@ export interface EarningsCalendarEntry {
   daysRemaining: number;   // 0 = today
   urgency: EarningsUrgency;
   estimatedEps?: number;   // Nasdaq "epsForecast", when present
-  estimatedRevenue?: undefined; // not provided by this free source – always Unavailable
+  // Nasdaq's calendar (primary source) never provides this – stays undefined
+  // for those rows. Populated only when the Finnhub secondary/fallback
+  // provider is configured and supplies a revenue estimate for this date.
+  estimatedRevenue?: number;
   timeOfDay?: "pre-market" | "post-market"; // real Nasdaq "time" column, when verified
   // 1–3 specific, real-data-driven reasons this report matters – sector
   // framing plus (when derivable) a concrete YoY EPS-forecast comparison.
@@ -314,7 +317,91 @@ export interface EconomicReading {
   source: SourceInfo;
 }
 
-// ===== Earnings follow-up (past reports, price reaction) =====
+// ===== Earnings tracking (persisted across runs – data/earnings-tracker.json,
+// committed back to the repo by the workflow so it survives GitHub Actions'
+// fresh checkouts; see src/earningsTracker.ts and the workflow's "Persist
+// rolling state" step) =====
+//
+// Lifecycle: a company entering the Upcoming Earnings Calendar is upserted
+// into the tracker as "awaiting". On every run, tracked records whose
+// expected date has passed or is today are checked against the results
+// provider. Once actual EPS/revenue figures are found:
+//   - if the stock-reaction close is ALSO already available -> "reported"
+//     (fully complete).
+//   - if not (e.g. an after-market report Tuesday evening – the next
+//     regular-session close doesn't exist until Wednesday's close) ->
+//     "reportedAwaitingReaction". This is re-checked on every subsequent
+//     run (cheaply – actual figures are already known, only the reaction
+//     is retried) until the reaction becomes computable, at which point it
+//     completes to "reported". A reaction is NEVER estimated or guessed in
+//     this interim state – see computeEarningsReaction in
+//     src/earningsReaction.ts, which returns null rather than a partial
+//     figure when the required close doesn't exist yet.
+// "resultsUnavailable" only after RESULTS_GRACE_DAYS with no confirmed
+// actuals at all (provider unconfigured/unreachable, or genuinely has
+// nothing) – never fabricated, and the record is still retained (not
+// discarded) for the full 90-day retention window either way.
+// Identity = ticker + earningsDate, so the same event can never appear as
+// both upcoming and reported.
+
+export type EarningsTimingExpectation = "pre-market" | "post-market" | "unknown";
+export type EarningsTrackingStatus =
+  | "awaiting"
+  | "reportedAwaitingReaction"
+  | "reported"
+  | "resultsUnavailable";
+
+export interface EarningsTrackingRecord {
+  ticker: string;
+  name: string;
+  earningsDate: string; // YYYY-MM-DD (expected date) – identity key together with ticker
+  expectedTiming: EarningsTimingExpectation;
+  expectedEps?: number;
+  expectedRevenue?: number;
+  firstSeenAt: string; // ISO – first run this event was seen in Upcoming Earnings Calendar
+  lastSeenAt: string;  // ISO – most recent run this event was (re)seen or (re)checked
+  status: EarningsTrackingStatus;
+  result?: EarningsResult;
+}
+
+// Whether actual figures were genuinely obtained – never "available" without
+// a real fetched value, never silently defaulted to "unavailable" when the
+// truth is simply "hasn't reported yet" (a normal, expected transient state,
+// not a data failure).
+export type EarningsFigureStatus = "available" | "unavailable" | "notYetReported";
+
+// Which of the two documented reaction rules produced this calculation –
+// see src/earningsReaction.ts. Computed only from REAL trading-day closes
+// (Yahoo daily history), which inherently skips weekends/holidays, so
+// baseline/new dates are always genuine trading days.
+export interface EarningsReaction {
+  baselineDate: string;
+  baselinePrice: number;
+  newDate: string;
+  newPrice: number;
+  reactionPercent: number;
+  basis: "post-market" | "pre-market"; // which of the two documented rules produced this
+}
+
+export interface EarningsResult {
+  status: EarningsFigureStatus;
+  reportedDate?: string;   // actual confirmed report date (provider's own date, may differ from expected)
+  reportedTiming?: EarningsTimingExpectation;
+  actualEps?: number;
+  expectedEpsAtReport?: number;    // consensus estimate as carried by the results provider itself
+  epsSurprisePct?: number | null;  // null = not computable (one side missing), even if status is "available"
+  actualRevenue?: number;
+  expectedRevenueAtReport?: number;
+  revenueSurprisePct?: number | null;
+  // null = figures are in but the reaction isn't computable yet (e.g. the
+  // next regular session hasn't closed) – a normal transient state.
+  reaction?: EarningsReaction | null;
+  interpretation?: string; // deterministic, English badge-style text, from real numbers only – see earningsReaction.ts
+  checkedAt: string; // ISO – when this result was last fetched/refreshed
+}
+
+// ===== Earnings follow-up (rendered section – recently reported companies
+// that were previously tracked via the Upcoming Earnings Calendar) =====
 
 // Same tri-state reasoning as EarningsCalendarStatus/MarketCatalystStatus –
 // "no recent reports" and "couldn't verify" must never render the same
@@ -324,18 +411,26 @@ export type EarningsFollowUpStatus = "confirmed" | "noneFound" | "unavailable";
 export interface EarningsFollowUpEntry {
   ticker: string;
   name: string;
-  reportDate: string;    // YYYY-MM-DD, from Nasdaq's public earnings calendar
+  reportDate: string;    // actual reported date when known, else the tracked expected date
   daysAgo: number;       // 0 = today
   timeOfDay?: "pre-market" | "post-market";
-  // Approximate cumulative price move since the report date, computed from
-  // locally-held Yahoo daily closes (trading-day offset, not calendar days).
-  // null when we don't have enough price history to compute it.
-  priceChangeSincePct: number | null;
+  result: EarningsResult;
+}
+
+// Section-8 diagnostics – see src/reportQuality.ts / src/reportHealth.ts.
+// Missing results reduce coverage but must never crash the report.
+export interface EarningsFollowUpCoverage {
+  tracked: number;             // total tracker records currently held (any status)
+  awaiting: number;            // expected date not yet reached, or reached but not yet confirmed reported
+  resultsFound: number;        // status === "reported" with actual figures available
+  resultsUnavailable: number;  // expected date has passed but the provider has nothing (genuinely unavailable)
+  reactionsCalculated: number; // of resultsFound, how many also got a computed price reaction
 }
 
 export interface EarningsFollowUpResult {
   entries: EarningsFollowUpEntry[];
   status: EarningsFollowUpStatus;
+  coverage: EarningsFollowUpCoverage;
 }
 
 // ===== Dividend information (derived from already-fetched company profiles –

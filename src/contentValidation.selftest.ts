@@ -9,11 +9,24 @@ import { RateLimitError } from "./alphaVantage";
 import { computeDataQuality } from "./dataQuality";
 import { cacheFirst } from "./dataSources";
 import { deriveEarningsCalendarFromRows } from "./earningsCalendar";
-import { deriveEarningsFollowUpFromRows } from "./earningsFollowUp";
+import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
+import { buildInterpretation, classifyBeatMiss, computeEarningsReaction, computeSurprisePct } from "./earningsReaction";
+import {
+  ClosesFetcher,
+  filterOutReported,
+  loadTracker,
+  pruneOldRecords,
+  ResultsFetcher,
+  runEarningsTracker,
+  saveTracker,
+  selectDisplayRecords,
+  upsertTrackedEarnings,
+} from "./earningsTracker";
 import { generateEmailHtmlBody, generateEmailTextBody } from "./emailBodyGenerator";
 import { buildTopOpportunities, EMERGENCY_MODE_LABEL, passesEmergencySafetyFilter } from "./emergencyMode";
 import { passesLongTermFilter } from "./filters";
 import { generateDiagnosticHtmlReport, generateHtmlReport } from "./htmlReportGenerator";
+import { DatedClose } from "./marketData";
 import { selectMarketStory } from "./marketStory";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import { NasdaqEarningsRow } from "./nasdaqEarnings";
@@ -29,11 +42,24 @@ import { classifyReportTiming, DELAYED_THRESHOLD_MINUTES, usMarketState } from "
 import { validateReportConsistency } from "./reportValidation";
 import { resolveTechnicalWatchPrice } from "./technicalAlerts";
 import { computeTechnicals } from "./technicals";
-import { DataQuality, EconomicReading, EnrichedStock, MarketOverviewItem, NewsItem, ReportData } from "./types";
+import {
+  DataQuality,
+  EarningsCalendarEntry,
+  EarningsTrackingRecord,
+  EconomicReading,
+  EnrichedStock,
+  MarketOverviewItem,
+  NewsItem,
+  ReportData,
+} from "./types";
 
 // Shared "everything's fine" quality fixture for tests that aren't
 // exercising the Report Quality Score / recovery-pass logic itself.
 const GOOD_QUALITY: ReportQuality = { dimensions: [], score: 100, band: "Excellent" };
+
+// Shared "nothing tracked yet" earnings-follow-up coverage fixture, for
+// fixtures that aren't exercising the earnings tracker itself.
+const ZERO_EARNINGS_COVERAGE = { tracked: 0, awaiting: 0, resultsFound: 0, resultsUnavailable: 0, reactionsCalculated: 0 };
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {
@@ -155,7 +181,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
     earningsCalendarStatus: "noneFound",
     marketCatalyst: { catalyst: null, status: "noneFound" },
     marketOverview: [],
-    earningsFollowUp: { entries: [], status: "noneFound" },
+    earningsFollowUp: { entries: [], status: "noneFound", coverage: ZERO_EARNINGS_COVERAGE },
     dividends: [],
     dividendsStatus: "confirmed",
     weekAhead: {
@@ -292,7 +318,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
     earningsCalendarStatus: "noneFound",
     marketCatalyst: { catalyst: null, status: "noneFound" },
     marketOverview: [],
-    earningsFollowUp: { entries: [], status: "noneFound" },
+    earningsFollowUp: { entries: [], status: "noneFound", coverage: ZERO_EARNINGS_COVERAGE },
     dividends: [],
     dividendsStatus: "confirmed",
     weekAhead: {
@@ -456,31 +482,158 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   assert(visibleOverviewItems(fiveValid).length >= MIN_VISIBLE_INDICATORS, "5+ valid indicators meets the display threshold");
 }
 
-// ===== Earnings Follow-up: same tri-state discipline as the forward-looking
-// calendar – "unavailable" and "no recent reports" must never collapse =====
+// ===== Earnings tracker/reaction: pure-function tests only (this file makes
+// no live API calls) – covers stock-reaction math, trading-day/weekend
+// handling, beat/miss classification, and the tracker's lifecycle/dedup
+// logic. The live-fetch orchestration itself (refreshTrackedEarnings) is
+// exercised implicitly by `npm run report` against real data, same as every
+// other live-provider function in this codebase. =====
 {
-  const rowsByDate = [
-    { dateIso: "2026-07-24", rows: [] as NasdaqEarningsRow[] },
-    { dateIso: "2026-07-22", rows: [nasdaqRow({ symbol: "meta" })] },
+  // A real trading week: Mon 2026-08-24 through Fri 2026-08-28, then Mon
+  // 2026-08-31 (Sat/Sun are simply absent, exactly like Yahoo's real feed).
+  const closes: DatedClose[] = [
+    { date: "2026-08-24", close: 100 },
+    { date: "2026-08-25", close: 102 },
+    { date: "2026-08-26", close: 101 },
+    { date: "2026-08-27", close: 103 },
+    { date: "2026-08-28", close: 105 }, // Friday
+    { date: "2026-08-31", close: 110 }, // next trading day after the Friday
   ];
-  const result = deriveEarningsFollowUpFromRows(rowsByDate, { nowIso: "2026-07-29" });
-  assert(result.status === "confirmed", "known recent earnings report -> status 'confirmed'");
-  const meta = result.entries.find((e) => e.ticker === "META");
-  assert(!!meta, "META follow-up entry is present");
-  assert(meta?.daysAgo === 7, "META daysAgo computed correctly (2026-07-22 -> 2026-07-29 = 7)");
 
-  const allFailed = deriveEarningsFollowUpFromRows(
-    [{ dateIso: "2026-07-22", rows: null }],
-    { nowIso: "2026-07-29" }
+  // --- After Market reaction: baseline = earnings-day close, new = NEXT session close ---
+  const postMarket = computeEarningsReaction(closes, "2026-08-26", "post-market");
+  assert(
+    postMarket !== null && postMarket.baselineDate === "2026-08-26" && postMarket.newDate === "2026-08-27" &&
+      postMarket.baselinePrice === 101 && postMarket.newPrice === 103 && postMarket.basis === "post-market",
+    `after-market reaction uses earnings-day close as baseline and the NEXT session's close as new (got ${JSON.stringify(postMarket)})`
   );
-  assert(allFailed.status === "unavailable", "every date's fetch failing -> status 'unavailable', not 'noneFound'");
+  assert(Math.abs((postMarket?.reactionPercent ?? 0) - 1.98) < 0.15, `after-market reactionPercent ~= (103-101)/101*100 (got ${postMarket?.reactionPercent})`);
 
-  const genuinelyEmpty = deriveEarningsFollowUpFromRows(
-    [{ dateIso: "2026-07-22", rows: [] }],
-    { nowIso: "2026-07-29" }
+  // --- Pre-Market reaction: baseline = PREVIOUS trading-day close, new = earnings-day close ---
+  const preMarket = computeEarningsReaction(closes, "2026-08-26", "pre-market");
+  assert(
+    preMarket !== null && preMarket.baselineDate === "2026-08-25" && preMarket.newDate === "2026-08-26" &&
+      preMarket.baselinePrice === 102 && preMarket.newPrice === 101 && preMarket.basis === "pre-market",
+    `pre-market reaction uses the PREVIOUS trading day's close as baseline and the earnings-day close as new (got ${JSON.stringify(preMarket)})`
   );
-  assert(genuinelyEmpty.status === "noneFound", "a real (successful) empty lookback -> status 'noneFound'");
-  assert(allFailed.status !== genuinelyEmpty.status, "'unavailable' and 'noneFound' are never the same status here either");
+
+  // --- Weekend handling / "earnings date on Friday -> next trading day Monday" ---
+  const fridayAfterMarket = computeEarningsReaction(closes, "2026-08-28", "post-market");
+  assert(
+    fridayAfterMarket !== null && fridayAfterMarket.newDate === "2026-08-31",
+    `an after-market report on a Friday correctly resolves its next session to the following Monday, skipping the weekend (got ${fridayAfterMarket?.newDate})`
+  );
+
+  // --- A nominal date that itself falls on a weekend resolves to the next real trading day ---
+  const weekendNominalDate = computeEarningsReaction(closes, "2026-08-29", "pre-market"); // Saturday
+  assert(
+    weekendNominalDate !== null && weekendNominalDate.newDate === "2026-08-31" && weekendNominalDate.baselineDate === "2026-08-28",
+    `a nominal earnings date that itself falls on a weekend resolves the "earnings day" to the next real trading day (got ${JSON.stringify(weekendNominalDate)})`
+  );
+
+  // --- Not yet computable (next/previous session doesn't exist in history yet) – never fabricated ---
+  assert(computeEarningsReaction(closes, "2026-08-31", "post-market") === null, "post-market reaction is null when the next session hasn't closed yet (no data to fabricate it from)");
+  assert(computeEarningsReaction(closes, "2026-08-24", "pre-market") === null, "pre-market reaction is null when there's no prior trading day in history");
+  assert(computeEarningsReaction(closes, "2026-08-26", "unknown") === null, "an 'unknown' timing never guesses a basis – always null");
+  assert(computeEarningsReaction(null, "2026-08-26", "post-market") === null, "missing price history is handled safely (null, not a crash)");
+  assert(computeEarningsReaction([], "2026-08-26", "post-market") === null, "empty price history is handled safely (null, not a crash)");
+
+  // --- EPS / revenue beat-miss classification ---
+  assert(classifyBeatMiss(computeSurprisePct(1.08, 1.01)) === "beat", "EPS actual > estimate -> 'beat'");
+  assert(classifyBeatMiss(computeSurprisePct(0.9, 1.01)) === "miss", "EPS actual < estimate -> 'miss'");
+  assert(classifyBeatMiss(computeSurprisePct(1.0, 1.0)) === "inline", "EPS actual == estimate -> 'inline'");
+  assert(classifyBeatMiss(computeSurprisePct(undefined, 1.01)) === "unavailable", "missing actual EPS -> 'unavailable', never fabricated");
+  assert(classifyBeatMiss(computeSurprisePct(46_700_000_000, 45_900_000_000)) === "beat", "revenue actual > estimate -> 'beat'");
+  assert(classifyBeatMiss(computeSurprisePct(40_000_000_000, 45_900_000_000)) === "miss", "revenue actual < estimate -> 'miss'");
+  assert(classifyBeatMiss(computeSurprisePct(45_900_000_000, undefined)) === "unavailable", "missing expected revenue -> 'unavailable', never fabricated");
+
+  // --- Deterministic interpretation, from real numbers only ---
+  const strongReaction = { baselineDate: "a", baselinePrice: 100, newDate: "b", newPrice: 104, reactionPercent: 4, basis: "post-market" as const };
+  const weakReaction = { baselineDate: "a", baselinePrice: 100, newDate: "b", newPrice: 96, reactionPercent: -4, basis: "post-market" as const };
+  assert(
+    buildInterpretation({ epsStatus: "available", epsSurprisePct: 5, revenueStatus: "available", revenueSurprisePct: 3, reaction: strongReaction }) ===
+      "Strong report with positive market confirmation.",
+    "beat EPS + beat revenue + positive reaction -> the exact documented sentence"
+  );
+  assert(
+    buildInterpretation({ epsStatus: "available", epsSurprisePct: 5, revenueStatus: "available", revenueSurprisePct: 3, reaction: weakReaction }) ===
+      "Results beat estimates, but the stock fell — expectations may have been higher.",
+    "beat EPS + beat revenue + negative reaction -> the exact documented sentence"
+  );
+  assert(
+    buildInterpretation({ epsStatus: "available", epsSurprisePct: -5, revenueStatus: "available", revenueSurprisePct: -3, reaction: weakReaction }) ===
+      "Weak report confirmed by negative market reaction.",
+    "miss EPS + miss revenue + negative reaction -> the exact documented sentence"
+  );
+  assert(
+    buildInterpretation({ epsStatus: "available", epsSurprisePct: 5, revenueStatus: "available", revenueSurprisePct: -3, reaction: strongReaction }) ===
+      "Mixed earnings result; market reaction provides the stronger signal.",
+    "mixed EPS/revenue result -> the exact documented sentence"
+  );
+  assert(
+    buildInterpretation({ epsStatus: "unavailable", epsSurprisePct: null, revenueStatus: "unavailable", revenueSurprisePct: null, reaction: null }).length > 0,
+    "missing actual results are handled safely (a real sentence, not a crash or an empty string)"
+  );
+
+  // --- Tracker persistence: dedup + lifecycle (upcoming -> awaiting; reported events vanish from Upcoming) ---
+  const upcomingEntry: EarningsCalendarEntry = {
+    ticker: "NVDA", name: "NVIDIA", reportDate: "2026-08-26", daysRemaining: 2, urgency: "week",
+    estimatedEps: 1.01, estimatedRevenue: 45_900_000_000, timeOfDay: "post-market", reasonsHebrew: [], priority: "watchlist",
+  };
+  let records = upsertTrackedEarnings([], [upcomingEntry], "2026-08-24T10:00:00.000Z");
+  assert(records.length === 1 && records[0].status === "awaiting", "a new Upcoming Earnings Calendar entry is tracked as 'awaiting'");
+  assert(records[0].firstSeenAt === "2026-08-24T10:00:00.000Z" && records[0].lastSeenAt === "2026-08-24T10:00:00.000Z", "firstSeenAt/lastSeenAt are set on first sight");
+
+  // Same ticker + same date seen again (e.g. next day's run) -> updates the
+  // SAME record (dedup), never a second one.
+  records = upsertTrackedEarnings(records, [upcomingEntry], "2026-08-25T10:00:00.000Z");
+  assert(records.length === 1, "seeing the same ticker+earningsDate again does not create a duplicate record");
+  assert(records[0].firstSeenAt === "2026-08-24T10:00:00.000Z", "firstSeenAt is preserved across re-sightings");
+  assert(records[0].lastSeenAt === "2026-08-25T10:00:00.000Z", "lastSeenAt is refreshed on each re-sighting");
+
+  // A different report date for the same ticker is a DIFFERENT event (ticker+earningsDate identity).
+  const laterEntry: EarningsCalendarEntry = { ...upcomingEntry, reportDate: "2026-11-25" };
+  records = upsertTrackedEarnings(records, [laterEntry], "2026-08-25T10:00:00.000Z");
+  assert(records.length === 2, "the same ticker with a DIFFERENT earnings date is tracked as a separate event (identity = ticker+earningsDate)");
+
+  // Simulate a completed transition to "reported" (as refreshTrackedEarnings
+  // would produce) and verify it disappears from Upcoming Earnings Calendar.
+  const reportedRecord: EarningsTrackingRecord = {
+    ...records[0],
+    status: "reported",
+    result: {
+      status: "available", reportedDate: "2026-08-26", reportedTiming: "post-market",
+      actualEps: 1.08, expectedEpsAtReport: 1.01, epsSurprisePct: 6.9,
+      actualRevenue: 46_700_000_000, expectedRevenueAtReport: 45_900_000_000, revenueSurprisePct: 1.7,
+      reaction: postMarket, interpretation: "Strong report with positive market confirmation.", checkedAt: "2026-08-27T10:00:00.000Z",
+    },
+  };
+  const trackedAfterTransition = [reportedRecord, records[1]];
+  const upcomingBeforeFilter = [upcomingEntry, laterEntry];
+  const upcomingAfterFilter = filterOutReported(upcomingBeforeFilter, trackedAfterTransition);
+  assert(
+    upcomingAfterFilter.length === 1 && upcomingAfterFilter[0].reportDate === "2026-11-25",
+    "an event that transitioned to 'reported' is removed from Upcoming Earnings Calendar – it can never render as both upcoming and reported"
+  );
+
+  // --- 90-day retention + display window (last 5 trading days, max 8) ---
+  const oldRecord: EarningsTrackingRecord = { ...reportedRecord, ticker: "OLD", earningsDate: "2026-01-01" };
+  const pruned = pruneOldRecords([reportedRecord, oldRecord], "2026-08-27");
+  assert(
+    pruned.some((r) => r.ticker === "NVDA") && !pruned.some((r) => r.ticker === "OLD"),
+    "a record more than 90 days past its earnings date is pruned from the store; a recent one is kept"
+  );
+
+  const withinDisplayWindow = selectDisplayRecords([reportedRecord], "2026-08-27"); // 1 day after the report
+  assert(withinDisplayWindow.length === 1, "a company that reported 1 day ago is shown in the Earnings Follow-up display window");
+  const tooOldForDisplay: EarningsTrackingRecord = {
+    ...reportedRecord,
+    ticker: "STALE",
+    earningsDate: "2026-08-01",
+    result: { ...reportedRecord.result!, reportedDate: "2026-08-01" },
+  };
+  const outsideDisplayWindow = selectDisplayRecords([tooOldForDisplay], "2026-08-27"); // ~26 days later, far past 5 trading days
+  assert(outsideDisplayWindow.length === 0, "a company that reported well over 5 trading days ago is excluded from the display window (still retained in the 90-day store)");
 }
 
 // ===== Report consistency: the HTML attachment, Markdown attachment, HTML
@@ -543,7 +696,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
     earningsCalendarStatus: "confirmed",
     marketCatalyst: { catalyst: null, status: "noneFound" },
     marketOverview: [],
-    earningsFollowUp: { entries: [], status: "noneFound" },
+    earningsFollowUp: { entries: [], status: "noneFound", coverage: ZERO_EARNINGS_COVERAGE },
     dividends: [],
     dividendsStatus: "confirmed",
     weekAhead: {
@@ -649,6 +802,8 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
       fundamentalsTotal: 9,
       topOpportunitiesConfidence: [90],
       emergencyWatchCount: 0,
+      earningsFollowUpResultsFound: 0,
+      earningsFollowUpResultsUnavailable: 0,
     }),
   });
 
@@ -803,7 +958,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
       { key: "gold", label: "Gold (Futures)", value: 3400, changePercent: 0.3, isProxy: false, source: { source: "live" } },
       { key: "oil", label: "Oil – WTI (Futures)", value: 78, changePercent: -1.1, isProxy: false, source: { source: "live" } },
     ],
-    earningsFollowUp: { entries: [], status: "noneFound" },
+    earningsFollowUp: { entries: [], status: "noneFound", coverage: ZERO_EARNINGS_COVERAGE },
     dividends: [{ ticker: "OPPA", name: "Opportunity A", dividendPerShare: 2.5, dividendYieldPct: 1.8 }],
     dividendsStatus: "confirmed",
     weekAhead: {
@@ -1199,6 +1354,8 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
     fundamentalsTotal: 9,
     topOpportunitiesConfidence: [95, 90, 92],
     emergencyWatchCount: 0,
+    earningsFollowUpResultsFound: 0,
+    earningsFollowUpResultsUnavailable: 0,
   };
   const excellent = computeReportQuality(excellentInput);
   assert(excellent.score >= 90 && excellent.band === "Excellent", "full coverage across every dimension scores Excellent (90-100)");
@@ -1218,6 +1375,8 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
     fundamentalsTotal: 9,
     topOpportunitiesConfidence: [],
     emergencyWatchCount: 0,
+    earningsFollowUpResultsFound: 0,
+    earningsFollowUpResultsUnavailable: 0,
   };
   const poor = computeReportQuality(poorInput);
   assert(poor.score < RECOVERY_THRESHOLD, "a run with widespread provider failure scores below the recovery threshold");
@@ -1498,6 +1657,196 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
 // async IIFE – kept last so every synchronous check above has already run
 // and set process.exitCode before we get here. =====
 async function runAsyncOnlyChecks(): Promise<void> {
+  // ===== Earnings tracker persistence: loadTracker/saveTracker round-trip
+  // via a real temp file on disk (never the real data/earnings-tracker.json). =====
+  {
+    const filePath = path.join(process.cwd(), "data", "selftest_earnings_tracker_loadsave.json");
+    try {
+      fs.rmSync(filePath, { force: true });
+      assert(loadTracker(filePath).length === 0, "loadTracker returns an empty array when the file doesn't exist yet, never a crash");
+
+      const sample: EarningsTrackingRecord[] = [
+        {
+          ticker: "ABC", name: "ABC Corp", earningsDate: "2026-09-01", expectedTiming: "unknown",
+          firstSeenAt: "2026-08-20T00:00:00.000Z", lastSeenAt: "2026-08-20T00:00:00.000Z", status: "awaiting",
+        },
+      ];
+      saveTracker(sample, filePath);
+      const reloaded = loadTracker(filePath);
+      assert(reloaded.length === 1 && reloaded[0].ticker === "ABC", "saveTracker + a fresh loadTracker round-trips the exact same record");
+
+      fs.writeFileSync(filePath, "{ this is not valid JSON", "utf8");
+      assert(loadTracker(filePath).length === 0, "a corrupt store file returns an empty array rather than crashing the run");
+    } finally {
+      fs.rmSync(filePath, { force: true });
+    }
+  }
+
+  // ===== Full multi-run lifecycle, exactly as it happens in production:
+  // each call to runEarningsTracker independently loads from disk and saves
+  // back to disk, so calling it repeatedly against the SAME file path is
+  // functionally identical to separate process runs from persistence's
+  // point of view (no in-memory state survives between the calls other than
+  // through the file itself). Finnhub/Yahoo are stubbed via the injectable
+  // fetchers – no network access. =====
+  {
+    const filePath = path.join(process.cwd(), "data", "selftest_earnings_tracker_lifecycle.json");
+    try {
+      fs.rmSync(filePath, { force: true });
+
+      const panwEntry: EarningsCalendarEntry = {
+        ticker: "PANW", name: "Palo Alto Networks, Inc.", reportDate: "2026-08-26", daysRemaining: 2,
+        urgency: "week", estimatedEps: 0.51, timeOfDay: "post-market", reasonsHebrew: [], priority: "watchlist",
+      };
+      const nothingYet: ResultsFetcher = async () => ({ value: null, source: { source: "unavailable" } });
+      const noClosesNeeded: ClosesFetcher = async () => ({ value: null, source: { source: "unavailable" } });
+
+      // ----- RUN 1: PANW appears in Upcoming Earnings -> persisted as awaiting -----
+      const run1 = await runEarningsTracker({
+        filePath, now: new Date("2026-08-24T13:00:00.000Z"), upcomingEntries: [panwEntry],
+        fetchResults: nothingYet, fetchCloses: noClosesNeeded,
+      });
+      assert(run1.coverage.tracked === 1 && run1.coverage.awaiting === 1, "RUN 1: PANW is persisted as a new 'awaiting' record");
+      assert(run1.entries.length === 0, "RUN 1: nothing shown in Earnings Follow-up yet (not due)");
+
+      // ----- RUN 2: fresh load from disk -> PANW is still remembered -----
+      const run2 = await runEarningsTracker({
+        filePath, now: new Date("2026-08-25T13:00:00.000Z"), upcomingEntries: [panwEntry],
+        fetchResults: nothingYet, fetchCloses: noClosesNeeded,
+      });
+      assert(run2.coverage.tracked === 1, "RUN 2: fresh load from disk still shows exactly one tracked PANW record (no duplicate)");
+      assert(
+        loadTracker(filePath)[0].firstSeenAt === run1.records[0].firstSeenAt,
+        "RUN 2: firstSeenAt from RUN 1 is preserved across the fresh disk load"
+      );
+
+      // ----- RUN 3: earnings result becomes available -----
+      const resultAvailable: ResultsFetcher = async (ticker) => ({
+        value: [{
+          symbol: ticker, date: "2026-08-26", timeOfDay: "post-market",
+          epsActual: 1.08, epsEstimate: 1.01, revenueActual: 46_700_000_000, revenueEstimate: 45_900_000_000,
+        }],
+        source: { source: "live" },
+      });
+      const fullCloses: ClosesFetcher = async () => ({
+        value: [
+          { date: "2026-08-25", close: 200 },
+          { date: "2026-08-26", close: 202 },
+          { date: "2026-08-27", close: 192.7 }, // next session close after the after-market report
+        ],
+        source: { source: "live" },
+      });
+      const run3 = await runEarningsTracker({
+        filePath, now: new Date("2026-08-27T13:00:00.000Z"), upcomingEntries: [panwEntry],
+        fetchResults: resultAvailable, fetchCloses: fullCloses,
+      });
+      const panwAfterRun3 = run3.records.find((r) => r.ticker === "PANW");
+      assert(
+        panwAfterRun3?.status === "reported",
+        `RUN 3: PANW transitions to 'reported' once actuals AND the reaction are both available (got ${panwAfterRun3?.status})`
+      );
+      assert(
+        panwAfterRun3?.result?.actualEps === 1.08 && panwAfterRun3?.result?.epsSurprisePct !== null,
+        "RUN 3: actual EPS and a computed surprise% are stored"
+      );
+      assert(
+        panwAfterRun3?.result?.reaction != null,
+        "RUN 3: stock reaction is calculated once sufficient market data exists"
+      );
+      assert(
+        run3.coverage.resultsFound === 1 && run3.coverage.reactionsCalculated === 1,
+        "RUN 3: coverage reflects one result found with a calculated reaction"
+      );
+
+      // ----- RUN 4: fresh process again -----
+      const failIfCalled = async (): Promise<never> => {
+        throw new Error("should not be called for an already-reported record");
+      };
+      const run4 = await runEarningsTracker({
+        filePath, now: new Date("2026-08-28T13:00:00.000Z"), upcomingEntries: [panwEntry], // Nasdaq might still list it briefly
+        fetchResults: failIfCalled, fetchCloses: failIfCalled,
+      });
+      assert(run4.coverage.tracked === 1, "RUN 4: PANW is not re-added as a duplicate upcoming event – still exactly one tracked record");
+      const panwAfterRun4 = run4.records.find((r) => r.ticker === "PANW");
+      assert(panwAfterRun4?.status === "reported", "RUN 4: the reported result remains available after a fresh load – status was not reset to 'awaiting'");
+      assert(
+        run4.entries.some((e) => e.ticker === "PANW" && e.result.actualEps === 1.08),
+        "RUN 4: PANW's real reported EPS is still shown in Earnings Follow-up after a fresh load"
+      );
+      assert(
+        filterOutReported([panwEntry], run4.records).length === 0,
+        "RUN 4: PANW is correctly excluded from Upcoming Earnings Calendar now that it has reported"
+      );
+    } finally {
+      fs.rmSync(filePath, { force: true });
+    }
+  }
+
+  // ===== Section 4: a result is never marked complete before the required
+  // regular-session closing price exists – "reported / awaiting market
+  // reaction" as its own intermediate, re-checked state. =====
+  {
+    const filePath = path.join(process.cwd(), "data", "selftest_earnings_tracker_awaiting_reaction.json");
+    try {
+      fs.rmSync(filePath, { force: true });
+      const tuesdayEntry: EarningsCalendarEntry = {
+        ticker: "TESTCO", name: "Test Co", reportDate: "2026-08-25", daysRemaining: 1,
+        urgency: "tomorrow", timeOfDay: "post-market", reasonsHebrew: [], priority: "watchlist",
+      };
+      const resultAvailable: ResultsFetcher = async (ticker) => ({
+        value: [{ symbol: ticker, date: "2026-08-25", timeOfDay: "post-market", epsActual: 2.0, epsEstimate: 1.9 }],
+        source: { source: "live" },
+      });
+      // Tuesday evening: Wednesday's regular-session close doesn't exist yet.
+      const closesWithoutNextSession: ClosesFetcher = async () => ({
+        value: [{ date: "2026-08-24", close: 100 }, { date: "2026-08-25", close: 102 }],
+        source: { source: "live" },
+      });
+      const evening = await runEarningsTracker({
+        filePath, now: new Date("2026-08-25T23:00:00.000Z"), upcomingEntries: [tuesdayEntry],
+        fetchResults: resultAvailable, fetchCloses: closesWithoutNextSession,
+      });
+      const recEvening = evening.records.find((r) => r.ticker === "TESTCO");
+      assert(
+        recEvening?.status === "reportedAwaitingReaction",
+        `actual EPS known but the next session hasn't closed -> 'reportedAwaitingReaction', never a premature 'reported' (got ${recEvening?.status})`
+      );
+      assert(
+        recEvening?.result?.actualEps === 2.0 && recEvening?.result?.reaction == null,
+        "the real EPS is stored immediately; the reaction stays null rather than being estimated or guessed"
+      );
+      assert(
+        evening.entries.some((e) => e.ticker === "TESTCO" && e.result.reaction == null),
+        "Earnings Follow-up already shows the real EPS while explicitly marking the reaction as not yet available"
+      );
+
+      // Wednesday: the next regular-session close now exists.
+      const closesWithNextSession: ClosesFetcher = async () => ({
+        value: [
+          { date: "2026-08-24", close: 100 },
+          { date: "2026-08-25", close: 102 },
+          { date: "2026-08-26", close: 99 },
+        ],
+        source: { source: "live" },
+      });
+      const failIfResultsRefetched = async (): Promise<never> => {
+        throw new Error("actual figures should not be re-fetched once already known");
+      };
+      const nextDay = await runEarningsTracker({
+        filePath, now: new Date("2026-08-26T13:00:00.000Z"), upcomingEntries: [tuesdayEntry],
+        fetchResults: failIfResultsRefetched, fetchCloses: closesWithNextSession,
+      });
+      const recNextDay = nextDay.records.find((r) => r.ticker === "TESTCO");
+      assert(recNextDay?.status === "reported", `once the next session closes, the record completes to 'reported' (got ${recNextDay?.status})`);
+      assert(
+        recNextDay?.result?.reaction?.reactionPercent !== undefined,
+        "the reaction is now calculated, without ever re-fetching the actual EPS/revenue figures"
+      );
+    } finally {
+      fs.rmSync(filePath, { force: true });
+    }
+  }
+
   const probeKey = "selftest_ratelimit_probe";
   const probePath = path.join(process.cwd(), "cache", `${probeKey}.json`);
   const emptyProbePath = path.join(process.cwd(), "cache", `${probeKey}_empty.json`);

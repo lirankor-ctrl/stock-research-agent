@@ -230,6 +230,7 @@ export function deriveEarningsCalendarFromRows(
         daysRemaining,
         urgency: urgencyFor(daysRemaining),
         estimatedEps: row.epsForecast,
+        estimatedRevenue: row.revenueForecast,
         timeOfDay: row.timeOfDay,
         reasonsHebrew: reasonsHebrew(row, enriched?.sector, enriched?.industry),
         priority,

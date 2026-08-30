@@ -11,6 +11,11 @@ import {
   dataFreshnessLine,
   daysRemainingLabelHebrew,
   earningsDateBadgeTone,
+  fmtEpsLine,
+  fmtReactionLine,
+  fmtReportedTimingLabel,
+  fmtRevenueLine,
+  fmtSurpriseBadge,
   formatOverviewValue,
   ltr,
   ltrTagged,
@@ -26,6 +31,7 @@ import {
   DividendsStatus,
   EarningsCalendarEntry,
   EarningsCalendarStatus,
+  EarningsFollowUpEntry,
   EarningsFollowUpResult,
   EarningsUrgency,
   EnrichedStock,
@@ -368,10 +374,43 @@ function renderTechnicalWatch(items: TechnicalWatchItem[], dataUnavailable: bool
 }
 
 // ===== 7. Earnings Follow-up =====
+//
+// Companies previously tracked via Upcoming Earnings Calendar that have now
+// reported – real actual-vs-expected EPS/revenue, a trading-day-correct
+// stock reaction, and a deterministic interpretation. See
+// src/earningsTracker.ts / src/earningsReaction.ts. Never fabricates a
+// figure: any missing piece renders "Unavailable" / "Not yet available"
+// explicitly rather than being silently omitted.
 
-function fmtFollowUpMove(pct: number | null): string {
-  if (pct === null) return "Unavailable";
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+function earningsFollowUpMetric(label: string, mainLine: string, badge?: string): string {
+  return `
+        <div class="followup-metric">
+          <span class="followup-metric-label">${esc(label)}</span>
+          <span class="followup-metric-value">${ltr(esc(mainLine))}</span>
+          ${badge ? `<span class="followup-metric-badge">${ltr(esc(badge))}</span>` : ""}
+        </div>`;
+}
+
+function renderEarningsFollowUpCard(e: EarningsFollowUpEntry): string {
+  const r = e.result;
+  const reactionClass = r.reaction ? changeClass(r.reaction.reactionPercent) : "flat";
+  return `
+      <article class="card followup-card">
+        <div class="followup-header">
+          <span class="story-ticker">${ltr(esc(e.ticker))}</span>
+          <span class="story-company">${esc(e.name)}</span>
+          <span class="followup-date">${ltr(esc(e.reportDate))} · ${ltr(esc(fmtReportedTimingLabel(e.timeOfDay)))}</span>
+        </div>
+        <div class="followup-metrics">
+          ${earningsFollowUpMetric("EPS", fmtEpsLine(r.actualEps, r.expectedEpsAtReport), fmtSurpriseBadge(r.epsSurprisePct))}
+          ${earningsFollowUpMetric("Revenue", fmtRevenueLine(r.actualRevenue, r.expectedRevenueAtReport), fmtSurpriseBadge(r.revenueSurprisePct))}
+          <div class="followup-metric">
+            <span class="followup-metric-label">Stock Reaction</span>
+            <span class="followup-metric-value ${reactionClass}">${ltr(esc(fmtReactionLine(r.reaction)))}</span>
+          </div>
+        </div>
+        <p class="followup-result">${esc(r.interpretation ?? "Unavailable")}</p>
+      </article>`;
 }
 
 function renderEarningsFollowUp(followUp: EarningsFollowUpResult): string {
@@ -383,30 +422,11 @@ function renderEarningsFollowUp(followUp: EarningsFollowUpResult): string {
   </section>`;
   }
 
-  const rows = followUp.entries
-    .slice(0, 12)
-    .map((e) => {
-      const moveClass = e.priceChangeSincePct === null ? "flat" : changeClass(e.priceChangeSincePct);
-      return `
-        <tr>
-          <td class="symbol">${ltr(esc(e.ticker))}<span class="alert-name">${esc(e.name)}</span></td>
-          <td>${ltr(esc(e.reportDate))}</td>
-          <td class="${moveClass}">${ltr(esc(fmtFollowUpMove(e.priceChangeSincePct)))}</td>
-        </tr>`;
-    })
-    .join("");
-
+  const cards = followUp.entries.map(renderEarningsFollowUpCard).join("");
   return `
   <section>
     <h2 class="section-title">Earnings Follow-up</h2>
-    <div class="table-wrap card">
-      <table class="report-table">
-        <thead>
-          <tr><th>Company</th><th>Earnings Date</th><th>Price Reaction</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
+    <div class="followup-grid">${cards}</div>
   </section>`;
 }
 
@@ -862,6 +882,18 @@ const CSS = `
   .headline-card { padding: 14px 16px; }
   .headline-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .headline-text { margin: 0 0 4px; font-size: 13.5px; color: var(--text); }
+
+  /* ===== Earnings Follow-up ===== */
+  .followup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .followup-card { padding: 14px 16px; }
+  .followup-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .followup-date { color: var(--muted); font-size: 12px; }
+  .followup-metrics { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .followup-metric { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+  .followup-metric-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; min-width: 62px; }
+  .followup-metric-value { font-weight: 700; color: var(--navy); }
+  .followup-metric-badge { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .followup-result { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text); }
 
   /* ===== Market Overview tiles ===== */
   .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }

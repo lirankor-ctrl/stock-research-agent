@@ -1,0 +1,101 @@
+[
+  {
+    "ticker": "PANW",
+    "name": "Palo Alto Networks, Inc.",
+    "earningsDate": "2026-09-01",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.51,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "DELL",
+    "name": "Dell Technologies Inc.",
+    "earningsDate": "2026-09-01",
+    "expectedTiming": "post-market",
+    "expectedEps": 4.72,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "MDT",
+    "name": "Medtronic plc",
+    "earningsDate": "2026-09-01",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.38,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CRDO",
+    "name": "Credo Technology Group Holding Ltd",
+    "earningsDate": "2026-09-01",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.91,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AVGO",
+    "name": "Broadcom Inc.",
+    "earningsDate": "2026-09-02",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.83,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "SNOW",
+    "name": "Snowflake Inc.",
+    "earningsDate": "2026-09-02",
+    "expectedTiming": "post-market",
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "HPE",
+    "name": "Hewlett Packard Enterprise Company",
+    "earningsDate": "2026-09-02",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.82,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "NTAP",
+    "name": "NetApp, Inc.",
+    "earningsDate": "2026-09-02",
+    "expectedTiming": "post-market",
+    "expectedEps": 1.72,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CIEN",
+    "name": "Ciena Corporation",
+    "earningsDate": "2026-09-03",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.45,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CPRT",
+    "name": "Copart, Inc.",
+    "earningsDate": "2026-09-03",
+    "expectedTiming": "unknown",
+    "expectedEps": 0.39,
+    "firstSeenAt": "2026-08-30T13:54:21.493Z",
+    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "status": "awaiting"
+  }
+]

@@ -10,9 +10,10 @@ import {
   RateLimitError,
 } from "./alphaVantage";
 import { readCache, TTL, writeCache } from "./cache";
+import { EarningsResultRow, fetchFinnhubEarningsResult } from "./earningsResults";
 import { fetchFinnhubEarningsForDate } from "./finnhubEarnings";
 import { fetchFinnhubCompanyNews } from "./finnhubNews";
-import { fetchYahooDailyCloses, fetchYahooQuote, YahooQuote } from "./marketData";
+import { DatedClose, fetchYahooDailyCloses, fetchYahooDailyClosesWithDates, fetchYahooQuote, YahooQuote } from "./marketData";
 import { fetchNasdaqEarningsForDate, NasdaqEarningsRow } from "./nasdaqEarnings";
 import {
   AlphaVantageMoversResponse,
@@ -246,6 +247,21 @@ export async function getYahooDailyCloses(
   );
 }
 
+// Dated variant used by the earnings-reaction calculator (src/earningsReaction.ts)
+// – shares the same cache key as getYahooDailyCloses would if it existed
+// separately, but keyed distinctly since the payload shape differs.
+export async function getYahooDailyClosesWithDates(
+  symbol: string,
+  onNote: (msg: string) => void = () => {}
+): Promise<SourcedValue<DatedClose[]>> {
+  return cacheFirst<DatedClose[]>(
+    `yahoo_daily_dated_${symbol}`,
+    TTL.HOURS_12,
+    () => fetchYahooDailyClosesWithDates(symbol),
+    onNote
+  );
+}
+
 // ===== Nasdaq earnings calendar (independent of Alpha Vantage – one call per
 // calendar date, 24h cache so a run only re-fetches dates it hasn't already
 // seen today) =====
@@ -277,6 +293,28 @@ export async function getNasdaqEarningsForDate(
     `nasdaq_earnings_${dateIso}`,
     TTL.HOURS_24,
     () => fetchEarningsWithFallback(dateIso, onNote),
+    onNote
+  );
+}
+
+// ===== Actual earnings results (Finnhub – the sole provider with reported
+// EPS/revenue figures in this codebase; see earningsResults.ts). Cached 24h
+// like other daily-refresh data (news, quotes) – uniform, simple TTL rather
+// than a dual "short until reported, then long-lived" scheme: once a result
+// genuinely appears, re-fetching the same true values on later runs is
+// idempotent and harmless, and this endpoint isn't Alpha-Vantage-budgeted at
+// all. Same source both before AND after a company reports – "not yet
+// reported" and "reported" are told apart by the CALLER inspecting
+// epsActual/revenueActual on the returned row(s), not by the cache layer. =====
+export async function getFinnhubEarningsResult(
+  symbol: string,
+  aroundDateIso: string,
+  onNote: (msg: string) => void = () => {}
+): Promise<SourcedValue<EarningsResultRow[]>> {
+  return cacheFirst<EarningsResultRow[]>(
+    `finnhub_earnings_result_${symbol}_${aroundDateIso}`,
+    TTL.HOURS_24,
+    () => fetchFinnhubEarningsResult(symbol, aroundDateIso),
     onNote
   );
 }

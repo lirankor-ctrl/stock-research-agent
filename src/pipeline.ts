@@ -13,6 +13,7 @@ import {
 } from "./enricher";
 import { buildEarningsCalendar } from "./earningsCalendar";
 import { buildEarningsFollowUp } from "./earningsFollowUp";
+import { filterOutReported } from "./earningsTracker";
 import { buildDividendInfo } from "./dividends";
 import { buildEconomicReadings } from "./economicIndicators";
 import { getFearGreed } from "./fearGreed";
@@ -381,22 +382,42 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     enrichedByTicker,
     onProgress: (m) => log(m),
   });
-  const earningsCalendar = earningsCalendarRes.entries;
-  log(
-    `   earnings calendar (next 14d): ${earningsCalendarRes.status} · ${earningsCalendar.length} companies`
-  );
+  const earningsCalendarBeforeTracking = earningsCalendarRes.entries;
 
-  const marketCatalyst = selectMarketCatalyst(earningsCalendarRes);
-  log(
-    `   market catalyst: ${marketCatalyst.status}${marketCatalyst.catalyst ? ` – ${marketCatalyst.catalyst.headline} (${marketCatalyst.catalyst.timingHebrew})` : ""}`
-  );
-
-  const earningsFollowUp = await buildEarningsFollowUp({
+  // Earnings tracker: persists every entry currently in Upcoming Earnings
+  // Calendar (section 1), checks tracked events whose expected date has
+  // passed/is today against actual results (sections 2/3/5), and returns the
+  // updated record set. filterOutReported (section 7) then removes any event
+  // that just transitioned to "reported" from the calendar itself – an
+  // event can never render as both upcoming AND reported. See
+  // src/earningsTracker.ts.
+  const followUpRun = await buildEarningsFollowUp({
     now,
+    upcomingEntries: earningsCalendarBeforeTracking,
     onProgress: (m) => log(m),
   });
+  const earningsCalendar = filterOutReported(earningsCalendarBeforeTracking, followUpRun.records);
+  const earningsFollowUp = {
+    entries: followUpRun.entries,
+    status: followUpRun.status,
+    coverage: followUpRun.coverage,
+  };
   log(
-    `   earnings follow-up (last 7d): ${earningsFollowUp.status} · ${earningsFollowUp.entries.length} companies`
+    `   earnings calendar (next 14d): ${earningsCalendarRes.status} · ${earningsCalendar.length} companies` +
+      (earningsCalendarBeforeTracking.length !== earningsCalendar.length
+        ? ` (${earningsCalendarBeforeTracking.length - earningsCalendar.length} already reported, filtered out)`
+        : "")
+  );
+  log(
+    `   earnings follow-up: ${earningsFollowUp.status} · ${earningsFollowUp.entries.length} shown · ` +
+      `tracker: ${followUpRun.coverage.tracked} tracked, ${followUpRun.coverage.awaiting} awaiting, ` +
+      `${followUpRun.coverage.resultsFound} found, ${followUpRun.coverage.resultsUnavailable} unavailable, ` +
+      `${followUpRun.coverage.reactionsCalculated} reactions calculated`
+  );
+
+  const marketCatalyst = selectMarketCatalyst({ ...earningsCalendarRes, entries: earningsCalendar });
+  log(
+    `   market catalyst: ${marketCatalyst.status}${marketCatalyst.catalyst ? ` – ${marketCatalyst.catalyst.headline} (${marketCatalyst.catalyst.timingHebrew})` : ""}`
   );
 
   const dividendInfo = buildDividendInfo([...watchlist, ...topOpportunities]);
@@ -503,6 +524,8 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     fundamentalsTotal: qualityUniverse.length,
     topOpportunitiesConfidence: topOpportunities.map((s) => s.dataQuality?.confidenceScore ?? 0),
     emergencyWatchCount: emergencyWatch.length,
+    earningsFollowUpResultsFound: followUpRun.coverage.resultsFound,
+    earningsFollowUpResultsUnavailable: followUpRun.coverage.resultsUnavailable,
   });
 
   data.reportQuality = quality;

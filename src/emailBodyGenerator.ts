@@ -22,6 +22,11 @@ import {
   daysRemainingLabelHebrew,
   earningsDateBadgeTone,
   EMAIL_MAX_WIDTH,
+  fmtEpsLine,
+  fmtReactionLine,
+  fmtReportedTimingLabel,
+  fmtRevenueLine,
+  fmtSurpriseBadge,
   formatOverviewValue,
   ltr,
   ltrTagged,
@@ -36,6 +41,7 @@ import {
   DividendInfoItem,
   DividendsStatus,
   EarningsCalendarEntry,
+  EarningsFollowUpEntry,
   EarningsFollowUpResult,
   EnrichedStock,
   MarketCatalystResult,
@@ -289,31 +295,45 @@ function htmlTechnicalWatch(items: ReportData["technicalWatch"], dataUnavailable
 }
 
 // ===== 7. Earnings Follow-up =====
+//
+// Companies previously tracked via Upcoming Earnings Calendar that have now
+// reported – real actual-vs-expected EPS/revenue, a trading-day-correct
+// stock reaction, and a deterministic interpretation. Never fabricates a
+// figure: any missing piece renders "Unavailable" / "Not yet available"
+// explicitly rather than being silently omitted.
+
+function followUpMetricRow(label: string, mainLine: string, badge?: string, valueColor?: string): string {
+  return `<tr><td style="padding:2px 0;font-size:13px;">` +
+    `<span style="display:inline-block;min-width:62px;color:${PALETTE.muted};font-size:11px;text-transform:uppercase;">${esc(label)}</span> ` +
+    `<span style="font-weight:700;color:${valueColor ?? PALETTE.navy};">${ltr(esc(mainLine))}</span>` +
+    (badge ? ` <span style="font-size:12px;color:${PALETTE.muted};">${ltr(esc(badge))}</span>` : "") +
+    `</td></tr>`;
+}
+
+function htmlEarningsFollowUpCard(e: EarningsFollowUpEntry): string {
+  const r = e.result;
+  const reactionColor = r.reaction ? CHANGE_COLOR[changeClass(r.reaction.reactionPercent)] : PALETTE.muted;
+  const inner = `
+    <div style="margin-bottom:8px;">
+      <span style="background:${PALETTE.navy};color:#fff;font-weight:800;font-size:11.5px;padding:2px 8px;border-radius:6px;">${ltr(esc(e.ticker))}</span>
+      <span style="color:${PALETTE.muted};font-size:12.5px;font-weight:600;">${esc(e.name)}</span>
+      <span style="color:${PALETTE.muted};font-size:11.5px;"> · ${ltr(esc(e.reportDate))} · ${ltr(esc(fmtReportedTimingLabel(e.timeOfDay)))}</span>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      ${followUpMetricRow("EPS", fmtEpsLine(r.actualEps, r.expectedEpsAtReport), fmtSurpriseBadge(r.epsSurprisePct))}
+      ${followUpMetricRow("Revenue", fmtRevenueLine(r.actualRevenue, r.expectedRevenueAtReport), fmtSurpriseBadge(r.revenueSurprisePct))}
+      ${followUpMetricRow("Reaction", fmtReactionLine(r.reaction), undefined, reactionColor)}
+    </table>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid ${PALETTE.border};font-size:12.5px;color:${PALETTE.navy};">${esc(r.interpretation ?? "Unavailable")}</div>`;
+  return `<tr><td style="padding-bottom:10px;">${card(inner)}</td></tr>`;
+}
 
 function htmlEarningsFollowUp(followUp: EarningsFollowUpResult): string {
   if (followUp.entries.length === 0) {
     return sectionWrap(`${h("Earnings Follow-up")}${emptyNotice(earningsFollowUpStatusMessageHebrew(followUp.status))}`);
   }
-  const rows = followUp.entries
-    .slice(0, 12)
-    .map((e) => {
-      const color = e.priceChangeSincePct === null ? PALETTE.muted : CHANGE_COLOR[changeClass(e.priceChangeSincePct)];
-      return `<tr>
-        <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:13px;"><strong style="color:${PALETTE.navy};">${ltr(esc(e.ticker))}</strong><br><span style="font-size:11.5px;color:${PALETTE.muted};">${esc(e.name)}</span></td>
-        <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:12.5px;">${ltr(esc(e.reportDate))}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:13px;font-weight:700;color:${color};">${ltr(esc(fmtFollowUpMove(e.priceChangeSincePct)))}</td>
-      </tr>`;
-    })
-    .join("");
-  const table = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <th style="text-align:start;padding:8px 10px;font-size:10.5px;color:${PALETTE.muted};text-transform:uppercase;background:${PALETTE.pageBg};">Company</th>
-      <th style="text-align:start;padding:8px 10px;font-size:10.5px;color:${PALETTE.muted};text-transform:uppercase;background:${PALETTE.pageBg};">Earnings Date</th>
-      <th style="text-align:start;padding:8px 10px;font-size:10.5px;color:${PALETTE.muted};text-transform:uppercase;background:${PALETTE.pageBg};">Price Reaction</th>
-    </tr>
-    ${rows}
-  </table>`;
-  return sectionWrap(`${h("Earnings Follow-up")}${card(table)}`);
+  const cards = followUp.entries.map(htmlEarningsFollowUpCard).join("");
+  return sectionWrap(`${h("Earnings Follow-up")}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cards}</table>`);
 }
 
 // ===== 8. Top Opportunities =====
@@ -668,11 +688,19 @@ function textEarningsFollowUp(followUp: EarningsFollowUpResult): string {
   if (followUp.entries.length === 0) {
     return `📮 Earnings Follow-up:\n  ${earningsFollowUpStatusMessageHebrew(followUp.status)}`;
   }
-  const lines = followUp.entries
-    .slice(0, 12)
-    .map((e) => `  • ${e.ticker} – ${e.name} · ${e.reportDate} · ${fmtFollowUpMove(e.priceChangeSincePct)}`)
-    .join("\n");
-  return `📮 Earnings Follow-up:\n${lines}`;
+  const blocks = followUp.entries
+    .map((e) => {
+      const r = e.result;
+      return (
+        `  • ${e.ticker} – ${e.name} · ${e.reportDate} · ${fmtReportedTimingLabel(e.timeOfDay)}\n` +
+        `      EPS: ${fmtEpsLine(r.actualEps, r.expectedEpsAtReport)} — ${fmtSurpriseBadge(r.epsSurprisePct)}\n` +
+        `      Revenue: ${fmtRevenueLine(r.actualRevenue, r.expectedRevenueAtReport)} — ${fmtSurpriseBadge(r.revenueSurprisePct)}\n` +
+        `      Stock Reaction: ${fmtReactionLine(r.reaction)}\n` +
+        `      Result: ${r.interpretation ?? "Unavailable"}`
+      );
+    })
+    .join("\n\n");
+  return `📮 Earnings Follow-up:\n${blocks}`;
 }
 
 // Top Opportunities NEVER contains an Emergency-Mode-promoted stock – see

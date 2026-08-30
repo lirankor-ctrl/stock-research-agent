@@ -1,4 +1,5 @@
 import axios from "axios";
+import { usMarketDateIso } from "./dateUtils";
 
 // Yahoo Finance's unofficial (but widely used, no-key) chart endpoint. Used
 // for market indices/commodities/crypto (Priority 2) and for daily
@@ -59,4 +60,33 @@ export async function fetchYahooDailyCloses(symbol: string): Promise<number[] | 
   const raw: Array<number | null> = result.indicators?.quote?.[0]?.close ?? [];
   const closes = raw.filter((c): c is number => typeof c === "number" && c > 0);
   return closes.length > 0 ? closes : null;
+}
+
+export interface DatedClose {
+  date: string; // YYYY-MM-DD, US/Eastern trading date (matches Nasdaq/Finnhub earnings dates)
+  close: number;
+}
+
+// Same ~6mo daily-close series as fetchYahooDailyCloses, but paired with each
+// close's actual trading date instead of a bare array. This is what makes an
+// earnings-reaction calculation trustworthy: Yahoo's series contains ONLY
+// real trading days (weekends/holidays are simply absent), so walking one
+// index before/after a given date is always a genuine adjacent trading day –
+// see src/earningsReaction.ts.
+export async function fetchYahooDailyClosesWithDates(symbol: string): Promise<DatedClose[] | null> {
+  const result = await fetchYahooChart(symbol, { range: "6mo", interval: "1d" });
+  if (!result) return null;
+  const timestamps: Array<number | null> = result.timestamp ?? [];
+  const raw: Array<number | null> = result.indicators?.quote?.[0]?.close ?? [];
+  const out: DatedClose[] = [];
+  for (let i = 0; i < Math.min(timestamps.length, raw.length); i++) {
+    const ts = timestamps[i];
+    const close = raw[i];
+    if (typeof ts !== "number" || typeof close !== "number" || close <= 0) continue;
+    // Yahoo's chart timestamps are UTC seconds at the session's start; the US
+    // market date formatter (dateUtils.ts) already exists precisely to avoid
+    // UTC-midnight date drift for this kind of US-market-date derivation.
+    out.push({ date: usMarketDateIso(new Date(ts * 1000)), close });
+  }
+  return out.length > 0 ? out : null;
 }

@@ -3,7 +3,8 @@
 // and plain-text renderers too). Nothing here changes what data is
 // computed, fetched, or selected – only how already-computed values are
 // labeled, grouped, or formatted for display.
-import { EarningsCalendarEntry, MarketOverviewItem, OpportunityTier, ReportData, RunStatus } from "./types";
+import { classifyBeatMiss } from "./earningsReaction";
+import { EarningsCalendarEntry, EarningsReaction, MarketOverviewItem, OpportunityTier, ReportData, RunStatus } from "./types";
 
 // Email clients render inside this fixed reading width; the HTML attachment
 // uses a slightly narrower column for a calmer, easier-to-scan layout.
@@ -37,6 +38,56 @@ export const PALETTE = {
 // per-share/per-unit price should. Percent-unit items (e.g. the 10-year
 // Treasury yield) already render correctly via `unit === "%"`.
 const NON_CURRENCY_KEYS = new Set(["fearGreed", "vix"]);
+
+// ===== Large dollar figures (EPS estimate revenue, actual revenue) =====
+// Compact $B/$M/$K formatting shared by the Upcoming Earnings Calendar and
+// the Earnings Follow-up table so a $46.7B figure never renders as
+// "$46700000000".
+export function fmtBigDollar(n: number | undefined): string {
+  if (n === undefined) return "Unavailable";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+// ===== Earnings Follow-up cell formatting =====
+// Shared by the Markdown, HTML, and email renderers so a beat/miss badge or
+// a reaction line can never read differently across the three surfaces.
+
+export function fmtEpsLine(actual: number | undefined, expected: number | undefined): string {
+  if (actual === undefined) return "Unavailable";
+  const expectedStr = expected !== undefined ? `$${expected.toFixed(2)}` : "n/a";
+  return `$${actual.toFixed(2)} vs ${expectedStr}`;
+}
+
+export function fmtRevenueLine(actual: number | undefined, expected: number | undefined): string {
+  if (actual === undefined) return "Unavailable";
+  const expectedStr = expected !== undefined ? fmtBigDollar(expected) : "n/a";
+  return `${fmtBigDollar(actual)} vs ${expectedStr}`;
+}
+
+export function fmtSurpriseBadge(surprisePct: number | null | undefined): string {
+  const label = classifyBeatMiss(surprisePct);
+  if (label === "unavailable") return "Unavailable";
+  if (label === "inline") return "In-line";
+  const sign = (surprisePct as number) >= 0 ? "+" : "";
+  return `${label === "beat" ? "Beat" : "Miss"} ${sign}${(surprisePct as number).toFixed(1)}%`;
+}
+
+export function fmtReactionLine(reaction: EarningsReaction | null | undefined): string {
+  if (!reaction) return "Not yet available";
+  const sign = reaction.reactionPercent >= 0 ? "+" : "";
+  const sessionLabel = reaction.basis === "post-market" ? "Next session" : "Same session";
+  return `${sign}${reaction.reactionPercent.toFixed(1)}% (${sessionLabel})`;
+}
+
+export function fmtReportedTimingLabel(timeOfDay: "pre-market" | "post-market" | undefined): string {
+  if (timeOfDay === "pre-market") return "Pre-Market";
+  if (timeOfDay === "post-market") return "After Market";
+  return "Unavailable";
+}
 
 export function formatOverviewValue(item: MarketOverviewItem): string {
   if (item.value === null) return "Unavailable";

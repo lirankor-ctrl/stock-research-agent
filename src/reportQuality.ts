@@ -64,6 +64,13 @@ export interface ReportQualityInput {
   fundamentalsTotal: number;
   topOpportunitiesConfidence: number[]; // confidenceScore of each Top Opportunity
   emergencyWatchCount: number;
+  // Earnings follow-up tracker (src/earningsTracker.ts) – of the tracked
+  // events whose expected date has passed (i.e. we actually attempted to
+  // resolve them), how many got real actual results vs. genuinely couldn't
+  // be confirmed. "awaiting" (not yet due) is deliberately excluded from
+  // both sides – it isn't a coverage failure, just not due yet.
+  earningsFollowUpResultsFound: number;
+  earningsFollowUpResultsUnavailable: number;
 }
 
 export function computeReportQuality(input: ReportQualityInput): ReportQuality {
@@ -129,6 +136,12 @@ export function computeReportQuality(input: ReportQualityInput): ReportQuality {
       label: "Top Opportunity confidence",
       scorePct: topOppScore,
       detail: topOppDetail,
+    },
+    {
+      key: "earningsFollowUp",
+      label: "Earnings follow-up coverage",
+      scorePct: ratioPct(input.earningsFollowUpResultsFound, input.earningsFollowUpResultsFound + input.earningsFollowUpResultsUnavailable),
+      detail: `${input.earningsFollowUpResultsFound}/${input.earningsFollowUpResultsFound + input.earningsFollowUpResultsUnavailable}`,
     },
   ];
 

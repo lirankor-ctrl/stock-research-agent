@@ -7,7 +7,16 @@ import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emerg
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { visibleOverviewItems, MIN_VISIBLE_INDICATORS } from "./marketOverview";
 import { fingerprintHtmlComment, provenanceHtmlComment } from "./reportFingerprint";
-import { formatOverviewValue, weekAheadExtraEarnings } from "./reportPresentation";
+import {
+  fmtBigDollar,
+  fmtEpsLine,
+  fmtReactionLine,
+  fmtReportedTimingLabel,
+  fmtRevenueLine,
+  fmtSurpriseBadge,
+  formatOverviewValue,
+  weekAheadExtraEarnings,
+} from "./reportPresentation";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
@@ -16,6 +25,7 @@ import {
   DividendsStatus,
   EarningsCalendarEntry,
   EarningsCalendarStatus,
+  EarningsFollowUpEntry,
   EarningsFollowUpResult,
   EarningsUrgency,
   EnrichedStock,
@@ -88,7 +98,8 @@ _${earningsCalendarStatusMessageHebrew(status)}_`;
     const eps = e.estimatedEps !== undefined ? `$${e.estimatedEps.toFixed(2)}` : "Unavailable";
     const days = e.daysRemaining === 0 ? "היום" : e.daysRemaining === 1 ? "מחר" : `${e.daysRemaining}d`;
     const bmoAmc = e.timeOfDay === "pre-market" ? "🌅 BMO" : e.timeOfDay === "post-market" ? "🌇 AMC" : "Unavailable";
-    return `| ${URGENCY_EMOJI[e.urgency]} | **${e.ticker}** | ${e.reportDate} | ${bmoAmc} | ${days} | ${eps} | Unavailable | ${e.reasonsHebrew.join(" · ")} |`;
+    const revenue = fmtBigDollar(e.estimatedRevenue);
+    return `| ${URGENCY_EMOJI[e.urgency]} | **${e.ticker}** | ${e.reportDate} | ${bmoAmc} | ${days} | ${eps} | ${revenue} | ${e.reasonsHebrew.join(" · ")} |`;
   });
 
   return `## 📅 Upcoming Earnings Calendar
@@ -266,10 +277,31 @@ ${[header, ...rows].join("\n")}`;
 }
 
 // ---------- 5b. Earnings Follow-up ----------
+//
+// Companies previously tracked via Upcoming Earnings Calendar that have now
+// reported – real actual-vs-expected EPS/revenue, a trading-day-correct
+// stock reaction, and a deterministic interpretation. See
+// src/earningsTracker.ts / src/earningsReaction.ts. Never fabricates a
+// figure: any missing piece renders "Unavailable" / "Not yet available"
+// explicitly rather than being silently omitted.
 
-function fmtFollowUpMove(pct: number | null): string {
-  if (pct === null) return "Unavailable";
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+function daysAgoLabelHebrew(daysAgo: number): string {
+  if (daysAgo === 0) return "היום";
+  if (daysAgo === 1) return "אתמול";
+  return `לפני ${daysAgo} ימים`;
+}
+
+function earningsFollowUpBlock(e: EarningsFollowUpEntry): string {
+  const r = e.result;
+  const timingLabel = fmtReportedTimingLabel(e.timeOfDay);
+  return `### ${e.ticker} — ${e.name}
+
+**${e.reportDate} · ${timingLabel} · ${daysAgoLabelHebrew(e.daysAgo)}**
+
+- **EPS:** ${fmtEpsLine(r.actualEps, r.expectedEpsAtReport)} — ${fmtSurpriseBadge(r.epsSurprisePct)}
+- **Revenue:** ${fmtRevenueLine(r.actualRevenue, r.expectedRevenueAtReport)} — ${fmtSurpriseBadge(r.revenueSurprisePct)}
+- **Stock Reaction:** ${fmtReactionLine(r.reaction)}
+- **Result:** ${r.interpretation ?? "Unavailable"}`;
 }
 
 function earningsFollowUpSection(followUp: EarningsFollowUpResult): string {
@@ -278,17 +310,10 @@ function earningsFollowUpSection(followUp: EarningsFollowUpResult): string {
 
 _${earningsFollowUpStatusMessageHebrew(followUp.status)}_`;
   }
-  const header = "| Symbol | Report Date | BMO/AMC | Reported | Move Since |\n| ------ | ----------- | ------- | -------- | ---------- |";
-  const rows = followUp.entries.slice(0, 12).map((e) => {
-    const bmoAmc = e.timeOfDay === "pre-market" ? "🌅 BMO" : e.timeOfDay === "post-market" ? "🌇 AMC" : "Unavailable";
-    const reported = e.daysAgo === 0 ? "היום" : e.daysAgo === 1 ? "אתמול" : `לפני ${e.daysAgo} ימים`;
-    return `| **${e.ticker}** | ${e.reportDate} | ${bmoAmc} | ${reported} | ${fmtFollowUpMove(e.priceChangeSincePct)} |`;
-  });
+  const body = followUp.entries.map(earningsFollowUpBlock).join("\n\n---\n\n");
   return `## 📮 Earnings Follow-up
 
-_מהלך המחיר המשוער מאז מועד הדיווח (מבוסס על ימי מסחר, קירוב)._
-
-${[header, ...rows].join("\n")}`;
+${body}`;
 }
 
 // ---------- 5c. Dividend Information ----------

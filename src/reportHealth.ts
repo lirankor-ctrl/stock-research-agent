@@ -66,6 +66,12 @@ export interface ReportHealth {
   topOpportunitiesNormal: number;
   topOpportunitiesReduced: number;
   providerFailures: Record<string, number>;
+  // Earnings follow-up tracker (src/earningsTracker.ts) – section 8.
+  earningsTracked: number;
+  earningsAwaiting: number;
+  earningsResultsFound: number;
+  earningsResultsUnavailable: number;
+  earningsReactionsCalculated: number;
 }
 
 export function buildReportHealth(opts: {
@@ -94,6 +100,11 @@ export function buildReportHealth(opts: {
     topOpportunitiesNormal: data.topOpportunities.length,
     topOpportunitiesReduced: data.emergencyWatch.length,
     providerFailures: computeProviderFailureCounts(data.status.notes),
+    earningsTracked: data.earningsFollowUp.coverage.tracked,
+    earningsAwaiting: data.earningsFollowUp.coverage.awaiting,
+    earningsResultsFound: data.earningsFollowUp.coverage.resultsFound,
+    earningsResultsUnavailable: data.earningsFollowUp.coverage.resultsUnavailable,
+    earningsReactionsCalculated: data.earningsFollowUp.coverage.reactionsCalculated,
   };
 }
 
@@ -113,6 +124,11 @@ export function formatReportHealth(h: ReportHealth): string[] {
     `   Market Overview usable metrics: ${h.marketOverviewUsableCount}`,
     `   Top Opportunities: Normal=${h.topOpportunitiesNormal} · Reduced Confidence=${h.topOpportunitiesReduced}`,
     `   Provider failures: ${Object.entries(h.providerFailures).map(([k, v]) => `${k}=${v}`).join(" · ")}`,
+    `   Tracked earnings: ${h.earningsTracked}`,
+    `   Awaiting results: ${h.earningsAwaiting}`,
+    `   Results found: ${h.earningsResultsFound}`,
+    `   Results unavailable: ${h.earningsResultsUnavailable}`,
+    `   Stock reactions calculated: ${h.earningsReactionsCalculated}`,
   ];
   return lines;
 }

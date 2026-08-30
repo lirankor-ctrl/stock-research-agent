@@ -18,6 +18,10 @@ export interface NasdaqEarningsRow {
   epsForecast?: number;
   lastYearEPS?: number;
   marketCap?: number;
+  // Nasdaq's public calendar never carries a revenue estimate – stays
+  // undefined for rows from this provider. Populated only by the Finnhub
+  // secondary/fallback provider (see finnhubEarnings.ts), when configured.
+  revenueForecast?: number;
 }
 
 function parseMoneyLike(raw: unknown): number | undefined {

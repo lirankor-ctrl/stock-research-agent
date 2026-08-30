@@ -41,6 +41,7 @@ export async function fetchFinnhubEarningsForDate(
           epsForecast: typeof r.epsEstimate === "number" ? r.epsEstimate : undefined,
           lastYearEPS: undefined,
           marketCap: undefined,
+          revenueForecast: typeof r.revenueEstimate === "number" ? r.revenueEstimate : undefined,
         };
       })
       .filter((r) => r.symbol.length > 0);
