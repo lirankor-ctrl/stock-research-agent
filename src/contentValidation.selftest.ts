@@ -3,14 +3,18 @@
 //
 //   npm run content:selftest
 
+import fs from "fs";
+import path from "path";
+import { RateLimitError } from "./alphaVantage";
 import { computeDataQuality } from "./dataQuality";
+import { cacheFirst } from "./dataSources";
 import { deriveEarningsCalendarFromRows } from "./earningsCalendar";
 import { deriveEarningsFollowUpFromRows } from "./earningsFollowUp";
 import { generateEmailHtmlBody, generateEmailTextBody } from "./emailBodyGenerator";
 import { buildTopOpportunities, EMERGENCY_MODE_LABEL, passesEmergencySafetyFilter } from "./emergencyMode";
 import { passesLongTermFilter } from "./filters";
 import { generateDiagnosticHtmlReport, generateHtmlReport } from "./htmlReportGenerator";
-import { RECOVERY_RECENT_DAYS, selectMarketStory } from "./marketStory";
+import { selectMarketStory } from "./marketStory";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import { NasdaqEarningsRow } from "./nasdaqEarnings";
 import { isEtfOrLeveragedFundNews, isPromotionalOrLegalNews } from "./newsFilter";
@@ -18,12 +22,14 @@ import { buildOpportunityThesis } from "./opportunityThesis";
 import { validatePresentation } from "./presentationValidation";
 import { computeProvenance, extractProvenance } from "./reportFingerprint";
 import { generateDiagnosticReport, generateReport } from "./reportGenerator";
+import { buildReportHealth, formatReportHealth } from "./reportHealth";
 import { EMAIL_MAX_WIDTH, formatOverviewValue, weekAheadExtraEarnings } from "./reportPresentation";
 import { computeReportQuality, RECOVERY_THRESHOLD, ReportQuality, SEND_THRESHOLD } from "./reportQuality";
+import { classifyReportTiming, DELAYED_THRESHOLD_MINUTES, usMarketState } from "./reportTiming";
 import { validateReportConsistency } from "./reportValidation";
 import { resolveTechnicalWatchPrice } from "./technicalAlerts";
 import { computeTechnicals } from "./technicals";
-import { DataQuality, EnrichedStock, MarketOverviewItem, NewsItem, ReportData } from "./types";
+import { DataQuality, EconomicReading, EnrichedStock, MarketOverviewItem, NewsItem, ReportData } from "./types";
 
 // Shared "everything's fine" quality fixture for tests that aren't
 // exercising the Report Quality Score / recovery-pass logic itself.
@@ -934,7 +940,11 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
     "normal mode only includes candidates that actually clear the quality bar"
   );
 
-  // --- 5a. The normal bar requires >=2 real fundamentals, not just a High/Medium label ---
+  // --- 5a. Missing OPTIONAL fundamentals (P/E, EPS, margin) must reduce
+  // confidence, never eliminate an otherwise strong, well-covered candidate
+  // (root cause of the 2026-08-28 "Top Opportunities: none" incident, where
+  // a single Alpha Vantage OVERVIEW rate-limit hit zeroed out 17 qualified
+  // candidates at once via a hard fundamentals-count gate). ---
   const thinFundamentalsCandidate = makeStock({
     ticker: "THIN",
     price: 80,
@@ -944,9 +954,25 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   });
   const thinResult = buildTopOpportunities([thinFundamentalsCandidate], 3);
   assert(
-    thinResult.topOpportunities.length === 0,
-    "a High-coverage stock with fewer than 2 real fundamental metrics does NOT clear the normal Top Opportunity bar"
+    thinResult.topOpportunities.length === 1 && thinResult.topOpportunities[0].ticker === "THIN",
+    "a High-coverage stock with missing OPTIONAL fundamentals (P/E, EPS, margin) still clears the normal Top " +
+      "Opportunity bar – mandatory data only, optional enrichment reduces confidence instead"
   );
+
+  const richFundamentalsCandidate = makeStock({
+    ticker: "RICH",
+    price: 80,
+    finalScore: 7.5,
+    dataQuality: makeDQ(),
+    profile: { symbol: "RICH", name: "Rich Fundamentals Co", marketCap: 5_000_000_000, peRatio: 22, eps: 3.1, profitMargin: 0.18 },
+  });
+  const richDQ = computeDataQuality(richFundamentalsCandidate, "available");
+  const thinDQ = computeDataQuality(thinFundamentalsCandidate, "available");
+  assert(
+    thinDQ.confidenceScore < richDQ.confidenceScore,
+    `missing optional fundamentals lowers confidence (thin=${thinDQ.confidenceScore}) relative to full fundamentals (rich=${richDQ.confidenceScore}), without excluding the candidate`
+  );
+  assert(!thinDQ.excluded, "missing optional fundamentals alone never excludes a candidate with a usable price");
 
   // --- 5b. buildTopOpportunities: Emergency Mode engages only when NOTHING clears the bar,
   // and fills emergencyWatch, never topOpportunities ---
@@ -1198,24 +1224,54 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   assert(poor.score < SEND_THRESHOLD, "a severely degraded run scores below the send threshold too");
   assert(poor.band === "Poor", "a severely degraded run is banded 'Poor'");
 
-  // The recovery pass's one concrete action: widening the Market Story news
-  // window finds a real story the normal window would have missed.
-  const oldNews = makeNews({
-    title: "Test Corp Announces New Product Launch",
-    publishedAt: "20260723T090000", // 15 days before "now" below – outside the normal 10-day window
+  // Market Story freshness: 24h primary window, 48h fallback (labeled),
+  // nothing older ever qualifies. See src/marketStory.ts.
+  const now = Date.parse("2026-08-07T12:00:00Z");
+  const freshNews = makeNews({
+    title: "Test Corp Reports Record Quarterly Earnings",
+    publishedAt: "20260807T030000", // 9h before "now" – inside the 24h primary window
     sentimentScore: 0.4,
     relevanceScore: 0.9,
   });
-  const staleNewsStock = makeStock({ ticker: "OLDNEWS", price: 50, news: [oldNews] });
-  const staleData: ReportData = makeReportData({ watchlist: [staleNewsStock] });
-  const now = Date.parse("2026-08-07T12:00:00Z");
-  const normalWindowStory = selectMarketStory(staleData, now);
-  assert(normalWindowStory === null, "sanity: a 15-day-old story is genuinely outside the normal 10-day window");
-  const recoveredStory = selectMarketStory(staleData, now, RECOVERY_RECENT_DAYS);
-  assert(
-    recoveredStory !== null && recoveredStory.headline === oldNews.title,
-    "the recovery pass's wider news window (RECOVERY_RECENT_DAYS) finds a real story the normal window missed"
+  const fallbackNews = makeNews({
+    title: "Test Corp Announces New Product Launch",
+    publishedAt: "20260806T060000", // 30h before "now" – outside 24h, inside 48h fallback
+    sentimentScore: 0.4,
+    relevanceScore: 0.9,
+  });
+  const tooOldNews = makeNews({
+    title: "Test Corp Signs New Supply Contract",
+    publishedAt: "20260803T090000", // ~99h before "now" – outside even the 48h fallback
+    sentimentScore: 0.4,
+    relevanceScore: 0.9,
+  });
+
+  const freshStory = selectMarketStory(
+    makeReportData({ watchlist: [makeStock({ ticker: "FRESH", price: 50, news: [freshNews] })] }),
+    now
   );
+  assert(
+    freshStory !== null && freshStory.isFallback === false,
+    "a story inside the 24h primary window is used directly, not marked as fallback"
+  );
+
+  const fallbackData: ReportData = makeReportData({
+    watchlist: [makeStock({ ticker: "FALLBACK", price: 50, news: [fallbackNews] })],
+  });
+  const primaryMiss = selectMarketStory(fallbackData, now);
+  assert(primaryMiss === null, "sanity: a 30h-old story is genuinely outside the 24h primary window");
+  const recoveredStory = selectMarketStory(fallbackData, now, 48);
+  assert(
+    recoveredStory !== null && recoveredStory.headline === fallbackNews.title && recoveredStory.isFallback === true,
+    "the 48h fallback window finds a real story the 24h primary window missed, and tags it isFallback"
+  );
+
+  const tooOldStory = selectMarketStory(
+    makeReportData({ watchlist: [makeStock({ ticker: "TOOOLD", price: 50, news: [tooOldNews] })] }),
+    now,
+    48
+  );
+  assert(tooOldStory === null, "a story older than the 48h fallback window never qualifies, even as a fallback");
 
   // Poor-quality reports do not masquerade as normal reports.
   const goodCandidate = makeStock({ ticker: "GOOD", price: 100, finalScore: 8, dataQuality: makeDQ() });
@@ -1254,6 +1310,268 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   assert(diagHtml.includes('dir="rtl"') && diagHtml.includes("report-header"), "the diagnostic HTML report reuses the same RTL/header visual shell as the normal report, not a stripped-down page");
 }
 
-console.log(
-  process.exitCode ? "\n💥 content validation self-test FAILED" : "\n🎉 content validation self-test PASSED"
-);
+// ===== 2026-08-28 regression: scheduled report cannot be silently sent
+// hours late as "pre-market" (root cause: GitHub's scheduler fired the
+// workflow ~9h50m after its target, landing the email at 02:04 IDT). =====
+{
+  // Weekday US market-time reference points (2026-08-28 is a Friday).
+  const preMarketNy = new Date("2026-08-28T13:15:00Z"); // ~09:15 ET (before 09:30 open)
+  const openNy = new Date("2026-08-28T15:00:00Z"); // ~11:00 ET (regular session)
+  const afterHoursNy = new Date("2026-08-29T02:00:00Z"); // ~22:00 ET the prior evening – market long closed
+  const weekendNy = new Date("2026-08-30T15:00:00Z"); // Saturday, regular-session UTC hour
+
+  assert(usMarketState(preMarketNy) === "pre-market", "sanity: the pre-market fixture is genuinely before the US open");
+  assert(usMarketState(openNy) === "open", "sanity: the open fixture is genuinely inside the US regular session");
+  assert(usMarketState(afterHoursNy) === "after-hours", "sanity: the after-hours fixture is genuinely after the US close");
+  assert(usMarketState(weekendNy) === "weekend", "sanity: the weekend fixture is genuinely a Saturday");
+
+  const onTime = classifyReportTiming({
+    now: preMarketNy,
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  assert(onTime.status === "onTime", `a run starting inside the target pre-market window is classified onTime (got ${onTime.status})`);
+
+  const stillPreMarketButLate = new Date(preMarketNy.getTime() + (DELAYED_THRESHOLD_MINUTES + 5) * 60_000 - 10 * 60_000);
+  // Nudge back 10 minutes so it's still provably before the 09:30 ET open while past the 45-min delay threshold.
+  const delayed = classifyReportTiming({
+    now: stillPreMarketButLate,
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  assert(
+    delayed.status === "delayed" || delayed.status === "intraday",
+    `a run more than ${DELAYED_THRESHOLD_MINUTES}min late is never silently presented as an on-time pre-market report (got ${delayed.status})`
+  );
+
+  // Directly exercises the "delayed" branch in isolation: a hypothetical
+  // early schedule (10:00 Israel) so a 50min delay still lands hours before
+  // the US market opens, rather than crossing into "intraday" first.
+  const isolatedDelay = classifyReportTiming({
+    now: new Date("2026-08-28T07:50:00Z"), // 10:50 IDT
+    scheduledHourIsrael: 10,
+    scheduledMinuteIsrael: 0,
+    isManualRun: false,
+  });
+  assert(
+    isolatedDelay.status === "delayed" && isolatedDelay.delayMinutes === 50,
+    `a run more than ${DELAYED_THRESHOLD_MINUTES}min late but still genuinely pre-market is labeled "delayed" specifically (got status=${isolatedDelay.status} delay=${isolatedDelay.delayMinutes})`
+  );
+
+  const intraday = classifyReportTiming({
+    now: openNy,
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  assert(
+    intraday.status === "intraday" && intraday.reportLabel === "Intraday Market Report",
+    `a run starting after the US market opens is relabeled as an Intraday Market Report, never presented as pre-market (got status=${intraday.status} label=${intraday.reportLabel})`
+  );
+
+  // This is the exact 2026-08-28 failure mode: a run starting at 02:04 IDT
+  // (hours after the US close) must NEVER be silently sent as a pre-market
+  // report.
+  const skipped = classifyReportTiming({
+    now: afterHoursNy,
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  assert(
+    skipped.status === "skip",
+    `a run starting hours after the US market closed (the 2026-08-28 02:04 IDT failure mode) is skipped, never sent as "pre-market" (got ${skipped.status})`
+  );
+
+  const manualBypass = classifyReportTiming({
+    now: afterHoursNy,
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: true,
+  });
+  assert(manualBypass.status === "onTime", "a manual workflow_dispatch run bypasses the staleness guard entirely");
+}
+
+// ===== Israel DST correctness: the same 16:05 Israel-time target must
+// resolve consistently whether "now" falls in Israel Daylight Time (summer,
+// UTC+3) or Israel Standard Time (winter, UTC+2). =====
+{
+  // 2026-08-28 13:20 UTC = 16:20 IDT (summer, UTC+3) – 15 min after target.
+  const summerOnTime = classifyReportTiming({
+    now: new Date("2026-08-28T13:20:00Z"),
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  assert(
+    summerOnTime.delayMinutes === 15 && summerOnTime.actualIsraelDisplay === "16:20",
+    `summer (IDT, UTC+3): 13:20 UTC correctly resolves to 16:20 Israel time, 15min delay (got delay=${summerOnTime.delayMinutes} display=${summerOnTime.actualIsraelDisplay})`
+  );
+
+  // 2026-01-28 14:20 UTC = 16:20 IST (winter, UTC+2) – also 15 min after the
+  // same nominal 16:05 target, via a completely different UTC offset.
+  const winterOnTime = classifyReportTiming({
+    now: new Date("2026-01-28T14:20:00Z"),
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  assert(
+    winterOnTime.delayMinutes === 15 && winterOnTime.actualIsraelDisplay === "16:20",
+    `winter (IST, UTC+2): 14:20 UTC correctly resolves to 16:20 Israel time, 15min delay (got delay=${winterOnTime.delayMinutes} display=${winterOnTime.actualIsraelDisplay})`
+  );
+}
+
+// ===== Historical macro values never appear under "This Week To Watch" –
+// only genuinely forward-looking earnings do. Already-published macro gets
+// its own, honestly-labeled "Recent Macro Data" section instead. =====
+{
+  const econReading: EconomicReading = {
+    key: "cpi",
+    label: "CPI (מדד המחירים לצרכן, ארה\"ב)",
+    value: 3.1,
+    unit: "%",
+    asOfDate: "2026-07-01",
+    source: { source: "live" },
+  };
+  const futureEarning = {
+    ticker: "ZZZZ",
+    name: "Future Reporter Co",
+    reportDate: "2099-01-01",
+    daysRemaining: 5,
+    urgency: "week" as const,
+    reasonsHebrew: [],
+    priority: "watchlist" as const,
+  };
+
+  const withMacroOnly: ReportData = makeReportData({
+    weekAhead: {
+      earnings: [],
+      earningsStatus: "noneFound",
+      economicReadings: [econReading],
+      economicUnavailableCount: 0,
+      unavailableNoticeHebrew: "",
+    },
+  });
+  const mdMacroOnly = generateReport(withMacroOnly);
+  const htmlMacroOnly = generateHtmlReport(withMacroOnly);
+  assert(
+    !mdMacroOnly.includes("This Week To Watch") && !htmlMacroOnly.includes("This Week To Watch"),
+    "with no forward-looking earnings, 'This Week To Watch' is hidden entirely rather than showing historical macro data under it"
+  );
+  assert(
+    mdMacroOnly.includes("Recent Macro Data (Already Published)") && htmlMacroOnly.includes("Recent Macro Data (Already Published)"),
+    "already-published macro data is shown under its own honestly-labeled section, not 'This Week To Watch'"
+  );
+
+  const withFutureEarning: ReportData = makeReportData({
+    earningsCalendar: [],
+    weekAhead: {
+      earnings: [futureEarning],
+      earningsStatus: "confirmed",
+      economicReadings: [econReading],
+      economicUnavailableCount: 0,
+      unavailableNoticeHebrew: "",
+    },
+  });
+  const mdWithEarning = generateReport(withFutureEarning);
+  assert(mdWithEarning.includes("This Week To Watch"), "a genuinely future earnings entry does surface under 'This Week To Watch'");
+  const thisWeekIdx = mdWithEarning.indexOf("This Week To Watch");
+  const recentMacroIdx = mdWithEarning.indexOf("Recent Macro Data (Already Published)");
+  const nextSectionIdx = mdWithEarning.indexOf("## ", thisWeekIdx + 1);
+  assert(
+    recentMacroIdx > thisWeekIdx && (nextSectionIdx === -1 || recentMacroIdx >= nextSectionIdx),
+    "the historical CPI reading is not nested inside the 'This Week To Watch' section body – it lives in its own section afterward"
+  );
+  assert(
+    !mdWithEarning.slice(thisWeekIdx, nextSectionIdx === -1 ? undefined : nextSectionIdx).includes(econReading.label),
+    "the 'This Week To Watch' section body itself contains no already-published macro reading"
+  );
+}
+
+// ===== Alpha Vantage rate-limit recovery: cacheFirst() must fall back to a
+// stale cached value on a RateLimitError (when one exists), and to
+// "unavailable" (never a crash, never a fabricated value) when it doesn't.
+// cacheFirst is async, so this (and everything after it) runs inside an
+// async IIFE – kept last so every synchronous check above has already run
+// and set process.exitCode before we get here. =====
+async function runAsyncOnlyChecks(): Promise<void> {
+  const probeKey = "selftest_ratelimit_probe";
+  const probePath = path.join(process.cwd(), "cache", `${probeKey}.json`);
+  const emptyProbePath = path.join(process.cwd(), "cache", `${probeKey}_empty.json`);
+  try {
+    fs.mkdirSync(path.join(process.cwd(), "cache"), { recursive: true });
+    fs.writeFileSync(
+      probePath,
+      JSON.stringify({ savedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), data: { probe: "stale-but-usable" } }),
+      "utf8"
+    );
+    fs.rmSync(emptyProbePath, { force: true });
+
+    const rateLimitedFetcher = () => {
+      throw new RateLimitError("Alpha Vantage quota hit (selftest)");
+    };
+
+    const withStaleCache = await cacheFirst(probeKey, 1, rateLimitedFetcher, () => {});
+    assert(
+      withStaleCache.source.source === "cached" && (withStaleCache.value as any)?.probe === "stale-but-usable",
+      "on a RateLimitError, cacheFirst recovers by falling back to the stale cached value rather than failing the run"
+    );
+
+    const withoutCache = await cacheFirst(`${probeKey}_empty`, 1, rateLimitedFetcher, () => {});
+    assert(
+      withoutCache.value === null && withoutCache.source.source === "unavailable",
+      "on a RateLimitError with no cache at all, cacheFirst returns an honest 'unavailable' rather than crashing or fabricating a value"
+    );
+  } finally {
+    fs.rmSync(probePath, { force: true });
+    fs.rmSync(emptyProbePath, { force: true });
+  }
+
+  // ===== Report Health: scheduled time, actual start time, and email-sent
+  // time are all logged (2026-08-28's root failure was invisible precisely
+  // because nothing surfaced these three timestamps together). =====
+  const timing = classifyReportTiming({
+    now: new Date("2026-08-28T13:20:00Z"),
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 5,
+    isManualRun: false,
+  });
+  const goodCandidateForHealth = makeStock({ ticker: "HEALTH", price: 100, finalScore: 8, dataQuality: makeDQ() });
+  const healthReportData: ReportData = makeReportData({
+    topOpportunities: [goodCandidateForHealth],
+    watchlist: [goodCandidateForHealth],
+    reportQuality: GOOD_QUALITY,
+  });
+
+  const beforeSend = buildReportHealth({ data: healthReportData, timing, emailSentAtIso: null });
+  assert(beforeSend.emailSentIsrael === null, "before sending, Report Health honestly shows no email-sent timestamp yet");
+  assert(beforeSend.scheduledIsrael === "16:05" && beforeSend.actualStartIsrael === "16:20", "Report Health logs both the scheduled and actual start times");
+
+  const afterSend = buildReportHealth({ data: healthReportData, timing, emailSentAtIso: "2026-08-28T13:25:00.000Z" });
+  assert(afterSend.emailSentIsrael !== null && afterSend.emailSentIsrael.includes("16:25"), "after sending, Report Health logs the actual email-sent timestamp");
+
+  const lines = formatReportHealth(afterSend);
+  assert(
+    lines.some((l) => l.includes("Scheduled time")) &&
+      lines.some((l) => l.includes("Actual start")) &&
+      lines.some((l) => l.includes("Email sent")) &&
+      lines.some((l) => l.includes("Delay")) &&
+      lines.some((l) => l.includes("Top Opportunities")) &&
+      lines.some((l) => l.includes("Provider failures")),
+    "formatReportHealth prints scheduled/actual/email timestamps, delay, Top Opportunities counts, and provider failure counts"
+  );
+}
+
+runAsyncOnlyChecks()
+  .catch((err) => {
+    console.error("💥 Unexpected error during async self-test checks:", err);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    console.log(
+      process.exitCode ? "\n💥 content validation self-test FAILED" : "\n🎉 content validation self-test PASSED"
+    );
+  });

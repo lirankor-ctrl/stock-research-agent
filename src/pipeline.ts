@@ -2,7 +2,7 @@ import "dotenv/config";
 import { categorize } from "./categorizer";
 import { computeDataQuality, dataQualityDebugSummary } from "./dataQuality";
 import { getTopMovers } from "./dataSources";
-import { buildTopOpportunities, EMERGENCY_MODE_LABEL } from "./emergencyMode";
+import { buildTopOpportunities, EMERGENCY_MODE_LABEL, explainTopOpportunityRejection } from "./emergencyMode";
 import {
   buildSkeletonEnriched,
   buildWatchlistStocks,
@@ -19,10 +19,10 @@ import { getFearGreed } from "./fearGreed";
 import { generateDiagnosticHtmlReport, generateHtmlReport, writeHtmlReport } from "./htmlReportGenerator";
 import { selectMarketCatalyst } from "./marketCatalyst";
 import { buildMarketOverview } from "./marketOverview";
-import { RECOVERY_RECENT_DAYS, selectAdditionalHeadlines, selectMarketStory } from "./marketStory";
+import { FALLBACK_WINDOW_HOURS, selectAdditionalHeadlines, selectMarketStory } from "./marketStory";
 import { buildOpportunityThesis } from "./opportunityThesis";
 import { preRank } from "./ranker";
-import { computeReportQuality, formatReportQuality, RECOVERY_THRESHOLD, SEND_THRESHOLD } from "./reportQuality";
+import { computeReportQuality, evaluateSendGate, formatReportQuality, formatSendGate, SEND_THRESHOLD } from "./reportQuality";
 import { generateDiagnosticReport, generateReport, writeReport } from "./reportGenerator";
 import { buildTechnicalAlerts, resolveTechnicalWatchPrice, technicalStatusHebrew } from "./technicalAlerts";
 import { WATCHLIST, watchlistName } from "./universe";
@@ -269,6 +269,19 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     log("   ⚠️  No usable candidate at all (every price is unavailable) – Top Opportunities stays empty.");
   }
 
+  // Rejection reasons for the top 10 ranked candidates that did NOT become a
+  // normal Top Opportunity – "Top Opportunities: none" must never be a
+  // silent mystery when candidates were actually scanned and qualified.
+  const topRankedNotSelected = rankedCandidates
+    .filter((s) => !topOpportunities.includes(s))
+    .slice(0, 10);
+  if (topRankedNotSelected.length > 0) {
+    log(`   🔎 Rejection reasons for top ${topRankedNotSelected.length} ranked candidates not in Top Opportunities:`);
+    for (const s of topRankedNotSelected) {
+      log(`      ${s.ticker.padEnd(6)} score=${s.finalScore.toFixed(1)} – ${explainTopOpportunityRejection(s)}`);
+    }
+  }
+
   // Technical Watch – one compact row per tracked watchlist stock. When the
   // live/cached quote is unavailable but RSI/Bollinger were still computed
   // (a completely separate Yahoo daily-closes fetch), fall back to the same
@@ -448,22 +461,33 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   };
 
   // 📰 Market Story of the Day + up to 2 additional relevant headlines.
+  // Primary window is 24h; the 48h fallback is tried ONLY when the primary
+  // window found nothing, and the result is tagged isFallback so every
+  // renderer must show the literal FALLBACK_NOTICE label rather than
+  // presenting an up-to-2-day-old story as fresh. No window wider than 48h
+  // is ever used – "genuinely nothing today" is an honest, allowed outcome.
   data.marketStory = selectMarketStory(data, Date.now());
   data.additionalHeadlines = selectAdditionalHeadlines(data, Date.now(), 2);
+  if (!data.marketStory) {
+    log(`   market story: nothing in the primary 24h window – trying ${FALLBACK_WINDOW_HOURS}h fallback...`);
+    data.marketStory = selectMarketStory(data, Date.now(), FALLBACK_WINDOW_HOURS);
+    data.additionalHeadlines = selectAdditionalHeadlines(data, Date.now(), 2, FALLBACK_WINDOW_HOURS);
+  }
   log(
     data.marketStory
-      ? `   market story: ${data.marketStory.ticker} – "${data.marketStory.headline}" (+${data.additionalHeadlines.length} more headlines)`
-      : "   market story: none meaningful today"
+      ? `   market story: ${data.marketStory.ticker} – "${data.marketStory.headline}"` +
+        `${data.marketStory.isFallback ? " [fallback: 24-48h old]" : ""} (+${data.additionalHeadlines.length} more headlines)`
+      : `   market story: none meaningful even within ${FALLBACK_WINDOW_HOURS}h – genuinely nothing qualifies today.`
   );
 
   // ===== Report Quality Score – final rollup of the Data Investigation
-  // phase, computed before rendering. Below RECOVERY_THRESHOLD, attempt one
-  // concrete recovery action (widen the Market Story news window); below
-  // SEND_THRESHOLD even after recovery, render a diagnostic-only report
-  // instead of the normal newsletter (every other dimension's fallback –
-  // cache / alt-provider / last-close – is already exhausted DURING normal
-  // fetching, see cacheFirst everywhere, so there's nothing left to retry
-  // for those specifically). =====
+  // phase, computed before rendering. The Market Story's own 24h->48h
+  // fallback already ran above (unconditionally, not gated on this score –
+  // see the block above). Below SEND_THRESHOLD, render a diagnostic-only
+  // report instead of the normal newsletter (every other dimension's
+  // fallback – cache / alt-provider / last-close – is already exhausted
+  // DURING normal fetching, see cacheFirst everywhere, so there's nothing
+  // left to retry for those specifically). =====
   const qualityUniverse = [...watchlist, ...topOpportunities];
   const quality = computeReportQuality({
     earningsCalendarStatus: earningsCalendarRes.status,
@@ -481,20 +505,17 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     emergencyWatchCount: emergencyWatch.length,
   });
 
-  if (quality.score < RECOVERY_THRESHOLD && !data.marketStory) {
-    log(`   🔧 Recovery pass engaged (quality ${quality.score} < ${RECOVERY_THRESHOLD}): widening Market Story news window to ${RECOVERY_RECENT_DAYS}d...`);
-    data.marketStory = selectMarketStory(data, Date.now(), RECOVERY_RECENT_DAYS);
-    data.additionalHeadlines = selectAdditionalHeadlines(data, Date.now(), 2, RECOVERY_RECENT_DAYS);
-    log(
-      data.marketStory
-        ? `      recovered: ${data.marketStory.ticker} – "${data.marketStory.headline}"`
-        : "      no story found even with the wider window – genuinely nothing qualifies today."
-    );
-  }
-
   data.reportQuality = quality;
   data.belowSendThreshold = quality.score < SEND_THRESHOLD;
   for (const line of formatReportQuality(quality)) log(line);
+  const sendGate = evaluateSendGate({
+    marketOverviewUsableCount: marketOverview.filter((i) => i.value !== null).length,
+    earningsCalendarStatus: earningsCalendarRes.status,
+    technicalsAvailable: techResult.available.size,
+    technicalsTotal: technicalUniverse.length,
+    score: quality.score,
+  });
+  for (const line of formatSendGate(sendGate)) log(line);
   if (data.belowSendThreshold) {
     log(
       `   🔴 Report Quality Score ${quality.score}/100 is below the send threshold (${SEND_THRESHOLD}) even after recovery – ` +

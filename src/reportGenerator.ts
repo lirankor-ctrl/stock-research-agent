@@ -1,12 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
+import { FALLBACK_NOTICE } from "./marketStory";
 import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
 import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { visibleOverviewItems, MIN_VISIBLE_INDICATORS } from "./marketOverview";
 import { fingerprintHtmlComment, provenanceHtmlComment } from "./reportFingerprint";
-import { formatOverviewValue } from "./reportPresentation";
+import { formatOverviewValue, weekAheadExtraEarnings } from "./reportPresentation";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
@@ -123,6 +124,7 @@ _לא נמצאה ידיעה חדשותית מהותית היום._`;
   const original = story.originalSummary
     ? `\n\n> _תקציר המקור (באנגלית):_ ${story.originalSummary}`
     : "";
+  const fallbackLine = story.isFallback ? `\n\n⚠️ **${FALLBACK_NOTICE}**` : "";
 
   return `## 📰 Market Story of the Day
 
@@ -131,7 +133,7 @@ _לא נמצאה ידיעה חדשותית מהותית היום._`;
 **${story.headline}**
 
 - 🗞️ **מקור:** ${story.source}
-- 🕒 **תאריך:** ${story.publishedDisplay}${moveLine}
+- 🕒 **תאריך:** ${story.publishedDisplay}${moveLine}${fallbackLine}
 
 ${story.summaryHebrew}
 
@@ -311,14 +313,24 @@ ${msg}`;
 ${[header, ...rows].join("\n")}`;
 }
 
-// ---------- 6. This Week To Watch ----------
+// ---------- 6. This Week To Watch (FUTURE events only) ----------
 
-function weekAheadSection(week: WeekAhead): string {
-  const earningsLines =
-    week.earnings.length > 0
-      ? week.earnings.map((e) => `- **${e.ticker}** — ${e.reportDate}`).join("\n")
-      : `_${earningsCalendarStatusMessageHebrew(week.earningsStatus === "unavailable" ? "unavailable" : "noneFound")}_`;
+// Earnings not already shown in the Upcoming Earnings Calendar – returns ""
+// (section hidden) when there's nothing genuinely forward-looking. Already-
+// published macro readings are never shown here – see recentMacroSection.
+function weekAheadSection(data: ReportData): string {
+  const extraEarnings = weekAheadExtraEarnings(data);
+  if (extraEarnings.length === 0) return "";
+  const earningsLines = extraEarnings.map((e) => `- **${e.ticker}** — ${e.reportDate}`).join("\n");
+  return `## 📅 This Week To Watch
 
+**דיווחי רווחים קרובים:**
+${earningsLines}`;
+}
+
+// ---------- 6b. Recent Macro Data (already published) ----------
+
+function recentMacroSection(week: WeekAhead): string {
   const econSection =
     week.economicReadings.length > 0
       ? week.economicReadings
@@ -326,12 +338,8 @@ function weekAheadSection(week: WeekAhead): string {
           .join("\n")
       : "_נתוני מאקרו אחרונים אינם זמינים כרגע._";
 
-  return `## 📅 This Week To Watch
+  return `## 📅 Recent Macro Data (Already Published)
 
-**דיווחי רווחים:**
-${earningsLines}
-
-**מאקרו (נתונים שכבר פורסמו, לא לוח קדימה):**
 ${econSection}`;
 }
 
@@ -406,7 +414,7 @@ ${dividendsSection(data.dividends, data.dividendsStatus)}
 
 ---
 
-${weekAheadSection(data.weekAhead)}
+${weekAheadSection(data) ? `${weekAheadSection(data)}\n\n---\n\n` : ""}${recentMacroSection(data.weekAhead)}
 
 ---
 

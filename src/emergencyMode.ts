@@ -36,8 +36,16 @@ function hasConfirmedMaterialNegativeEvent(stock: EnrichedStock): boolean {
 }
 
 // How many of the market-cap / P/E / EPS / profit-margin fields are actually
-// populated – the concrete, countable stand-in for "at least TWO meaningful
-// fundamental metrics".
+// populated – used for confidence/diagnostics, never as a hard elimination
+// gate (see meetsNormalTopOpportunityBar below). P/E, EPS and profit margin
+// in particular are OPTIONAL enrichment from Alpha Vantage's OVERVIEW call:
+// on a rate-limited run they're frequently the fields missing even when
+// price/volume/profile identity/news/technicals are all live. Root cause of
+// the 2026-08-28 "Top Opportunities: none" incident with 17 qualified
+// candidates: this count used to be a HARD gate (>=2 required or the stock
+// was dropped to Emergency Mode), so a single Alpha Vantage rate-limit hit
+// on OVERVIEW could zero out every candidate at once even though nothing
+// about the candidates themselves was actually weak.
 function countMeaningfulFundamentals(profile: CompanyProfile | undefined): number {
   if (!profile) return 0;
   let n = 0;
@@ -48,20 +56,41 @@ function countMeaningfulFundamentals(profile: CompanyProfile | undefined): numbe
   return n;
 }
 
-const MIN_FUNDAMENTAL_METRICS = 2;
-
-// The bar for a NORMAL Top Opportunity – stricter than the plain data-quality
-// gate. A stock can carry a "Medium" coverage label (clearing
-// meetsRecommendationThreshold) while still having essentially no usable
-// fundamentals if profile/news happened to be the only genuinely-missing
-// dimensions; this closes that gap explicitly rather than relying on the
-// coverage score alone. A candidate that fails this can still be shown, but
-// only in the separate Reduced-Confidence Watch – never as a normal pick.
+// The bar for a NORMAL Top Opportunity. Mandatory data only:
+//  - dataQuality already clears the recommendation threshold (not Excluded,
+//    label High/Medium) – this covers price/volume/marketCap/profile/news/
+//    technical coverage as a whole, see dataQuality.ts.
+//  - basic company identity (a name) is resolvable.
+// Optional enrichment (news, P/E, margin, extra profile detail) is NOT a
+// gate here – missing optional data already lowers dataQuality's
+// confidenceScore (see the fundamentals-depth penalty in dataQuality.ts) and
+// is fully visible in the reliability line, but it must never by itself zero
+// out an otherwise strong, liquid, well-covered stock's Top Opportunity
+// eligibility. A candidate that genuinely fails the mandatory bar can still
+// be shown, but only in the separate Reduced-Confidence Watch – never as a
+// normal pick.
 export function meetsNormalTopOpportunityBar(stock: EnrichedStock): boolean {
   if (!meetsRecommendationThreshold(stock.dataQuality)) return false;
   if (!stock.profile?.name) return false; // basic company identity
-  if (countMeaningfulFundamentals(stock.profile) < MIN_FUNDAMENTAL_METRICS) return false;
   return true;
+}
+
+// Human-readable reason a candidate did NOT make Top Opportunities – used to
+// print rejection reasons for the top-ranked candidates in diagnostics (see
+// pipeline.ts), so "Top Opportunities: none" is never a silent mystery.
+export function explainTopOpportunityRejection(stock: EnrichedStock): string {
+  const dq = stock.dataQuality;
+  if (!dq) return "no data-quality score computed";
+  if (dq.excluded) return `excluded – ${dq.reliabilityHebrew}`;
+  if (!meetsRecommendationThreshold(dq)) {
+    return `data quality label "${dq.label}" below Medium (coverage=${dq.coverageScore}, confidence=${dq.confidenceScore})`;
+  }
+  if (!stock.profile?.name) return "no resolvable company name/identity";
+  const fundamentals = countMeaningfulFundamentals(stock.profile);
+  return (
+    `passes mandatory bar (label=${dq.label}, coverage=${dq.coverageScore}, confidence=${dq.confidenceScore}, ` +
+    `fundamentals=${fundamentals}/4) – not selected, ranked below the cutoff`
+  );
 }
 
 export interface EmergencySafetyResult {

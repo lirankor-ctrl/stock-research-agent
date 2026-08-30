@@ -4,6 +4,7 @@ import { earningsCalendarStatusMessageHebrew } from "./earningsCalendar";
 import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
 import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
+import { FALLBACK_NOTICE } from "./marketStory";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import {
   catalystWhyItMattersHebrew,
@@ -213,6 +214,9 @@ function renderMarketStory(story: MarketStory | null): string {
       ? `<span class="story-move ${changeClass(story.priceMove.changePercent)}">${ltr(esc(fmtPrice(story.priceMove.price)))} · ${ltr(esc(fmtChange(story.priceMove.changePercent)))}</span>`
       : "";
   const sentimentHtml = story.sentimentLabel ? `<span class="story-chip">${esc(story.sentimentLabel)}</span>` : "";
+  const fallbackHtml = story.isFallback
+    ? `<p class="story-fallback-notice">⚠️ ${esc(FALLBACK_NOTICE)}</p>`
+    : "";
 
   return `
   <section>
@@ -228,6 +232,7 @@ function renderMarketStory(story: MarketStory | null): string {
         </div>
         <h3 class="story-headline">${ltr(esc(story.headline))}</h3>
         <p class="story-meta">${esc(story.source)} · ${ltr(esc(story.publishedDisplay))}</p>
+        ${fallbackHtml}
         <div class="story-block">
           <h4>מה קרה</h4>
           <p>${esc(story.summaryHebrew)}</p>
@@ -571,19 +576,36 @@ function renderDividends(items: DividendInfoItem[], status: DividendsStatus): st
   </section>`;
 }
 
-// ===== 10. This Week To Watch – macro only; the earnings sub-list is shown
-// ONLY when it has entries beyond what Upcoming Earnings Calendar already
-// displayed (never a bare repeat of the same information). =====
+// ===== 10. This Week To Watch – FUTURE events only (upcoming earnings not
+// already shown in the Upcoming Earnings Calendar). Historical/already-
+// published macro readings are never shown under a "To Watch" heading – see
+// renderRecentMacro below for their own, honestly-labeled section. Hidden
+// entirely when there's nothing genuinely forward-looking to show. =====
 
 function renderWeekAhead(data: ReportData): string {
-  const { weekAhead } = data;
   const extraEarnings = weekAheadExtraEarnings(data);
+  if (extraEarnings.length === 0) return "";
 
-  const earningsHtml =
-    extraEarnings.length > 0
-      ? `<ul class="week-list week-ahead-earnings">${extraEarnings.map((e) => `<li><strong>${ltr(esc(e.ticker))}</strong> — ${ltr(esc(e.reportDate))}</li>`).join("")}</ul>`
-      : "";
+  const earningsHtml = `<ul class="week-list week-ahead-earnings">${extraEarnings
+    .map((e) => `<li><strong>${ltr(esc(e.ticker))}</strong> — ${ltr(esc(e.reportDate))}</li>`)
+    .join("")}</ul>`;
 
+  return `
+  <section class="secondary-section">
+    <h3 class="section-title-sm">This Week To Watch</h3>
+    <div class="card card-sm">
+      <h4>דיווחי רווחים קרובים</h4>
+      ${earningsHtml}
+    </div>
+  </section>`;
+}
+
+// ===== 10b. Recent Macro Data – explicitly labeled as ALREADY PUBLISHED,
+// never under a "To Watch" heading (see section 5 of the 2026-08-28 fix:
+// historical macro values must never be presented as forward-looking). =====
+
+function renderRecentMacro(data: ReportData): string {
+  const { weekAhead } = data;
   const econHtml =
     weekAhead.economicReadings.length > 0
       ? `<ul class="week-list">${weekAhead.economicReadings
@@ -593,10 +615,8 @@ function renderWeekAhead(data: ReportData): string {
 
   return `
   <section class="secondary-section">
-    <h3 class="section-title-sm">This Week To Watch</h3>
+    <h3 class="section-title-sm">Recent Macro Data (Already Published)</h3>
     <div class="card card-sm">
-      ${extraEarnings.length > 0 ? `<h4>דיווחי רווחים נוספים</h4>${earningsHtml}` : ""}
-      <h4>מאקרו (נתונים שכבר פורסמו)</h4>
       ${econHtml}
     </div>
   </section>`;
@@ -991,6 +1011,7 @@ export function generateHtmlReport(data: ReportData): string {
     renderEmergencyWatch(emergencyWatch),
     renderDividends(dividends, dividendsStatus),
     renderWeekAhead(data),
+    renderRecentMacro(data),
     renderDiagnostics(data),
     renderDisclaimer(data.generatedAt),
     `</main>`,

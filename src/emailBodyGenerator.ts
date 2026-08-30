@@ -9,6 +9,7 @@ import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
 import { EMERGENCY_MODE_LABEL, EMERGENCY_MODE_EXPLANATION_HEBREW } from "./emergencyMode";
 import { marketCatalystStatusMessageHebrew } from "./marketCatalyst";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
+import { FALLBACK_NOTICE } from "./marketStory";
 import {
   fingerprintHtmlComment,
   fingerprintTextTag,
@@ -193,6 +194,7 @@ function htmlMarketStory(story: MarketStory | null): string {
     </div>
     <div style="font-size:16px;font-weight:700;color:${PALETTE.navy};margin-bottom:6px;">${ltr(esc(story.headline))}</div>
     <div style="font-size:12px;color:${PALETTE.muted};margin-bottom:10px;">${esc(story.source)} · ${ltr(esc(story.publishedDisplay))}</div>
+    ${story.isFallback ? `<div style="font-size:11.5px;color:${PALETTE.amber};font-weight:700;margin-bottom:8px;">⚠️ ${esc(FALLBACK_NOTICE)}</div>` : ""}
     <div style="margin-bottom:8px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">מה קרה</strong><br><span style="font-size:13.5px;">${esc(story.summaryHebrew)}</span></div>
     <div style="margin-bottom:10px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">למה זה חשוב</strong><br><span style="font-size:13.5px;">${esc(story.whyMattersHebrew)}</span></div>
     <a href="${esc(story.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${PALETTE.navyAccent};color:#ffffff;font-weight:700;font-size:12.5px;text-decoration:none;padding:8px 16px;border-radius:999px;">Read full article</a>`;
@@ -438,26 +440,35 @@ function htmlDividends(items: DividendInfoItem[], status: DividendsStatus): stri
   return sectionWrap(`${smallHeading}${card(table, "opacity:.95;")}`);
 }
 
-// ===== 10. This Week To Watch – macro only; earnings sub-list omitted when
-// it would only repeat the Upcoming Earnings Calendar. =====
+// ===== 10. This Week To Watch – FUTURE events only (upcoming earnings not
+// already shown in the Upcoming Earnings Calendar). Hidden entirely when
+// there's nothing forward-looking. Already-published macro readings get
+// their own, honestly-labeled section below (htmlRecentMacro) – never
+// presented under a "To Watch" heading. =====
 
 function htmlWeekAhead(data: ReportData): string {
-  const smallHeading = `<div style="font-size:13px;font-weight:700;color:${PALETTE.muted};text-transform:uppercase;letter-spacing:.02em;margin:0 0 8px;">This Week To Watch</div>`;
   const extraEarnings = weekAheadExtraEarnings(data);
-  const week = data.weekAhead;
+  if (extraEarnings.length === 0) return "";
 
-  const earningsHtml =
-    extraEarnings.length > 0
-      ? `<div class="week-ahead-earnings"><strong style="font-size:12px;">דיווחי רווחים נוספים</strong><br>${extraEarnings.map((e) => `${ltr(esc(e.ticker))} — ${ltr(esc(e.reportDate))}`).join("<br>")}</div>`
-      : "";
+  const smallHeading = `<div style="font-size:13px;font-weight:700;color:${PALETTE.muted};text-transform:uppercase;letter-spacing:.02em;margin:0 0 8px;">This Week To Watch</div>`;
+  const earningsHtml = `<div class="week-ahead-earnings"><strong style="font-size:12px;">דיווחי רווחים קרובים</strong><br>${extraEarnings.map((e) => `${ltr(esc(e.ticker))} — ${ltr(esc(e.reportDate))}`).join("<br>")}</div>`;
+
+  return sectionWrap(`${smallHeading}${card(earningsHtml, "opacity:.95;")}`);
+}
+
+// ===== 10b. Recent Macro Data – explicitly labeled as ALREADY PUBLISHED. =====
+
+function htmlRecentMacro(data: ReportData): string {
+  const smallHeading = `<div style="font-size:13px;font-weight:700;color:${PALETTE.muted};text-transform:uppercase;letter-spacing:.02em;margin:0 0 8px;">Recent Macro Data (Already Published)</div>`;
+  const week = data.weekAhead;
   const econHtml =
     week.economicReadings.length > 0
-      ? `<div style="margin-top:${extraEarnings.length > 0 ? "8px" : "0"};"><strong style="font-size:12px;">מאקרו (נתונים שכבר פורסמו)</strong><br>${week.economicReadings
+      ? `<div>${week.economicReadings
           .map((r) => `${esc(r.label)}: ${ltr(esc(String(r.value) + r.unit))}`)
           .join("<br>")}</div>`
       : `<div style="font-size:12.5px;color:${PALETTE.muted};">נתוני מאקרו אחרונים אינם זמינים כרגע.</div>`;
 
-  return sectionWrap(`${smallHeading}${card(`${earningsHtml}${econHtml}`, "opacity:.95;")}`);
+  return sectionWrap(`${smallHeading}${card(econHtml, "opacity:.95;")}`);
 }
 
 // ===== 11. Data Diagnostics (bottom, muted) =====
@@ -571,6 +582,7 @@ export function generateEmailHtmlBody(data: ReportData, today: string): string {
     htmlEmergencyWatch(data.emergencyWatch),
     htmlDividends(data.dividends, data.dividendsStatus),
     htmlWeekAhead(data),
+    htmlRecentMacro(data),
     htmlDiagnostics(data),
     htmlFooter(),
   ].join("\n");
@@ -616,10 +628,11 @@ function textMarketCatalyst(catalyst: MarketCatalystResult): string {
 
 function textMarketStory(story: MarketStory | null): string {
   if (!story) return `📰 Market Story of the Day:\n  לא נמצאה ידיעה חדשותית מהותית היום.`;
+  const fallbackLine = story.isFallback ? `\n  ⚠️ ${FALLBACK_NOTICE}` : "";
   return `📰 Market Story of the Day:
   ${story.ticker} – ${story.companyName}
   "${story.headline}"
-  🗞️ ${story.source} · 🕒 ${story.publishedDisplay}
+  🗞️ ${story.source} · 🕒 ${story.publishedDisplay}${fallbackLine}
   ${story.summaryHebrew}
   למה זה חשוב למשקיע לטווח ארוך: ${story.whyMattersHebrew}
   🔗 ${story.url}`;
@@ -696,12 +709,22 @@ function textDividends(items: DividendInfoItem[], status: DividendsStatus): stri
   return `💵 Dividend Information:\n${lines}`;
 }
 
-function textWeekAhead(week: ReportData["weekAhead"]): string {
-  const lines =
-    week.earnings.length > 0
-      ? week.earnings.map((e) => `  • ${e.ticker} — ${e.reportDate}`).join("\n")
-      : `  ${earningsCalendarStatusMessageHebrew(week.earningsStatus === "unavailable" ? "unavailable" : "noneFound")}`;
+// FUTURE events only – hidden entirely when there's nothing forward-looking
+// beyond what the Upcoming Earnings Calendar already showed. See
+// textRecentMacro below for already-published macro data, kept separate.
+function textWeekAhead(data: ReportData): string {
+  const extraEarnings = weekAheadExtraEarnings(data);
+  if (extraEarnings.length === 0) return "";
+  const lines = extraEarnings.map((e) => `  • ${e.ticker} — ${e.reportDate}`).join("\n");
   return `📅 This Week To Watch:\n${lines}`;
+}
+
+function textRecentMacro(week: ReportData["weekAhead"]): string {
+  if (week.economicReadings.length === 0) {
+    return `📅 Recent Macro Data (Already Published):\n  נתוני מאקרו אחרונים אינם זמינים כרגע.`;
+  }
+  const lines = week.economicReadings.map((r) => `  • ${r.label}: ${r.value}${r.unit}`).join("\n");
+  return `📅 Recent Macro Data (Already Published):\n${lines}`;
 }
 
 function textDiagnostics(data: ReportData): string {
@@ -770,7 +793,8 @@ export function generateEmailTextBody(data: ReportData, today: string): string {
     textTopOpportunities(data.topOpportunities),
     textEmergencyWatch(data.emergencyWatch),
     textDividends(data.dividends, data.dividendsStatus),
-    textWeekAhead(data.weekAhead),
+    textWeekAhead(data),
+    textRecentMacro(data.weekAhead),
     textDiagnostics(data),
   ]
     .filter((s) => s.length > 0)

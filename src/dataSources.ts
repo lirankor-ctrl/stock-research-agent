@@ -11,6 +11,7 @@ import {
 } from "./alphaVantage";
 import { readCache, TTL, writeCache } from "./cache";
 import { fetchFinnhubEarningsForDate } from "./finnhubEarnings";
+import { fetchFinnhubCompanyNews } from "./finnhubNews";
 import { fetchYahooDailyCloses, fetchYahooQuote, YahooQuote } from "./marketData";
 import { fetchNasdaqEarningsForDate, NasdaqEarningsRow } from "./nasdaqEarnings";
 import {
@@ -104,6 +105,10 @@ export async function getTopMovers(
   );
 }
 
+// Fundamentals (name/sector/marketCap/P-E/EPS/margin/dividends) barely move
+// day to day – a 7-day cache means most days re-use yesterday's OVERVIEW
+// call for free instead of spending part of the 25/day Alpha Vantage budget
+// on data that hasn't actually changed.
 export async function getOverview(
   symbol: string,
   apiKey: string,
@@ -112,48 +117,93 @@ export async function getOverview(
 ): Promise<SourcedValue<CompanyProfile>> {
   return cacheFirst<CompanyProfile>(
     `overview_${symbol}`,
-    TTL.HOURS_24,
+    TTL.DAYS_7,
     () => fetchCompanyOverview(symbol, apiKey),
     onNote,
     allowLive
   );
 }
 
+// Both getQuote and getNews try a non-Alpha provider FIRST and only fall
+// back to Alpha Vantage when that provider has nothing. `usedAlpha` tells
+// the caller whether THIS call actually touched the Alpha Vantage live
+// budget / 5-per-minute rate limit, so it can call budget.note()/sleep()
+// only when genuinely warranted – a naive "source === live -> it was Alpha"
+// assumption (the pre-existing convention, back when getQuote/getNews were
+// 100% Alpha) would otherwise silently burn through the scarce Alpha budget
+// on free, unbudgeted Yahoo/Finnhub calls, and add pointless 13s
+// rate-limit sleeps after them too.
+export interface ProviderResult<T> extends SourcedValue<T> {
+  usedAlpha: boolean;
+}
+
+// News tries Finnhub's free company-news endpoint FIRST (silent no-op when
+// FINNHUB_API_KEY isn't configured – same graceful-degrade pattern as
+// fetchFinnhubEarningsForDate) so a normal run doesn't have to spend an
+// Alpha Vantage call on news at all when Finnhub already covers it.
 export async function getNews(
   symbol: string,
   apiKey: string,
   onNote: (msg: string) => void = () => {},
   allowLive = true
-): Promise<SourcedValue<NewsItem[]>> {
-  return cacheFirst<NewsItem[]>(
-    `news_${symbol}`,
-    TTL.HOURS_24,
-    () => fetchNewsForTicker(symbol, apiKey, 5),
-    onNote,
-    allowLive
-  );
+): Promise<ProviderResult<NewsItem[]>> {
+  const cacheKey = `news_${symbol}`;
+  // Fresh cache short-circuits before touching either provider.
+  const fresh = readCache<NewsItem[]>(cacheKey, TTL.HOURS_24);
+  if (fresh) {
+    return { value: fresh.data, source: { source: "cached", ageHours: round1(fresh.ageHours) }, usedAlpha: false };
+  }
+
+  const finnhub = await fetchFinnhubCompanyNews(symbol);
+  if (finnhub !== null) {
+    // Finnhub reachable (configured) – even a genuinely empty result is a
+    // real answer, and never a reason to also spend an Alpha call.
+    writeCache(cacheKey, finnhub);
+    return { value: finnhub, source: { source: "live" }, usedAlpha: false };
+  }
+  onNote(`Finnhub news unavailable for ${symbol} (not configured or fetch failed) – falling back to Alpha Vantage`);
+  const alpha = await cacheFirst<NewsItem[]>(cacheKey, TTL.HOURS_24, () => fetchNewsForTicker(symbol, apiKey, 5), onNote, allowLive);
+  return { ...alpha, usedAlpha: true };
 }
 
+// Quotes try Yahoo Finance FIRST (no key, no daily-budget gate – see
+// marketData.ts, already used elsewhere in this file for indices/technicals)
+// and only fall back to Alpha Vantage's GLOBAL_QUOTE when Yahoo has nothing
+// AND the live-call budget allows it. This is the single biggest Alpha
+// Vantage reduction: the watchlist's ~10 daily GLOBAL_QUOTE calls move to a
+// provider with no shared daily quota at all.
 export async function getQuote(
   symbol: string,
   apiKey: string,
   onNote: (msg: string) => void = () => {},
   allowLive = true
-): Promise<SourcedValue<Quote>> {
+): Promise<ProviderResult<Quote>> {
+  const yahoo = await getYahooQuote(symbol, onNote);
+  if (yahoo.value) {
+    return {
+      value: { price: yahoo.value.price, changePercent: yahoo.value.changePercent, volume: yahoo.value.volume },
+      source: yahoo.source,
+      usedAlpha: false,
+    };
+  }
+  onNote(`Yahoo quote unavailable for ${symbol} – falling back to Alpha Vantage`);
   // Quotes go stale fast – keep the fresh window short so the daily report
   // reflects the latest close.
-  return cacheFirst<Quote>(
+  const alpha = await cacheFirst<Quote>(
     `quote_${symbol}`,
     TTL.HOURS_12,
     () => fetchQuote(symbol, apiKey),
     onNote,
     allowLive
   );
+  return { ...alpha, usedAlpha: true };
 }
 
 // Latest released macro reading (CPI/unemployment/GDP/Fed funds rate) – not a
-// forward calendar. Treasury yield now comes from Yahoo (real ^TNX) instead,
-// see getYahooTreasuryYield below.
+// forward calendar, and these series only update monthly/quarterly, so a
+// 7-day cache avoids re-spending a live call on a value that can't have
+// changed since yesterday. Treasury yield comes from Yahoo (real ^TNX)
+// instead, see getYahooTreasuryYield below.
 export async function getEconomicIndicator(
   fn: EconomicIndicatorFn,
   apiKey: string,
@@ -162,7 +212,7 @@ export async function getEconomicIndicator(
 ): Promise<SourcedValue<EconomicIndicatorPoint>> {
   return cacheFirst<EconomicIndicatorPoint>(
     `econ_${fn}`,
-    TTL.HOURS_24,
+    TTL.DAYS_7,
     () => fetchEconomicIndicator(fn, apiKey),
     onNote,
     allowLive

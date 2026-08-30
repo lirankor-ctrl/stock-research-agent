@@ -136,6 +136,63 @@ export function computeReportQuality(input: ReportQualityInput): ReportQuality {
   return { dimensions, score, band: qualityBand(score) };
 }
 
+// ===== Named send-gate checks =====
+//
+// The score above is an equal-weighted AVERAGE across dimensions (by
+// design – see the module comment), so a single weak dimension can be
+// diluted by strong ones elsewhere. This function makes four specific,
+// named conditions visible in diagnostics even when the averaged score
+// alone wouldn't have flagged them: "Do not send a normal report unless
+// Market Overview has >=6 usable metrics, the earnings calendar has valid
+// provider status, technical coverage is >=70%, and the overall score is
+// >=RECOVERY_THRESHOLD." This is diagnostic/logging only – it does NOT
+// change the normal-vs-diagnostic send decision (still purely
+// score < SEND_THRESHOLD, see pipeline.ts), so a report that's strong
+// everywhere else but weak on one named dimension still sends rather than
+// being blocked by a single soft signal, consistent with the averaged-score
+// design used everywhere else in this module.
+export interface SendGateResult {
+  ok: boolean;
+  reasons: string[]; // failing conditions only, empty when ok
+}
+
+export const MIN_MARKET_OVERVIEW_METRICS = 6;
+export const MIN_TECHNICAL_COVERAGE_PCT = 70;
+
+export function evaluateSendGate(input: {
+  marketOverviewUsableCount: number;
+  earningsCalendarStatus: EarningsCalendarStatus;
+  technicalsAvailable: number;
+  technicalsTotal: number;
+  score: number;
+}): SendGateResult {
+  const reasons: string[] = [];
+  if (input.marketOverviewUsableCount < MIN_MARKET_OVERVIEW_METRICS) {
+    reasons.push(
+      `Market Overview has only ${input.marketOverviewUsableCount} usable metrics (need >=${MIN_MARKET_OVERVIEW_METRICS})`
+    );
+  }
+  if (input.earningsCalendarStatus === "unavailable") {
+    reasons.push("Earnings calendar provider status is unavailable");
+  }
+  const technicalPct = input.technicalsTotal > 0 ? (input.technicalsAvailable / input.technicalsTotal) * 100 : 100;
+  if (technicalPct < MIN_TECHNICAL_COVERAGE_PCT) {
+    reasons.push(`Technical coverage ${technicalPct.toFixed(0)}% is below ${MIN_TECHNICAL_COVERAGE_PCT}%`);
+  }
+  if (input.score < RECOVERY_THRESHOLD) {
+    reasons.push(`Report Quality Score ${input.score} is below ${RECOVERY_THRESHOLD}`);
+  }
+  return { ok: reasons.length === 0, reasons };
+}
+
+export function formatSendGate(g: SendGateResult): string[] {
+  if (g.ok) return [`   ✅ Send gate: all named conditions pass (Market Overview, earnings status, technical coverage, quality score).`];
+  return [
+    `   ⚠️  Send gate: ${g.reasons.length} named condition(s) not fully met (informational – see score/band above for the actual send decision):`,
+    ...g.reasons.map((r) => `      - ${r}`),
+  ];
+}
+
 export function formatReportQuality(q: ReportQuality): string[] {
   const lines = [`🛫 Report Quality Score: ${q.score}/100 (${q.band})`];
   for (const d of q.dimensions) {

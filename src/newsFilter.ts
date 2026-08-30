@@ -87,23 +87,77 @@ export function isPromotionalOrLegalNews(item: NewsItem): boolean {
   return EXCLUDE_PATTERNS.some((re) => re.test(title));
 }
 
-// Substantive categories a long-term investor actually cares about – used as
-// a soft positive signal (prioritization) and to rescue analyst headlines
-// that do carry real reasoning.
-const SUBSTANTIVE_PATTERNS: RegExp[] = [
-  /earnings|quarterly results|q[1-4]\s*results/i,
-  /guidance/i,
-  /product launch|unveils|announces new/i,
-  /regulat(?:ion|or|ory)/i,
-  /acqui(?:res|sition)|merger|to acquire/i,
-  /contract|partnership|deal with/i,
-  /\b(ceo|cfo|chief executive)\b.*(?:appoint|step down|resign|name)/i,
-  /upgrade|downgrade|price target|initiates coverage/i,
+// Materiality ranking for "Market Story of the Day" (see marketStory.ts) –
+// a long-term investor's rough priority order for what actually moves a
+// thesis, highest-weight first: confirmed earnings/guidance and M&A carry
+// far more real signal than a bare analyst price-target tweak. Used as a
+// soft positive signal (prioritization boost + tie-breaking), never a hard
+// requirement – a genuinely strong story outside these categories can still
+// win, just without the boost.
+export type MaterialityCategory =
+  | "earningsGuidance"
+  | "ma"
+  | "regulation"
+  | "contract"
+  | "productEvent"
+  | "strategic"
+  | "analystAction"
+  | "marketImpact"
+  | "none";
+
+const MATERIALITY_PATTERNS: Array<{ category: MaterialityCategory; weight: number; patterns: RegExp[] }> = [
+  {
+    category: "earningsGuidance",
+    weight: 0.16,
+    patterns: [/earnings|quarterly results|q[1-4]\s*results/i, /guidance/i, /(?:raises?|cuts?|lowers?)\s+(?:full-year\s+|fy\s*)?(?:outlook|guidance|forecast)/i],
+  },
+  {
+    category: "ma",
+    weight: 0.15,
+    patterns: [/acqui(?:res|sition)|merger|to acquire|to be acquired|buyout|takeover bid/i],
+  },
+  {
+    category: "regulation",
+    weight: 0.13,
+    patterns: [/regulat(?:ion|or|ory)/i, /antitrust/i, /fda approv/i, /sec (?:approves|charges|investigation)/i],
+  },
+  {
+    category: "contract",
+    weight: 0.11,
+    patterns: [/contract|partnership|deal with|licensing agreement/i],
+  },
+  {
+    category: "productEvent",
+    weight: 0.1,
+    patterns: [/product launch|unveils|announces new|recalls?\b|discontinu/i],
+  },
+  {
+    category: "strategic",
+    weight: 0.09,
+    patterns: [/restructur|layoffs|spin[- ]?off/i, /\b(ceo|cfo|chief executive)\b.*(?:appoint|step down|resign|name)/i],
+  },
+  {
+    category: "analystAction",
+    weight: 0.06,
+    patterns: [/upgrade|downgrade|price target|initiates coverage/i],
+  },
+  {
+    category: "marketImpact",
+    weight: 0.05,
+    patterns: [/\bmarket\s+(?:rally|selloff|sell-off)\b/i, /\bstocks?\s+(?:rally|surge|tumble|sink|plunge)\b/i],
+  },
 ];
 
-export function isSubstantiveNews(item: NewsItem): boolean {
+export function materiality(item: NewsItem): { category: MaterialityCategory; weight: number } {
   const title = item.title ?? "";
-  return SUBSTANTIVE_PATTERNS.some((re) => re.test(title));
+  for (const m of MATERIALITY_PATTERNS) {
+    if (m.patterns.some((re) => re.test(title))) return { category: m.category, weight: m.weight };
+  }
+  return { category: "none", weight: 0 };
+}
+
+export function isSubstantiveNews(item: NewsItem): boolean {
+  return materiality(item).weight > 0;
 }
 
 // Legal-entity suffixes stripped off a company's display name to get its

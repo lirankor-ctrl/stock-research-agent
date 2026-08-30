@@ -232,6 +232,13 @@ export interface MarketStory {
   originalSummary?: string;   // the source's own (English) summary, verbatim
   priceMove?: { price: number; changePercent: number };
   logoUrl?: string;           // only when a safe public logo is available
+  // true when this story was NOT found within the primary 24h window and
+  // came from the 48h fallback window instead – every renderer MUST show
+  // the literal fallback notice below when this is true (see
+  // src/marketStory.ts's FALLBACK_NOTICE), so an older story is never
+  // presented as if it were today's news.
+  isFallback: boolean;
+  materialityCategory: string; // e.g. "earningsGuidance", "ma", "none" – see newsFilter.ts
 }
 
 // ===== Earnings calendar =====

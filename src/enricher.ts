@@ -86,8 +86,14 @@ export async function buildWatchlistStocks(
       budget.allow
     );
     recordTally(tally, res.source);
-    budget.note(res.source);
-    if (res.source.source === "live") await sleep(delayMs);
+    // Only an actual Alpha Vantage call touches the shared live-call budget
+    // and its 5/min rate limit – the Yahoo-first path (the common case) is
+    // unbudgeted and needs no rate-limit sleep. See dataSources.ts's
+    // ProviderResult/usedAlpha.
+    if (res.usedAlpha) {
+      budget.note(res.source);
+      if (res.source.source === "live") await sleep(delayMs);
+    }
 
     stocks.push({
       ticker: w.ticker,
@@ -135,9 +141,14 @@ export async function enrichStocks(
       budget.allow
     );
     recordTally(tally, newsRes.source);
-    budget.note(newsRes.source);
-    if (newsRes.source.source === "live" && i < candidates.length - 1) {
-      await sleep(delayMs);
+    // Only an actual Alpha Vantage call touches the shared live-call budget
+    // and its rate limit – the Finnhub-first path is unbudgeted. See
+    // dataSources.ts's ProviderResult/usedAlpha.
+    if (newsRes.usedAlpha) {
+      budget.note(newsRes.source);
+      if (newsRes.source.source === "live" && i < candidates.length - 1) {
+        await sleep(delayMs);
+      }
     }
 
     const profile = profileRes.value ?? undefined;

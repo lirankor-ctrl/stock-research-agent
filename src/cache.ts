@@ -6,6 +6,10 @@ const CACHE_DIR = path.resolve(process.cwd(), "cache");
 export const TTL = {
   HOURS_12: 12 * 60 * 60 * 1000,
   HOURS_24: 24 * 60 * 60 * 1000,
+  // For data that is locally computable or genuinely slow-moving (company
+  // fundamentals, monthly/quarterly macro releases) – never spend a scarce
+  // Alpha Vantage call refreshing something that hasn't actually changed.
+  DAYS_7: 7 * 24 * 60 * 60 * 1000,
 };
 
 interface CacheEnvelope<T> {

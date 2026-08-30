@@ -175,7 +175,23 @@ export function computeDataQuality(
   // Optional technical data is never a reason to exclude a stock, but its
   // absence must always keep confidence below a perfect score.
   const technicalGapPenalty = statuses.technical === "available" ? 0 : 15;
-  const confidenceScore = clamp(coverageScore - freshnessPenalty - technicalGapPenalty, 0, 100);
+  // Optional valuation depth (P/E, EPS, profit margin – all from Alpha
+  // Vantage's OVERVIEW call) is likewise never a reason to exclude a stock
+  // (see meetsNormalTopOpportunityBar in emergencyMode.ts, which used to
+  // hard-gate on this and caused the 2026-08-28 "Top Opportunities: none"
+  // incident). Missing it still has to cost SOMETHING, or two candidates
+  // with genuinely different data depth would score identically – so it's a
+  // small, capped confidence penalty instead of an elimination.
+  const p = s.profile;
+  const hasValuationDepth = !!(
+    p && ((p.peRatio && p.peRatio > 0) || p.eps !== undefined || p.profitMargin !== undefined)
+  );
+  const valuationDepthPenalty = priceUsable && p && !hasValuationDepth ? 8 : 0;
+  const confidenceScore = clamp(
+    coverageScore - freshnessPenalty - technicalGapPenalty - valuationDepthPenalty,
+    0,
+    100
+  );
 
   const missing = DIMS.filter((d) => statuses[d] === "genuinelyMissing").map((d) => DIM_HEBREW[d]);
   const rateLimited = DIMS.filter(

@@ -30,6 +30,7 @@ export interface YahooQuote {
   price: number;
   previousClose: number;
   changePercent: number;
+  volume: number; // 0 when Yahoo's chart meta doesn't carry a volume figure
 }
 
 export async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null> {
@@ -41,10 +42,12 @@ export async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null
   if (typeof price !== "number" || typeof previousClose !== "number" || previousClose === 0) {
     return null;
   }
+  const volume = typeof meta.regularMarketVolume === "number" ? meta.regularMarketVolume : 0;
   return {
     price,
     previousClose,
     changePercent: ((price - previousClose) / previousClose) * 100,
+    volume,
   };
 }
 

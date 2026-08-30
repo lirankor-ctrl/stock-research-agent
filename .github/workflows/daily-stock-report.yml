@@ -2,9 +2,30 @@ name: Daily Stock Report
 
 on:
   schedule:
-    # 12:10 UTC, Monday–Friday = 14:10 Israel winter time / 15:10 Israel summer time.
-    # GitHub may delay scheduled runs by several minutes during high load.
-    - cron: '10 13 * * 1-5'
+    # GitHub Actions added native timezone-aware scheduling in March 2026: an
+    # optional IANA `timezone` field as a sibling of `cron` on a schedule
+    # entry, with automatic DST handling (see the GitHub Actions changelog,
+    # "Late March 2026 updates"). One entry now covers 16:05 Israel time
+    # year-round — no manual summer/winter cron split needed. A non-round
+    # minute (:05) is used deliberately to avoid the top-of-hour congestion
+    # where GitHub delays scheduled runs the most.
+    #
+    # Root cause of the 2026-08-28 incident (email arrived 02:04 IDT):
+    # confirmed via the GitHub Actions API that the cron ITSELF never changed
+    # (stable at '10 13 * * 1-5' since 2026-08-07) — the run that produced
+    # that email was created by GitHub at 23:00:33 UTC, ~9h50m after its
+    # 13:10 UTC trigger time, with no corresponding code/workflow change and
+    # no other workflow in this repo. That is GitHub's scheduler itself
+    # firing (or queueing) the job hours late, a documented-but-unbounded
+    # GitHub Actions reliability gap for `schedule` triggers — not a wrong
+    # cron, not a timezone bug, not a retry/overlap in this repo's own code.
+    # A correct timezone (this fix) cannot bound GitHub's own scheduling
+    # delay, so the app-level staleness guard in src/reportTiming.ts remains
+    # the real fix for THAT failure mode: it detects a late/stale run at run
+    # time and refuses to silently mail a stale "pre-market" report,
+    # regardless of why GitHub ran late.
+    - cron: '5 16 * * 1-5'
+      timezone: "Asia/Jerusalem"
   workflow_dispatch:
     inputs:
       test_recipient:
@@ -33,6 +54,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Record actual workflow start time
+        id: timing
+        run: echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Generate and email report
         env:
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
@@ -43,6 +68,16 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ github.event.inputs.test_recipient || secrets.EMAIL_TO }}
           EMAIL_BCC: ${{ github.event.inputs.test_recipient && '' || secrets.EMAIL_BCC }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          # Report-health / staleness-guard inputs (src/reportTiming.ts) —
+          # this is the actual fix for the 2026-08-28 02:04 IDT incident:
+          # GitHub can still run a scheduled job late, but the app now
+          # detects it and refuses to silently mail a stale "pre-market"
+          # report regardless of why GitHub ran late.
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          SCHEDULED_HOUR_ISRAEL: "16"
+          SCHEDULED_MINUTE_ISRAEL: "5"
+          WORKFLOW_STARTED_AT: ${{ steps.timing.outputs.started_at }}
         run: npm run email-report
 
       - name: Upload report artifacts

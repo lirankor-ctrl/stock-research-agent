@@ -1,4 +1,4 @@
-import { isDirectlyAboutCompany, isPromotionalOrLegalNews, isSubstantiveNews } from "./newsFilter";
+import { isDirectlyAboutCompany, isPromotionalOrLegalNews, materiality } from "./newsFilter";
 import { EnrichedStock, MarketStory, NewsItem, ReportData } from "./types";
 import { watchlistName } from "./universe";
 
@@ -41,12 +41,16 @@ interface ScoredNews {
   score: number;
 }
 
-// Only consider news published within the last `RECENT_DAYS` days. Widened
-// to `RECOVERY_RECENT_DAYS` by the Report Quality recovery pass when the
-// normal window turned up nothing and overall report quality is degraded –
-// see reportQuality.ts / pipeline.ts.
-const RECENT_DAYS = 10;
-export const RECOVERY_RECENT_DAYS = 20;
+// Primary window: only news published within the last 24h qualifies for a
+// normal (unlabeled) Market Story. Fallback: widened to 48h ONLY when
+// nothing in the primary window qualifies – and the result is always
+// tagged `isFallback: true` so every renderer must show FALLBACK_NOTICE
+// rather than presenting an up-to-2-day-old story as if it were fresh. No
+// window wider than 48h is ever used for the hero story – see pipeline.ts.
+export const PRIMARY_WINDOW_HOURS = 24;
+export const FALLBACK_WINDOW_HOURS = 48;
+// Exact, literal label every renderer must show when isFallback is true.
+export const FALLBACK_NOTICE = "Fallback: no material story found in the last 24h";
 // Minimum meaningfulness score for a story to be worth featuring.
 const MIN_SCORE = 0.18;
 
@@ -69,7 +73,7 @@ function scoreNews(
   stock: EnrichedStock,
   item: NewsItem,
   now: number,
-  recentDays: number,
+  windowHours: number,
   requireDirectRelevance: boolean
 ): ScoredNews | null {
   if (!item.title || !item.url) return null; // need a real headline + link
@@ -86,17 +90,18 @@ function scoreNews(
   if (!date) return null;
 
   const hoursAgo = (now - date.getTime()) / 3_600_000;
-  if (hoursAgo < 0 || hoursAgo > recentDays * 24) return null; // not recent
+  if (hoursAgo < 0 || hoursAgo > windowHours) return null; // not recent enough for this window
 
   const relevance = item.relevanceScore ?? 0.3;
   const impact = Math.min(Math.abs(item.sentimentScore ?? 0), 1);
-  const recency = Math.max(0, 1 - hoursAgo / (recentDays * 24));
-  // Small, deliberate boost for substantive categories (earnings, guidance,
-  // product news, regulation, M&A, leadership, analyst calls) so they win
-  // ties against generic market-noise headlines – never a hard requirement.
-  const substantiveBoost = isSubstantiveNews(item) ? 0.1 : 0;
+  const recency = Math.max(0, 1 - hoursAgo / windowHours);
+  // Materiality boost ranked by category (earnings/guidance and M&A rank
+  // above a bare analyst price-target tweak) so genuinely material
+  // developments win ties against generic market-noise headlines – never a
+  // hard requirement, see newsFilter.ts's materiality().
+  const materialityBoost = materiality(item).weight;
 
-  const score = relevance * 0.4 + impact * 0.35 + recency * 0.25 + substantiveBoost;
+  const score = relevance * 0.4 + impact * 0.35 + recency * 0.25 + materialityBoost;
   return { stock, item, date, score };
 }
 
@@ -144,7 +149,7 @@ function buildWhyMattersHebrew(s: ScoredNews): string {
   return base ? `${base} ${newsAngle}` : newsAngle;
 }
 
-function toMarketStory(s: ScoredNews): MarketStory {
+function toMarketStory(s: ScoredNews, isFallback: boolean): MarketStory {
   return {
     ticker: s.stock.ticker,
     companyName: displayName(s.stock),
@@ -161,6 +166,8 @@ function toMarketStory(s: ScoredNews): MarketStory {
     // No safe/licensed logo source is wired in, so renderers use the ticker
     // placeholder. Leave undefined rather than hotlink a copyrighted image.
     logoUrl: undefined,
+    isFallback,
+    materialityCategory: materiality(s.item).category,
   };
 }
 
@@ -184,12 +191,12 @@ function candidatePool(data: ReportData): EnrichedStock[] {
 // stock (see isDirectlyAboutCompany) – this is what keeps an ETF article or
 // an unrelated-company headline from ever winning a "Market Story" slot just
 // because the provider tagged it relevant.
-function scoreCompanyCandidates(data: ReportData, nowMs: number, recentDays: number): ScoredNews[] {
+function scoreCompanyCandidates(data: ReportData, nowMs: number, windowHours: number): ScoredNews[] {
   const bestPerStock: ScoredNews[] = [];
   for (const stock of candidatePool(data)) {
     let best: ScoredNews | null = null;
     for (const item of stock.news) {
-      const scored = scoreNews(stock, item, nowMs, recentDays, true);
+      const scored = scoreNews(stock, item, nowMs, windowHours, true);
       if (scored && (!best || scored.score > best.score)) best = scored;
     }
     if (best && best.score >= MIN_SCORE) bestPerStock.push(best);
@@ -202,12 +209,12 @@ function scoreCompanyCandidates(data: ReportData, nowMs: number, recentDays: num
 // qualifies (see scoreAllCandidates). Still a real, already-fetched article;
 // this never invents content, only widens which real article can fill the
 // hero slot.
-function scoreMacroCandidates(data: ReportData, nowMs: number, recentDays: number): ScoredNews[] {
+function scoreMacroCandidates(data: ReportData, nowMs: number, windowHours: number): ScoredNews[] {
   const macro: ScoredNews[] = [];
   for (const stock of candidatePool(data)) {
     for (const item of stock.news) {
       if (!MACRO_KEYWORDS.test(item.title ?? "")) continue;
-      const scored = scoreNews(stock, item, nowMs, recentDays, false);
+      const scored = scoreNews(stock, item, nowMs, windowHours, false);
       if (scored && scored.score >= MIN_SCORE) macro.push(scored);
     }
   }
@@ -219,26 +226,27 @@ function scoreMacroCandidates(data: ReportData, nowMs: number, recentDays: numbe
 // market-wide development fill the slot instead. Both pools can legitimately
 // come back empty – the caller then shows an honest "no story today"
 // message rather than padding the hero slot with low-value news.
-function scoreAllCandidates(data: ReportData, nowMs: number, recentDays = RECENT_DAYS): ScoredNews[] {
-  const company = scoreCompanyCandidates(data, nowMs, recentDays);
+function scoreAllCandidates(data: ReportData, nowMs: number, windowHours: number): ScoredNews[] {
+  const company = scoreCompanyCandidates(data, nowMs, windowHours);
   if (company.length > 0) return company;
-  return scoreMacroCandidates(data, nowMs, recentDays);
+  return scoreMacroCandidates(data, nowMs, windowHours);
 }
 
 // ===== public API =====
 
 // Pick the single most meaningful recent news story across the report's
-// stocks. Returns null when nothing recent/meaningful is available.
-// `recentDays` is widened by the Report Quality recovery pass (see
-// reportQuality.ts) when the normal window found nothing and overall
-// quality is degraded.
+// stocks, trying the 24h primary window first and falling back to 48h ONLY
+// when the primary window found nothing (see pipeline.ts) – the fallback
+// result is always tagged isFallback so no renderer can present a
+// (up-to-2-day-old) story as if it were today's. Returns null when nothing
+// qualifies even within 48h.
 export function selectMarketStory(
   data: ReportData,
   nowMs: number,
-  recentDays = RECENT_DAYS
+  windowHours: number = PRIMARY_WINDOW_HOURS
 ): MarketStory | null {
-  const candidates = scoreAllCandidates(data, nowMs, recentDays);
-  return candidates.length > 0 ? toMarketStory(candidates[0]) : null;
+  const candidates = scoreAllCandidates(data, nowMs, windowHours);
+  return candidates.length > 0 ? toMarketStory(candidates[0], windowHours > PRIMARY_WINDOW_HOURS) : null;
 }
 
 // Up to `count` more relevant, distinct-ticker headlines beyond the hero
@@ -247,13 +255,13 @@ export function selectAdditionalHeadlines(
   data: ReportData,
   nowMs: number,
   count = 2,
-  recentDays = RECENT_DAYS
+  windowHours: number = PRIMARY_WINDOW_HOURS
 ): MarketStory[] {
-  const candidates = scoreAllCandidates(data, nowMs, recentDays);
+  const candidates = scoreAllCandidates(data, nowMs, windowHours);
   if (candidates.length === 0) return [];
   const [hero, ...rest] = candidates;
   return rest
     .filter((c) => c.stock.ticker !== hero.stock.ticker)
     .slice(0, count)
-    .map(toMarketStory);
+    .map((c) => toMarketStory(c, windowHours > PRIMARY_WINDOW_HOURS));
 }
