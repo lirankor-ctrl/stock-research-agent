@@ -99,15 +99,19 @@ export function explainWhyHebrew(
   const sectorText = sector ? ` (${sector})` : "";
   const headline = `${companyName}${sectorText} רשמה ${direction} של ${absChange}% במחזור של כ-${volM}M מניות.`;
 
+  // Deliberately reports CO-OCCURRENCE, never causation. detectDrivers only
+  // keyword-matches headlines; it has no way to establish that a headline
+  // caused a price move, and asserting "the reason is likely X" from keyword
+  // overlap is exactly the invented explanation this report must not produce.
   switch (drivers.type) {
     case "positive":
-      return `${headline} הסיבה ככל הנראה: חדשות חיוביות${drivers.sample ? ` – "${drivers.sample}"` : ""}.`;
+      return `${headline} ברקע פורסמו חדשות חיוביות${drivers.sample ? ` – "${drivers.sample}"` : ""}; הקשר לתנועת המחיר לא אומת.`;
     case "negative":
-      return `${headline} הסיבה ככל הנראה: חדשות שליליות${drivers.sample ? ` – "${drivers.sample}"` : ""}.`;
+      return `${headline} ברקע פורסמו חדשות שליליות${drivers.sample ? ` – "${drivers.sample}"` : ""}; הקשר לתנועת המחיר לא אומת.`;
     case "mixed":
-      return `${headline} הרקע מעורב: גם חדשות חיוביות וגם שליליות${drivers.sample ? ` (לדוגמה: "${drivers.sample}")` : ""}.`;
+      return `${headline} ברקע פורסמו חדשות מעורבות${drivers.sample ? ` (לדוגמה: "${drivers.sample}")` : ""}; הקשר לתנועת המחיר לא אומת.`;
     case "none":
-      return `${headline} לא זוהו חדשות חזקות – ייתכן תנועה טכנית, מומנטום סקטוריאלי או זרימת כסף.`;
+      return `${headline} לא זוהו חדשות בולטות בכותרות שנסרקו, ולכן אין הסבר מאומת לתנועה.`;
   }
 }
 

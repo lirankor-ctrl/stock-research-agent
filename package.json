@@ -13,7 +13,12 @@
     "build": "tsc",
     "start": "node dist/index.js"
   },
-  "keywords": ["stocks", "alpha-vantage", "research", "nasdaq"],
+  "keywords": [
+    "stocks",
+    "alpha-vantage",
+    "research",
+    "nasdaq"
+  ],
   "license": "MIT",
   "dependencies": {
     "axios": "^1.7.7",

@@ -56,23 +56,25 @@ function countMeaningfulFundamentals(profile: CompanyProfile | undefined): numbe
   return n;
 }
 
-// The bar for a NORMAL Top Opportunity. Mandatory data only:
-//  - dataQuality already clears the recommendation threshold (not Excluded,
-//    label High/Medium) – this covers price/volume/marketCap/profile/news/
-//    technical coverage as a whole, see dataQuality.ts.
-//  - basic company identity (a name) is resolvable.
-// Optional enrichment (news, P/E, margin, extra profile detail) is NOT a
-// gate here – missing optional data already lowers dataQuality's
-// confidenceScore (see the fundamentals-depth penalty in dataQuality.ts) and
-// is fully visible in the reliability line, but it must never by itself zero
-// out an otherwise strong, liquid, well-covered stock's Top Opportunity
-// eligibility. A candidate that genuinely fails the mandatory bar can still
-// be shown, but only in the separate Reduced-Confidence Watch – never as a
-// normal pick.
+// The bar for a NORMAL Top Opportunity: dataQuality clears the recommendation
+// threshold (not Excluded, label High/Medium). That threshold now weighs only
+// CORE data – price, volume, market cap – because those are what make a stock
+// eligible and safe to recommend at all.
+//
+// Optional enrichment (company identity/profile, news, P/E, EPS, margin,
+// technicals) is deliberately NOT a gate. It lowers dataQuality's
+// confidenceScore and shows up in the reliability line, but it must never by
+// itself zero out an otherwise strong, liquid, well-priced candidate.
+//
+// The company-name check that used to live here was the last hard gate of
+// that kind: `name` arrives on the SAME provider call as P/E and margins, so
+// one rate-limited fundamentals call eliminated every candidate at once —
+// the identical failure shape as the 2026-08-28 "Top Opportunities: none with
+// 17 qualified" incident. Every renderer already falls back to
+// watchlistName(ticker) ?? ticker, so a missing name costs confidence and
+// nothing else.
 export function meetsNormalTopOpportunityBar(stock: EnrichedStock): boolean {
-  if (!meetsRecommendationThreshold(stock.dataQuality)) return false;
-  if (!stock.profile?.name) return false; // basic company identity
-  return true;
+  return meetsRecommendationThreshold(stock.dataQuality);
 }
 
 // Human-readable reason a candidate did NOT make Top Opportunities – used to
@@ -85,12 +87,39 @@ export function explainTopOpportunityRejection(stock: EnrichedStock): string {
   if (!meetsRecommendationThreshold(dq)) {
     return `data quality label "${dq.label}" below Medium (coverage=${dq.coverageScore}, confidence=${dq.confidenceScore})`;
   }
-  if (!stock.profile?.name) return "no resolvable company name/identity";
   const fundamentals = countMeaningfulFundamentals(stock.profile);
   return (
     `passes mandatory bar (label=${dq.label}, coverage=${dq.coverageScore}, confidence=${dq.confidenceScore}, ` +
     `fundamentals=${fundamentals}/4) – not selected, ranked below the cutoff`
   );
+}
+
+// Machine-countable version of explainTopOpportunityRejection, so "Top
+// Opportunities: 0" always comes with an attributable reason instead of being
+// a number nobody can explain after the fact.
+export type RejectionCategory =
+  | "noDataQualityScore"
+  | "excludedByDataQuality"
+  | "belowQualityLabel"
+  | "rankedBelowCutoff";
+
+export function categorizeTopOpportunityRejection(stock: EnrichedStock): RejectionCategory {
+  const dq = stock.dataQuality;
+  if (!dq) return "noDataQualityScore";
+  if (dq.excluded) return "excludedByDataQuality";
+  if (!meetsRecommendationThreshold(dq)) return "belowQualityLabel";
+  return "rankedBelowCutoff";
+}
+
+export function summarizeRejections(rejected: EnrichedStock[]): Record<RejectionCategory, number> {
+  const counts: Record<RejectionCategory, number> = {
+    noDataQualityScore: 0,
+    excludedByDataQuality: 0,
+    belowQualityLabel: 0,
+    rankedBelowCutoff: 0,
+  };
+  for (const s of rejected) counts[categorizeTopOpportunityRejection(s)]++;
+  return counts;
 }
 
 export interface EmergencySafetyResult {

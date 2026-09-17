@@ -4,7 +4,8 @@
 
 import { Freshness, Market, Metrics, RecInput, RecommendationRecord } from "./types";
 import { computeMetrics, evaluateLedger, recordRecommendations } from "./tracker";
-import { appendRunSnapshot, loadLedger, saveLedger, saveMetrics } from "./store";
+import { loadLedger, saveLedger, saveMetrics, upsertRunSnapshot } from "./store";
+import { usMarketDateIso } from "../dateUtils";
 
 export interface TrackingResult {
   metrics: Metrics;
@@ -39,8 +40,11 @@ export function runTracking(params: {
   });
   saveMetrics(reportsDir, metrics);
 
-  // 5. Append a trend snapshot.
-  appendRunSnapshot(reportsDir, {
+  // 5. Record this trading day's trend snapshot, replacing the day's previous
+  // one if the pipeline already ran today (a re-trigger must converge, not
+  // accumulate a second line).
+  upsertRunSnapshot(reportsDir, {
+    tradingDate: usMarketDateIso(new Date(nowIso)),
     generatedAt: nowIso,
     market,
     runDataQuality: metrics.runDataQuality,

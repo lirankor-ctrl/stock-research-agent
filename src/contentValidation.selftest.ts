@@ -10,38 +10,46 @@ import { computeDataQuality } from "./dataQuality";
 import { cacheFirst } from "./dataSources";
 import { deriveEarningsCalendarFromRows } from "./earningsCalendar";
 import { earningsFollowUpStatusMessageHebrew } from "./earningsFollowUp";
-import { buildInterpretation, classifyBeatMiss, computeEarningsReaction, computeSurprisePct } from "./earningsReaction";
+import { buildInterpretation, classifyBeatMiss, computeEarningsReaction, computeSurprisePct, excludeUnsettledSession } from "./earningsReaction";
 import {
   ClosesFetcher,
   filterOutReported,
   loadTracker,
   pruneOldRecords,
   ResultsFetcher,
+  resolveReportedTiming,
   runEarningsTracker,
   saveTracker,
   selectDisplayRecords,
   upsertTrackedEarnings,
 } from "./earningsTracker";
 import { generateEmailHtmlBody, generateEmailTextBody } from "./emailBodyGenerator";
-import { buildTopOpportunities, EMERGENCY_MODE_LABEL, passesEmergencySafetyFilter } from "./emergencyMode";
+import { isUsEarlyCloseDay, isUsMarketHoliday, isUsTradingDay, usMarketCloseMinute, usMarketHolidayName, usMarketHolidays } from "./marketCalendar";
+import { diagnoseSchedule } from "./scheduleDiagnostics";
+import { buildTopOpportunities, EMERGENCY_MODE_LABEL, passesEmergencySafetyFilter, summarizeRejections } from "./emergencyMode";
 import { passesLongTermFilter } from "./filters";
 import { generateDiagnosticHtmlReport, generateHtmlReport } from "./htmlReportGenerator";
 import { DatedClose } from "./marketData";
 import { selectMarketStory } from "./marketStory";
 import { MIN_VISIBLE_INDICATORS, visibleOverviewItems } from "./marketOverview";
 import { NasdaqEarningsRow } from "./nasdaqEarnings";
-import { isEtfOrLeveragedFundNews, isPromotionalOrLegalNews } from "./newsFilter";
+import { isEtfOrLeveragedFundNews, isPromotionalOrLegalNews, materiality, sourceQualityScore } from "./newsFilter";
 import { buildOpportunityThesis } from "./opportunityThesis";
 import { validatePresentation } from "./presentationValidation";
+import { providerForCacheKey, summarizeProviderFailures } from "./providerLedger";
+import { throttleFinnhub } from "./finnhubThrottle";
 import { computeProvenance, extractProvenance } from "./reportFingerprint";
 import { generateDiagnosticReport, generateReport } from "./reportGenerator";
 import { buildReportHealth, formatReportHealth } from "./reportHealth";
 import { EMAIL_MAX_WIDTH, formatOverviewValue, weekAheadExtraEarnings } from "./reportPresentation";
 import { computeReportQuality, RECOVERY_THRESHOLD, ReportQuality, SEND_THRESHOLD } from "./reportQuality";
-import { classifyReportTiming, DELAYED_THRESHOLD_MINUTES, usMarketState } from "./reportTiming";
+import { classifyReportTiming, DELAYED_THRESHOLD_MINUTES, MAX_LATENESS_MINUTES, usMarketState } from "./reportTiming";
+import { alreadySentForTradingDate, loadReportState, parseReportState, saveReportState } from "./reportState";
+import { loadRunSnapshots, saveLedger, upsertRunSnapshot } from "./performance/store";
+import { recordRecommendations } from "./performance/tracker";
 import { validateReportConsistency } from "./reportValidation";
-import { resolveTechnicalWatchPrice } from "./technicalAlerts";
-import { computeTechnicals } from "./technicals";
+import { resolveTechnicalWatchPrice, trendLabelHebrew } from "./technicalAlerts";
+import { computeTechnicals, movingAverageTrend } from "./technicals";
 import {
   DataQuality,
   EarningsCalendarEntry,
@@ -1506,23 +1514,33 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   );
 
   // Directly exercises the "delayed" branch in isolation: a hypothetical
-  // early schedule (10:00 Israel) so a 50min delay still lands hours before
-  // the US market opens, rather than crossing into "intraday" first.
+  // early schedule (10:00 Israel) so the delay still lands hours before the
+  // US market opens, rather than crossing into "intraday" first. 20 minutes
+  // sits deliberately between DELAYED_THRESHOLD_MINUTES (12) and
+  // MAX_LATENESS_MINUTES (30) — late enough to be labeled, not late enough
+  // to be refused.
   const isolatedDelay = classifyReportTiming({
-    now: new Date("2026-08-28T07:50:00Z"), // 10:50 IDT
+    now: new Date("2026-08-28T07:20:00Z"), // 10:20 IDT
     scheduledHourIsrael: 10,
     scheduledMinuteIsrael: 0,
     isManualRun: false,
   });
   assert(
-    isolatedDelay.status === "delayed" && isolatedDelay.delayMinutes === 50,
+    isolatedDelay.status === "delayed" && isolatedDelay.delayMinutes === 20,
     `a run more than ${DELAYED_THRESHOLD_MINUTES}min late but still genuinely pre-market is labeled "delayed" specifically (got status=${isolatedDelay.status} delay=${isolatedDelay.delayMinutes})`
   );
 
+  // Note on reachability: with the production target of 15:58 Israel and a
+  // 30-minute lateness cap, the latest permitted start is 16:28 Israel =
+  // 09:28 New York — two minutes before the US open. So on the real schedule
+  // this branch can no longer trigger; a run late enough to cross the open is
+  // now refused outright instead of being relabeled. The branch is kept
+  // because it is still correct for any later target, and is exercised here
+  // with one: a 16:20 Israel target, 15 minutes late, lands at 09:35 ET.
   const intraday = classifyReportTiming({
-    now: openNy,
+    now: new Date("2026-08-28T13:35:00Z"), // 16:35 Israel = 09:35 New York
     scheduledHourIsrael: 16,
-    scheduledMinuteIsrael: 5,
+    scheduledMinuteIsrael: 20,
     isManualRun: false,
   });
   assert(
@@ -1728,7 +1746,43 @@ async function runAsyncOnlyChecks(): Promise<void> {
         }],
         source: { source: "live" },
       });
-      const fullCloses: ClosesFetcher = async () => ({
+      // Closes as they ACTUALLY exist to a pre-market run on 2026-08-27: the
+      // 27th's own session has not happened yet, so its close cannot be here.
+      // PANW reported after the close on the 26th, so the reaction needs the
+      // 27th's close and is genuinely not computable during this run.
+      const closesThroughWednesday: ClosesFetcher = async () => ({
+        value: [
+          { date: "2026-08-25", close: 200 },
+          { date: "2026-08-26", close: 202 },
+        ],
+        source: { source: "live" },
+      });
+      // The scheduled report runs at 16:00 Israel = 09:00 New York, i.e.
+      // BEFORE the US open – that is the real timing every production run has.
+      const run3 = await runEarningsTracker({
+        filePath, now: new Date("2026-08-27T13:00:00.000Z"), upcomingEntries: [panwEntry],
+        fetchResults: resultAvailable, fetchCloses: closesThroughWednesday,
+      });
+      const panwAfterRun3 = run3.records.find((r) => r.ticker === "PANW");
+      assert(
+        panwAfterRun3?.status === "reportedAwaitingReaction",
+        `RUN 3: with the actuals known but the required next-session close not yet existing, PANW is 'reportedAwaitingReaction' – never prematurely 'reported' (got ${panwAfterRun3?.status})`
+      );
+      assert(
+        panwAfterRun3?.result?.actualEps === 1.08 && panwAfterRun3?.result?.epsSurprisePct !== null,
+        "RUN 3: actual EPS and a computed surprise% are stored immediately, without waiting for the reaction"
+      );
+      assert(
+        panwAfterRun3?.result?.reaction == null,
+        "RUN 3: the stock reaction stays null rather than being computed against a session that hasn't closed"
+      );
+      assert(
+        run3.coverage.resultsFound === 1 && run3.coverage.reactionsCalculated === 0,
+        "RUN 3: coverage reflects one result found and no reaction calculated yet"
+      );
+
+      // ----- RUN 3b: the next pre-market run, once the 27th has closed -----
+      const closesThroughThursday: ClosesFetcher = async () => ({
         value: [
           { date: "2026-08-25", close: 200 },
           { date: "2026-08-26", close: 202 },
@@ -1736,26 +1790,22 @@ async function runAsyncOnlyChecks(): Promise<void> {
         ],
         source: { source: "live" },
       });
-      const run3 = await runEarningsTracker({
-        filePath, now: new Date("2026-08-27T13:00:00.000Z"), upcomingEntries: [panwEntry],
-        fetchResults: resultAvailable, fetchCloses: fullCloses,
+      const run3b = await runEarningsTracker({
+        filePath, now: new Date("2026-08-28T13:00:00.000Z"), upcomingEntries: [panwEntry],
+        fetchResults: resultAvailable, fetchCloses: closesThroughThursday,
       });
-      const panwAfterRun3 = run3.records.find((r) => r.ticker === "PANW");
+      const panwAfterRun3b = run3b.records.find((r) => r.ticker === "PANW");
       assert(
-        panwAfterRun3?.status === "reported",
-        `RUN 3: PANW transitions to 'reported' once actuals AND the reaction are both available (got ${panwAfterRun3?.status})`
+        panwAfterRun3b?.status === "reported",
+        `RUN 3b: PANW completes to 'reported' on the next run, once the required session close genuinely exists (got ${panwAfterRun3b?.status})`
       );
       assert(
-        panwAfterRun3?.result?.actualEps === 1.08 && panwAfterRun3?.result?.epsSurprisePct !== null,
-        "RUN 3: actual EPS and a computed surprise% are stored"
+        panwAfterRun3b?.result?.reaction != null,
+        "RUN 3b: the stock reaction is calculated once sufficient market data exists"
       );
       assert(
-        panwAfterRun3?.result?.reaction != null,
-        "RUN 3: stock reaction is calculated once sufficient market data exists"
-      );
-      assert(
-        run3.coverage.resultsFound === 1 && run3.coverage.reactionsCalculated === 1,
-        "RUN 3: coverage reflects one result found with a calculated reaction"
+        run3b.coverage.resultsFound === 1 && run3b.coverage.reactionsCalculated === 1,
+        "RUN 3b: coverage reflects one result found with a calculated reaction"
       );
 
       // ----- RUN 4: fresh process again -----
@@ -1763,7 +1813,7 @@ async function runAsyncOnlyChecks(): Promise<void> {
         throw new Error("should not be called for an already-reported record");
       };
       const run4 = await runEarningsTracker({
-        filePath, now: new Date("2026-08-28T13:00:00.000Z"), upcomingEntries: [panwEntry], // Nasdaq might still list it briefly
+        filePath, now: new Date("2026-08-31T13:00:00.000Z"), upcomingEntries: [panwEntry], // Nasdaq might still list it briefly
         fetchResults: failIfCalled, fetchCloses: failIfCalled,
       });
       assert(run4.coverage.tracked === 1, "RUN 4: PANW is not re-added as a duplicate upcoming event – still exactly one tracked record");
@@ -1820,7 +1870,10 @@ async function runAsyncOnlyChecks(): Promise<void> {
         "Earnings Follow-up already shows the real EPS while explicitly marking the reaction as not yet available"
       );
 
-      // Wednesday: the next regular-session close now exists.
+      // Thursday pre-market: Wednesday's regular-session close now genuinely
+      // exists and is final. Note this is the THURSDAY run, not Wednesday's –
+      // a report generated at 16:00 Israel runs at 09:00 New York, before the
+      // US open, so Wednesday's own close is not available to Wednesday's run.
       const closesWithNextSession: ClosesFetcher = async () => ({
         value: [
           { date: "2026-08-24", close: 100 },
@@ -1833,7 +1886,7 @@ async function runAsyncOnlyChecks(): Promise<void> {
         throw new Error("actual figures should not be re-fetched once already known");
       };
       const nextDay = await runEarningsTracker({
-        filePath, now: new Date("2026-08-26T13:00:00.000Z"), upcomingEntries: [tuesdayEntry],
+        filePath, now: new Date("2026-08-27T13:00:00.000Z"), upcomingEntries: [tuesdayEntry],
         fetchResults: failIfResultsRefetched, fetchCloses: closesWithNextSession,
       });
       const recNextDay = nextDay.records.find((r) => r.ticker === "TESTCO");
@@ -1911,6 +1964,852 @@ async function runAsyncOnlyChecks(): Promise<void> {
       lines.some((l) => l.includes("Top Opportunities")) &&
       lines.some((l) => l.includes("Provider failures")),
     "formatReportHealth prints scheduled/actual/email timestamps, delay, Top Opportunities counts, and provider failure counts"
+  );
+
+  // ===== Section 5: Finnhub calls are throttled under its 60/min free tier.
+  // Company fundamentals moved off Alpha Vantage onto Finnhub, so a
+  // cold-cache run now makes ~3 Finnhub calls per stock with no daily budget
+  // guard in front of them. =====
+  {
+    const order: number[] = [];
+    const started: number[] = [];
+    const call = (id: number) =>
+      throttleFinnhub(async () => {
+        started.push(Date.now());
+        order.push(id);
+        return id;
+      });
+
+    const t0 = Date.now();
+    await Promise.all([call(1), call(2), call(3)]);
+    const elapsed = Date.now() - t0;
+
+    assert(
+      order.join(",") === "1,2,3",
+      `throttled Finnhub calls run strictly in submission order, never all at once (got ${order.join(",")})`
+    );
+    assert(
+      started.length === 3 && started[1] - started[0] >= 500 && started[2] - started[1] >= 500,
+      "consecutive Finnhub calls are spaced apart rather than fired in one burst"
+    );
+    assert(elapsed >= 1000, `three throttled calls take real time to drain (got ${elapsed}ms)`);
+
+    // A failed request still consumed quota, and must not wedge the queue.
+    let afterFailure = false;
+    await throttleFinnhub(async () => {
+      throw new Error("simulated Finnhub 429");
+    }).catch(() => undefined);
+    await throttleFinnhub(async () => {
+      afterFailure = true;
+    });
+    assert(afterFailure, "a rejected Finnhub call does not deadlock the throttle – later calls still run");
+  }
+}
+
+// ===== Section 4: US market calendar — full closures and early closes =====
+{
+  // Checked against the real published NYSE calendars for these years. The
+  // rules are derived, not hardcoded, so these assertions are what proves the
+  // derivation is right in years nobody has hand-entered.
+  const holidays2026 = usMarketHolidays(2026).map((h) => h.date);
+  const expected2026 = [
+    "2026-01-01", // New Year's Day (Thu)
+    "2026-01-19", // MLK — 3rd Monday
+    "2026-02-16", // Washington's Birthday — 3rd Monday
+    "2026-04-03", // Good Friday (Easter 2026-04-05)
+    "2026-05-25", // Memorial Day — last Monday
+    "2026-06-19", // Juneteenth (Fri)
+    "2026-07-03", // Independence Day: Jul 4 is a Saturday -> observed Friday
+    "2026-09-07", // Labor Day — 1st Monday
+    "2026-11-26", // Thanksgiving — 4th Thursday
+    "2026-12-25", // Christmas (Fri)
+  ];
+  assert(
+    holidays2026.join(",") === expected2026.join(","),
+    `the 2026 NYSE holiday calendar is derived correctly (got ${holidays2026.join(",")})`
+  );
+
+  // Weekend-observation rules, in both directions.
+  assert(usMarketHolidayName("2026-07-03") === "Independence Day", "a Saturday holiday is observed on the preceding Friday");
+  assert(usMarketHolidayName("2027-07-05") === "Independence Day", "a Sunday holiday is observed on the following Monday");
+  // New Year's Day is the documented exception: a Saturday Jan 1 does NOT
+  // close the market on the preceding Friday, which is in the previous year.
+  assert(!isUsMarketHoliday("2027-12-31"), "a Saturday New Year's Day does not close the market on the preceding Friday");
+
+  // Good Friday moves with Easter and must track it.
+  assert(isUsMarketHoliday("2025-04-18") && isUsMarketHoliday("2026-04-03") && isUsMarketHoliday("2027-03-26"),
+    "Good Friday is derived from Easter and is correct across years");
+
+  // This is the day the pipeline actually mailed a report for a market that
+  // never opened.
+  assert(isUsMarketHoliday("2026-09-07"), "2026-09-07 (Labor Day) is recognised as a full US market closure");
+  assert(!isUsTradingDay("2026-09-07"), "Labor Day is not a trading day");
+  assert(isUsTradingDay("2026-09-08"), "the day after a holiday is a normal trading day again");
+  assert(!isUsTradingDay("2026-09-05"), "a Saturday is not a trading day");
+
+  // Early closes are half-days, NOT closures.
+  assert(isUsEarlyCloseDay("2026-11-27"), "the Friday after Thanksgiving is an early-close day");
+  assert(isUsEarlyCloseDay("2026-12-24"), "Christmas Eve on a weekday is an early-close day");
+  assert(isUsTradingDay("2026-11-27"), "an early-close day is still a trading day – the market opens normally");
+  assert(usMarketCloseMinute("2026-11-27") === 13 * 60, "an early-close day closes at 13:00 ET");
+  assert(usMarketCloseMinute("2026-11-25") === 16 * 60, "a normal trading day closes at 16:00 ET");
+  // When Jul 4 falls on a Saturday, Jul 3 IS the holiday, so there is no
+  // early close that year — an early close and a closure cannot coexist.
+  assert(!isUsEarlyCloseDay("2026-07-03"), "when Jul 3 is itself the observed holiday it is not also an early-close day");
+  assert(isUsEarlyCloseDay("2025-07-03"), "Jul 3 is an early close when Jul 4 is a normal weekday");
+}
+
+// ===== Section 4: the report is not sent on a US market holiday =====
+{
+  // 13:00 UTC on Labor Day = 09:00 New York = normally a perfect pre-market
+  // slot. The only thing making this wrong is that the market never opens.
+  const onHoliday = classifyReportTiming({
+    now: new Date("2026-09-07T13:00:00Z"),
+    scheduledHourIsrael: 15,
+    scheduledMinuteIsrael: 58,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-07T13:00:00Z"),
+  });
+  assert(onHoliday.usMarketStateAtRun === "holiday", "a US market holiday is detected as its own market state, not as 'pre-market'");
+  assert(onHoliday.status === "skip", "no report is sent on a full US market holiday");
+  assert(onHoliday.reportLabel === "Report Skipped (US Market Holiday)", "the holiday skip is labelled distinctly from the stale/late skips");
+  assert(onHoliday.reasonHebrew.includes("Labor Day"), "the skip reason names the actual holiday");
+
+  // An early close must NOT suppress the pre-market report.
+  const onEarlyClose = classifyReportTiming({
+    now: new Date("2026-11-27T14:00:00Z"), // 09:00 New York on the Friday after Thanksgiving
+    scheduledHourIsrael: 15,
+    scheduledMinuteIsrael: 58,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-11-27T14:00:00Z"),
+  });
+  assert(onEarlyClose.usMarketStateAtRun === "pre-market", "an early-close day is still pre-market before the open – the report is valid");
+  assert(onEarlyClose.status !== "skip", "the pre-market report IS sent on an early-close day");
+
+  // ...but the shortened session must be reflected once it ends: 14:00 ET is
+  // open on a normal day and already closed on a half-day.
+  assert(usMarketState(new Date("2026-11-27T19:00:00Z")) === "after-hours", "at 14:00 ET an early-close day is correctly already after-hours");
+  assert(usMarketState(new Date("2026-11-25T19:00:00Z")) === "open", "at 14:00 ET a normal trading day is still open");
+
+  // A manual dispatch remains an explicit operator request and still bypasses.
+  const manualOnHoliday = classifyReportTiming({
+    now: new Date("2026-09-07T13:00:00Z"),
+    scheduledHourIsrael: 15,
+    scheduledMinuteIsrael: 58,
+    isManualRun: true,
+  });
+  assert(manualOnHoliday.status !== "skip", "a manual workflow_dispatch run still produces a report on a holiday – the operator asked for it deliberately");
+}
+
+// ===== Section 1/2: did the cron fire when we asked it to? =====
+//
+// The workflow now carries explicit UTC crons ('58 12' for IDT, '58 13' for
+// IST), both representing 15:58 Israel. This measures how far off the real
+// start was, and separates "GitHub was late" from "the off-season cron fired".
+{
+  // Dead on target in summer: 12:58 UTC = 15:58 IDT.
+  const onTarget = diagnoseSchedule({
+    workflowStartedAt: new Date("2026-09-10T12:58:00Z"),
+    targetHourIsrael: 15,
+    targetMinuteIsrael: 58,
+  });
+  assert(onTarget.verdict === "onTarget", `an on-time start is reported as onTarget (got ${onTarget.verdict})`);
+  assert(onTarget.delayMinutes === 0, `an on-time start has zero delay (got ${onTarget.delayMinutes})`);
+  assert(onTarget.startedIsraelDisplay === "15:58", "the Israel-time display resolves IDT correctly");
+
+  // The same nominal target in winter, via the other cron and a different UTC
+  // offset: 13:58 UTC = 15:58 IST. Must be equally on target.
+  const onTargetWinter = diagnoseSchedule({
+    workflowStartedAt: new Date("2026-01-14T13:58:00Z"),
+    targetHourIsrael: 15,
+    targetMinuteIsrael: 58,
+  });
+  assert(
+    onTargetWinter.verdict === "onTarget" && onTargetWinter.startedIsraelDisplay === "15:58",
+    `the IST cron hits the same Israel wall-clock target (got ${onTargetWinter.verdict} at ${onTargetWinter.startedIsraelDisplay})`
+  );
+
+  // The real run 35002540222 signature: created 17:38:36Z = 20:38 Israel.
+  const realLateRun = diagnoseSchedule({
+    workflowStartedAt: new Date("2026-09-15T17:38:36Z"),
+    targetHourIsrael: 15,
+    targetMinuteIsrael: 58,
+  });
+  assert(realLateRun.verdict === "late", `the real 20:38 start is reported as late (got ${realLateRun.verdict})`);
+  assert(realLateRun.delayMinutes === 280, `the real run was 280 minutes past target (got ${realLateRun.delayMinutes})`);
+  assert(
+    !realLateRun.looksLikeDstDrift,
+    "a 280-minute delay is scheduler lag, not the one-hour DST signature"
+  );
+
+  // Exactly one hour late during a changeover month: the off-season cron, not
+  // ordinary lag — the distinction the summary needs to name the right cause.
+  const dstLate = diagnoseSchedule({
+    // 2026-03-10 is before Israel's late-March DST switch, so this is IST:
+    // 13:58 UTC = 15:58 Israel, exactly 60 min past a 14:58 target.
+    workflowStartedAt: new Date("2026-03-10T13:58:00Z"),
+    targetHourIsrael: 14,
+    targetMinuteIsrael: 58,
+  });
+  assert(
+    dstLate.delayMinutes === 60 && dstLate.looksLikeDstDrift,
+    `an exactly-60-minute offset is flagged as DST drift (got delay=${dstLate.delayMinutes} drift=${dstLate.looksLikeDstDrift})`
+  );
+
+  // An hour EARLY is the other half of the same signature.
+  const dstEarly = diagnoseSchedule({
+    workflowStartedAt: new Date("2026-10-28T11:58:00Z"), // 13:58 IST, target 14:58
+    targetHourIsrael: 14,
+    targetMinuteIsrael: 58,
+  });
+  assert(
+    dstEarly.delayMinutes === -60 && dstEarly.looksLikeDstDrift && dstEarly.verdict === "early",
+    `an hour-early start is reported as early DST drift (got delay=${dstEarly.delayMinutes} verdict=${dstEarly.verdict})`
+  );
+
+  // Day-wrap: a start after local midnight is very late, never "early".
+  const postMidnight = diagnoseSchedule({
+    workflowStartedAt: new Date("2026-08-28T23:04:00Z"), // 02:04 Israel next day
+    targetHourIsrael: 15,
+    targetMinuteIsrael: 58,
+  });
+  assert(
+    postMidnight.verdict === "late" && postMidnight.delayMinutes > 600,
+    `a post-midnight start is reported as very late (got ${postMidnight.verdict} delay=${postMidnight.delayMinutes})`
+  );
+}
+
+// ===== Section 2/13: a run GitHub started hours late is not mailed at all,
+// even if the US market technically happens to still be open =====
+{
+  // 2026-09-09T19:30Z = 22:30 Israel = 15:30 New York – market still OPEN,
+  // so the market-state branch alone would have sent this as an "Intraday"
+  // report ~6.5 hours after the 16:00 target.
+  const veryLate = classifyReportTiming({
+    now: new Date("2026-09-09T19:30:00Z"),
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 0,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-09T19:30:00Z"),
+  });
+  assert(veryLate.usMarketStateAtRun === "open", "sanity: the US market really is still open at 22:30 Israel");
+  assert(veryLate.status === "skip", `a run ${veryLate.delayMinutes}min past the target is skipped, not mailed hours late`);
+  assert(veryLate.reportLabel === "Report Skipped (Too Late)", "the too-late skip is labeled distinctly from the after-hours stale skip");
+
+  // Just inside the 30-minute cap, still pre-market: must NOT be skipped.
+  // 13:20Z = 16:20 Israel = 20 minutes after the 16:00 target.
+  const tolerable = classifyReportTiming({
+    now: new Date("2026-09-09T13:20:00Z"),
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 0,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-09T13:20:00Z"),
+  });
+  assert(tolerable.status !== "skip", "a moderately late but still pre-market run is delivered, not skipped – the cap must not swallow normal delays");
+
+  // The exact shape of run 35002540222: GitHub created the job at 17:38:36Z =
+  // 20:38 Israel, 280 minutes after the 15:58 target. The US market was still
+  // open (13:38 New York), which is precisely why the deployed code relabeled
+  // it "Intraday Market Report" and mailed it at 20:41 as if it were the
+  // 16:00 report. The lateness cap must now win over the market-state branch.
+  const run35002540222 = classifyReportTiming({
+    now: new Date("2026-09-15T17:41:52Z"),
+    scheduledHourIsrael: 15,
+    scheduledMinuteIsrael: 58,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-15T17:38:36Z"),
+  });
+  assert(
+    run35002540222.usMarketStateAtRun === "open",
+    "sanity: the US market really was still open during run 35002540222"
+  );
+  assert(
+    run35002540222.status === "skip" && run35002540222.reportLabel === "Report Skipped (Too Late)",
+    `the real 20:38-Israel run is refused, not mailed as an Intraday report (got status=${run35002540222.status} label=${run35002540222.reportLabel} delay=${run35002540222.delayMinutes})`
+  );
+  assert(
+    run35002540222.delayMinutes === 280,
+    `the reported lateness is measured from the job start, not the send (got ${run35002540222.delayMinutes})`
+  );
+
+  // The off-season cron during a DST changeover month fires ~60 min early.
+  // It must be discarded, not delivered as an hour-early duplicate.
+  const offSeasonCron = classifyReportTiming({
+    now: new Date("2026-10-28T11:58:00Z"), // 13:58 Israel (IST) — 120 min early
+    scheduledHourIsrael: 15,
+    scheduledMinuteIsrael: 58,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-10-28T11:58:00Z"),
+  });
+  assert(
+    offSeasonCron.status === "skip" && offSeasonCron.reportLabel === "Report Skipped (Too Early)",
+    `a run that starts well before the target is refused as too early (got status=${offSeasonCron.status} label=${offSeasonCron.reportLabel} delay=${offSeasonCron.delayMinutes})`
+  );
+
+  // A run GitHub starts after local midnight is ~10 hours LATE, not ~14 hours
+  // early. Without the day-wrap correction the signed delay would read as a
+  // large negative number and be reported as the wrong failure entirely.
+  const afterMidnight = classifyReportTiming({
+    now: new Date("2026-09-09T23:04:00Z"), // 02:04 Israel the next day
+    scheduledHourIsrael: 15,
+    scheduledMinuteIsrael: 58,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-09T23:04:00Z"),
+  });
+  assert(
+    afterMidnight.delayMinutes > 0 && afterMidnight.reportLabel === "Report Skipped (Too Late)",
+    `a post-midnight start is classified as very late, not as early (got delay=${afterMidnight.delayMinutes} label=${afterMidnight.reportLabel})`
+  );
+
+  // Schedule delay is a property of when GitHub started us, NOT of how long
+  // generation took. Previously `now` was used for both, silently adding the
+  // whole pipeline duration to every reported delay.
+  const startedOnTime = classifyReportTiming({
+    now: new Date("2026-09-09T13:04:00Z"),        // send time: 16:04 Israel
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 0,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-09T13:00:00Z"), // job start: 16:00 Israel
+  });
+  assert(
+    startedOnTime.delayMinutes === 0,
+    `generation duration is not counted as schedule delay (got ${startedOnTime.delayMinutes}min)`
+  );
+}
+
+// ===== Section 6: missing OPTIONAL enrichment reduces confidence, it never
+// eliminates an otherwise valid, liquid candidate =====
+{
+  const liquidButUnenriched = makeStock({
+    ticker: "LIQ",
+    // Company identity and news both unavailable – the exact shape produced
+    // when the fundamentals/news provider is rate-limited. Price, volume and
+    // market cap (the CORE data) are all present and live.
+    profile: { symbol: "LIQ", marketCap: 50_000_000_000 },
+    profileSource: { source: "live" },
+    news: [],
+    newsSource: { source: "live" },
+  });
+  const dqUnenriched = computeDataQuality(liquidButUnenriched, "genuinelyMissing");
+  assert(!dqUnenriched.excluded, "a liquid, well-priced candidate is not excluded just because profile/news/technicals are missing");
+  assert(
+    dqUnenriched.label === "High" || dqUnenriched.label === "Medium",
+    `missing optional enrichment keeps the candidate recommendable (got label=${dqUnenriched.label}, coverage=${dqUnenriched.coverageScore})`
+  );
+  assert(dqUnenriched.confidenceScore < 100, "missing optional enrichment still costs confidence – it is never free");
+
+  const fullyEnriched = computeDataQuality(makeStock({ ticker: "FULL" }), "available");
+  assert(
+    fullyEnriched.confidenceScore > dqUnenriched.confidenceScore,
+    "a fully enriched candidate scores strictly higher confidence than an unenriched one"
+  );
+
+  // The whole point: it must actually survive into Top Opportunities.
+  const withDq = { ...liquidButUnenriched, dataQuality: dqUnenriched };
+  const built = buildTopOpportunities([withDq], 3);
+  assert(
+    built.topOpportunities.length === 1 && !built.emergencyModeActive,
+    "an otherwise valid liquid candidate with no company name still becomes a NORMAL Top Opportunity, not an emergency-mode fallback"
+  );
+
+  // ...while CORE data missing still gates strictly.
+  const noMarketCap = makeStock({
+    ticker: "NOCAP",
+    profile: { symbol: "NOCAP", name: "No Cap Inc" },
+    volume: 0,
+  });
+  const dqNoCore = computeDataQuality(noMarketCap, "available");
+  assert(dqNoCore.excluded, "core data (market cap + volume) genuinely missing still excludes the candidate – safety rules stay strict");
+}
+
+// ===== Section 6: "Top Opportunities: 0" always carries a counted reason ====
+{
+  const excludedStock = { ...makeStock({ ticker: "EX" }), dataQuality: makeDQ({ excluded: true, label: "Excluded" }) };
+  const lowStock = { ...makeStock({ ticker: "LOW" }), dataQuality: makeDQ({ excluded: false, label: "Low" }) };
+  const goodStock = { ...makeStock({ ticker: "OK" }), dataQuality: makeDQ({ excluded: false, label: "High" }) };
+  const counts = summarizeRejections([excludedStock, lowStock, goodStock]);
+  assert(counts.excludedByDataQuality === 1, "an excluded candidate is counted under excludedByDataQuality");
+  assert(counts.belowQualityLabel === 1, "a Low-label candidate is counted under belowQualityLabel");
+  assert(counts.rankedBelowCutoff === 1, "a qualifying candidate that simply ranked too low is counted separately, not as a data failure");
+  assert(
+    Object.values(counts).reduce((a, b) => a + b, 0) === 3,
+    "every non-selected candidate lands in exactly one rejection bucket – the funnel always adds up"
+  );
+}
+
+// ===== Section 12: Report Health records the full timing chain =====
+{
+  const timing = classifyReportTiming({
+    now: new Date("2026-09-09T13:04:00Z"),
+    scheduledHourIsrael: 16,
+    scheduledMinuteIsrael: 0,
+    isManualRun: false,
+    workflowStartedAt: new Date("2026-09-09T10:35:00Z"),
+  });
+  const health = buildReportHealth({
+    data: makeReportData({
+      generatedAt: "2026-09-09T13:03:00.000Z",
+      scanned: 60,
+      qualified: 17,
+      opportunityFunnel: {
+        candidatesEvaluated: 9,
+        topOpportunities: 2,
+        reducedConfidence: 0,
+        rejectionCounts: { belowQualityLabel: 4, rankedBelowCutoff: 3 },
+      },
+    }),
+    timing,
+    emailSentAtIso: "2026-09-09T13:04:00.000Z",
+    workflowStartedAtIso: "2026-09-09T10:35:00.000Z",
+    generationStartedAtIso: "2026-09-09T13:00:00.000Z",
+  });
+
+  assert(health.workflowStartedIsrael !== null && health.workflowStartedIsrael.includes("13:35"),
+    "Report Health records the instant GitHub actually started the job, separately from generation");
+  assert(health.reportGeneratedIsrael !== null && health.reportGeneratedIsrael.includes("16:03"),
+    "Report Health records when the report itself was generated");
+  assert(health.totalRuntimeSeconds === 240,
+    `Report Health records total runtime from generation start to email sent, excluding the delivery wait (got ${health.totalRuntimeSeconds})`);
+  assert(health.candidatesEvaluated === 9 && health.scanned === 60 && health.qualified === 17,
+    "Report Health carries the full Top Opportunities funnel, not just the final count");
+
+  const lines = formatReportHealth(health);
+  assert(lines.some((l) => l.includes("Workflow started")), "formatReportHealth prints the workflow start time");
+  assert(lines.some((l) => l.includes("Report generated")), "formatReportHealth prints the report generation time");
+  assert(lines.some((l) => l.includes("Total runtime")), "formatReportHealth prints total runtime");
+  assert(lines.some((l) => l.includes("Funnel:")), "formatReportHealth prints the scanned/qualified/evaluated funnel");
+  assert(lines.some((l) => l.includes("Rejection reasons")), "formatReportHealth prints why candidates were rejected");
+}
+
+// ===== Section 7: weak promotional / low-signal headlines are rejected,
+// without over-matching genuinely material news =====
+{
+  const headline = (title: string): NewsItem => makeNews({ title });
+
+  // Every one of these was observed leaking into a REAL generated report.
+  const mustReject: Array<[string, string]> = [
+    ["algorithmic move recap", "Amazon.com Inc Stock (AMZN) Moved Up by 3.69% on Aug 28: A Full Analysis"],
+    ["13F 'makes new investment'", "Leeward Financial Partners LLC Makes New Investment in Amazon.com, Inc. $AMZN"],
+    ["fund-manager trade disclosure", "Cathie Wood Buys $28.1 Million Worth of Meta Stock, Dumps Alphabet Shares"],
+    ["shareholder D&O complaint", "AI NEWS—W.D. Wash.: Complaint alleges Microsoft D&Os misled about AI strategy"],
+    ["13F 'takes position in'", "Private Advisory Group LLC Takes Position in Amazon.com, Inc. $AMZN"],
+    ["13F 'increases holdings'", "Vanguard Group Inc. Increases Holdings in NVIDIA"],
+    ["13F share sale by a bank", "Bank of Montreal Can Sells 1,200 Shares of Meta Platforms"],
+    ["named-manager portfolio move", "Cathie Wood’s ARK sells Alphabet stock, buys Meta and Beam Therapeutics"],
+    ["analyst-firm award PR", "Acme named a Leader in the 2026 Gartner Magic Quadrant"],
+    ["partner award PR", "Acme Wins Partner of the Year Award from Microsoft"],
+    ["corporate celebration PR", "Acme celebrates 25th anniversary with ribbon-cutting ceremony"],
+    ["employer-branding PR", "Acme recognized as one of the Best Places to Work in 2026"],
+  ];
+  for (const [label, title] of mustReject) {
+    assert(isPromotionalOrLegalNews(headline(title)), `${label} is rejected as weak/promotional news`);
+  }
+
+  // The other half of the requirement: the filter must not swallow real news.
+  // "wins an award" is promotional; "wins a contract" and "wins approval" are
+  // material, and they share the same verb.
+  const mustKeep: Array<[string, string, string]> = [
+    ["major contract", "contract", "Acme wins $2.4 billion Pentagon cloud contract"],
+    ["regulatory approval", "regulation", "Acme wins FDA approval for its lead cancer therapy"],
+    ["enforcement action", "regulation", "DOJ complaint alleges Acme violated antitrust law"],
+    ["enforcement investigation", "regulation", "DOJ opens investigation into Acme"],
+    ["M&A, all-cash phrasing", "ma", "Acme buys rival chipmaker for $8 billion"],
+    ["earnings + guidance", "earnings", "Acme raises full-year guidance after record quarterly earnings"],
+    ["management change", "management", "Acme CEO steps down; CFO named interim chief executive"],
+    ["product launch", "productStrategic", "Acme launches new AI inference platform"],
+    ["strategic partnership", "contract", "Acme Partners with Nvidia to build AI data centers"],
+    ["corporate division named 'Capital'", "earnings", "Acme Capital Markets reports record quarterly results"],
+    ["company's own divestiture + buyback", "productStrategic", "Acme sells its storage division, buys back $3 billion of stock"],
+  ];
+  for (const [label, expectedCategory, title] of mustKeep) {
+    assert(!isPromotionalOrLegalNews(headline(title)), `${label} is NOT rejected – the promotional filter must not swallow real news`);
+    const cat = materiality(headline(title)).category;
+    assert(cat === expectedCategory, `${label} is classified as "${expectedCategory}" (got "${cat}")`);
+  }
+
+  // Materiality must follow the requested priority order.
+  const w = (title: string) => materiality(headline(title)).weight;
+  assert(
+    w("Acme reports Q3 earnings, beats estimates") > w("Acme raises full-year outlook") &&
+      w("Acme raises full-year outlook") > w("Acme to acquire Beta Corp") &&
+      w("Acme to acquire Beta Corp") > w("Acme wins $2B contract") &&
+      w("Acme wins $2B contract") > w("Regulators fine Acme") &&
+      w("Regulators fine Acme") > w("Acme names new CEO") &&
+      w("Acme names new CEO") > w("Analyst raises Acme price target"),
+    "materiality is ranked earnings > guidance > M&A > contract > regulation > management > analyst action"
+  );
+
+  // Source quality must be a real ranking factor, with PR wires ranked below
+  // genuine financial reporting.
+  const src = (source: string, url = "https://example.com/a") => makeNews({ title: "Acme reports Q3 earnings", source, url });
+  assert(sourceQualityScore(src("Reuters")) > sourceQualityScore(src("Yahoo Finance")), "a top-tier financial wire outranks a general finance portal");
+  assert(sourceQualityScore(src("Yahoo Finance")) > sourceQualityScore(src("PR Newswire")), "genuine financial reporting outranks a press-release wire");
+  assert(
+    sourceQualityScore(src("The Globe and Mail", "https://theglobeandmail.com/investing/markets/pressreleases/1/")) ===
+      sourceQualityScore(src("PR Newswire")),
+    "a press-release URL is treated as promotional even when the host is a real newspaper"
+  );
+}
+
+// ===== Section 10: 50/200-day trend is computed from data we already have,
+// and is never faked from too little history =====
+{
+  const rising = Array.from({ length: 260 }, (_, i) => 100 + i * 0.5); // steadily up
+  const upTrend = movingAverageTrend(rising);
+  assert(upTrend !== null && upTrend.ma50 !== null && upTrend.ma200 !== null, "with a full year of closes, both the 50- and 200-day averages are computable");
+  assert(upTrend?.aboveMa50 === true && upTrend?.aboveMa200 === true, "a steadily rising series is correctly reported as above both moving averages");
+
+  const falling = Array.from({ length: 260 }, (_, i) => 300 - i * 0.5);
+  const downTrend = movingAverageTrend(falling);
+  assert(downTrend?.aboveMa50 === false && downTrend?.aboveMa200 === false, "a steadily falling series is correctly reported as below both moving averages");
+
+  // The important guard: sma() pads short slices, so a naive implementation
+  // would happily return a "200-day average" computed from 60 bars.
+  const short = Array.from({ length: 60 }, (_, i) => 100 + i);
+  const shortTrend = movingAverageTrend(short);
+  assert(shortTrend?.ma50 !== null && shortTrend?.ma50 !== undefined, "50 days of history is enough for a 50-day average");
+  assert(shortTrend?.ma200 === null, "60 bars never produce a '200-day' average – it stays null rather than being computed from a short slice");
+  assert(shortTrend?.aboveMa200 === null, "with no 200-day average there is no above/below claim either");
+
+  assert(movingAverageTrend([]) === null, "an empty price series yields no trend at all, not a crash");
+
+  assert(
+    trendLabelHebrew(upTrend) === "מעל MA50 · מעל MA200",
+    `the compact trend label renders both averages (got ${trendLabelHebrew(upTrend)})`
+  );
+  assert(trendLabelHebrew(shortTrend)?.includes("MA200") === false, "the label omits the 200-day average entirely when it isn't computable");
+  assert(trendLabelHebrew(null) === null, "no trend data means no label – the cell is omitted rather than showing a placeholder");
+}
+
+// ===== Section 5: every unavailable field carries an attributable CAUSE ====
+{
+  assert(providerForCacheKey("overview_AAPL") === "alphaVantage", "an OVERVIEW cache key is attributed to Alpha Vantage");
+  assert(providerForCacheKey("yahoo_daily_AAPL") === "yahoo", "a Yahoo cache key is attributed to Yahoo");
+  assert(providerForCacheKey("finnhub_earnings_result_AAPL_2026-09-01") === "finnhub", "a Finnhub cache key is attributed to Finnhub");
+  assert(providerForCacheKey("nasdaq_earnings_2026-09-01") === "nasdaq", "a Nasdaq cache key is attributed to Nasdaq");
+  assert(providerForCacheKey("movers") === "alphaVantage", "the bare 'movers' key is attributed to Alpha Vantage");
+
+  const breakdown = summarizeProviderFailures([
+    { provider: "alphaVantage", cause: "budgetSkipped", key: "overview_A" },
+    { provider: "alphaVantage", cause: "budgetSkipped", key: "overview_B" },
+    { provider: "alphaVantage", cause: "rateLimit", key: "overview_C" },
+    { provider: "finnhub", cause: "missingApiKey", key: "news_D" },
+  ]);
+  assert(breakdown.total === 4, "the ledger totals every recorded failure");
+  assert(
+    breakdown.byCause.budgetSkipped === 2 && breakdown.byCause.rateLimit === 1 && breakdown.byCause.missingApiKey === 1,
+    "a budget-skipped call, a rate limit and a missing API key are counted as THREE different causes, never lumped together"
+  );
+  assert(
+    breakdown.byProvider.alphaVantage === 3 && breakdown.byProvider.finnhub === 1,
+    "failures are simultaneously attributable by provider"
+  );
+}
+
+// ===== Section 3: an unrecognized provider timing must not pin a record in
+// "awaiting reaction" forever =====
+{
+  // Finnhub's `hour` parses to the literal string "unknown", never undefined,
+  // so a plain `??` fallback silently never fires.
+  assert(
+    resolveReportedTiming("unknown", "pre-market") === "pre-market",
+    "an 'unknown' provider timing falls back to the expected timing instead of overriding it"
+  );
+  assert(
+    resolveReportedTiming(undefined, "post-market") === "post-market",
+    "a missing provider timing falls back to the expected timing"
+  );
+  assert(
+    resolveReportedTiming("post-market", "pre-market") === "post-market",
+    "a KNOWN provider timing still wins over the expected timing – the provider is more authoritative once it reports"
+  );
+  assert(
+    resolveReportedTiming("unknown", "unknown") === "unknown",
+    "when neither source knows the timing, it stays 'unknown' – never guessed"
+  );
+}
+
+// ===== Section 3: never finalize a reaction against a session that is still
+// trading =====
+{
+  const closes: DatedClose[] = [
+    { date: "2026-09-08", close: 100 },
+    { date: "2026-09-09", close: 110 }, // "today" – still in progress while the market is open
+  ];
+  const duringSession = new Date("2026-09-09T17:00:00Z");  // 13:00 New York – OPEN
+  const afterSession = new Date("2026-09-09T21:00:00Z");   // 17:00 New York – closed
+
+  assert(
+    excludeUnsettledSession(closes, duringSession).length === 1,
+    "while the US session is still trading, that day's unsettled bar is dropped from the price history"
+  );
+  assert(
+    excludeUnsettledSession(closes, afterSession).length === 2,
+    "once the US session has closed, that day's bar is a real close and is kept"
+  );
+
+  assert(
+    computeEarningsReaction(closes, "2026-09-09", "pre-market", duringSession) === null,
+    "a pre-market earnings reaction is NOT finalized against an intraday price while the session is still open"
+  );
+  const settled = computeEarningsReaction(closes, "2026-09-09", "pre-market", afterSession);
+  assert(
+    settled !== null && settled.reactionPercent === 10,
+    "the same reaction IS computed once that session has actually closed"
+  );
+}
+
+// ===== Section 4: the tracker file can never be left half-written =====
+{
+  const tmpDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "tracker-atomic-"));
+  const file = path.join(tmpDir, "earnings-tracker.json");
+  const records: EarningsTrackingRecord[] = [
+    {
+      ticker: "PANW",
+      name: "Palo Alto Networks, Inc.",
+      earningsDate: "2026-09-01",
+      expectedTiming: "post-market",
+      status: "awaiting",
+      firstSeenAt: "2026-08-30T14:26:37.000Z",
+      lastSeenAt: "2026-08-30T14:26:37.000Z",
+    },
+  ];
+  saveTracker(records, file);
+  assert(!fs.existsSync(`${file}.tmp`), "saveTracker leaves no .tmp file behind – the rename completed");
+  assert(loadTracker(file).length === 1, "the atomically written tracker round-trips through loadTracker");
+
+  // Guard the real hazard: loadTracker swallows parse errors and returns [],
+  // so a torn write would silently erase all reported earnings history rather
+  // than failing loudly.
+  fs.writeFileSync(file, '[{"ticker":"PANW","earnings', "utf8");
+  assert(loadTracker(file).length === 0, "sanity: a truncated file really does read back as empty – which is exactly why the write must be atomic");
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+}
+
+// ===== Duplicate-send guard: one report per US trading date =====
+//
+// The external scheduler is a second system that can fire twice. GitHub's
+// `concurrency` group serializes runs but does not make them idempotent, so this
+// state file is what actually stops a second email.
+{
+  const tmpDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "report-state-"));
+  const file = path.join(tmpDir, "report-state.json");
+
+  // A missing file must read as "nothing sent", never as "already sent" – the
+  // safe direction is at worst one duplicate, never a permanently suppressed report.
+  assert(loadReportState(file).lastSentUsTradingDate === null, "a missing send-state file reads as 'nothing sent yet'");
+
+  saveReportState(
+    {
+      lastSentUsTradingDate: "2026-09-16",
+      lastSentAtIso: "2026-09-16T12:58:41.123Z",
+      lastSentMessageId: "<abc@mail>",
+      lastSentRunId: "35002540222",
+      lastSentEvent: "workflow_dispatch",
+    },
+    file
+  );
+  assert(!fs.existsSync(`${file}.tmp`), "saveReportState leaves no .tmp behind – the atomic rename completed");
+  const roundTripped = loadReportState(file);
+  assert(
+    roundTripped.lastSentUsTradingDate === "2026-09-16" && roundTripped.lastSentEvent === "workflow_dispatch",
+    "the send-state round-trips through save/load"
+  );
+
+  // The gate itself.
+  assert(
+    alreadySentForTradingDate("2026-09-16", "2026-09-16"),
+    "a second trigger on a trading date already sent is recognised as a duplicate"
+  );
+  assert(
+    !alreadySentForTradingDate("2026-09-15", "2026-09-16"),
+    "a new trading date is NOT treated as a duplicate – yesterday's send must not suppress today's report"
+  );
+  assert(
+    !alreadySentForTradingDate(null, "2026-09-16"),
+    "an empty state (first ever run, or an unreadable file) never suppresses the send"
+  );
+
+  // A corrupt file must not read as "already sent", which would silently stop
+  // the report going out for good.
+  fs.writeFileSync(file, '{"lastSentUsTradingDate":"2026-09-1', "utf8");
+  assert(
+    loadReportState(file).lastSentUsTradingDate === null,
+    "a torn/corrupt send-state file reads as 'nothing sent' rather than suppressing the report"
+  );
+  assert(parseReportState("not json at all").lastSentUsTradingDate === null, "unparseable send-state is tolerated");
+  assert(parseReportState(null).lastSentUsTradingDate === null, "absent send-state is tolerated");
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+}
+
+// ===== Performance state: a re-run must CONVERGE, not accumulate =====
+{
+  const tmpDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "perf-state-"));
+  const snapshot = {
+    tradingDate: "2026-09-16",
+    generatedAt: "2026-09-16T12:58:00.000Z",
+    market: "US" as const,
+    runDataQuality: 61,
+    freshness: "degraded" as const,
+    recommendationsThisRun: 3,
+    openCount: 5,
+    closedCount: 3,
+    winRate: 0.667,
+    avgReturnPct: 1.15,
+    calibrationError: 0.1,
+    avgConfidence: 0.59,
+  };
+
+  upsertRunSnapshot(tmpDir, snapshot);
+  upsertRunSnapshot(tmpDir, { ...snapshot, generatedAt: "2026-09-16T13:30:00.000Z", openCount: 6 });
+  const sameDay = loadRunSnapshots(tmpDir);
+  assert(
+    sameDay.length === 1,
+    `two runs on the same trading date leave exactly one trend snapshot, not two (got ${sameDay.length}) – this is what stops a double trigger permanently skewing the trend history`
+  );
+  assert(sameDay[0].openCount === 6, "the later run's snapshot replaces the earlier one for that trading date");
+
+  // A genuinely different trading date must still accumulate.
+  upsertRunSnapshot(tmpDir, { ...snapshot, tradingDate: "2026-09-17", generatedAt: "2026-09-17T12:58:00.000Z" });
+  const twoDays = loadRunSnapshots(tmpDir);
+  assert(twoDays.length === 2, `a new trading date appends a snapshot (got ${twoDays.length})`);
+  assert(
+    twoDays[0].tradingDate === "2026-09-16" && twoDays[1].tradingDate === "2026-09-17",
+    "trend snapshots stay ordered by trading date"
+  );
+
+  // Atomicity of the ledger write – the path that would otherwise silently
+  // discard the entire recommendation history on a torn write.
+  saveLedger(tmpDir, []);
+  assert(
+    !fs.existsSync(path.join(tmpDir, "performance", "ledger.json.tmp")),
+    "saveLedger leaves no .tmp behind – the atomic rename completed"
+  );
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+}
+
+// ===== Ledger ids stay unique even when a symbol closes and reopens same-day =====
+//
+// The id is `market:symbol@date`, which collides if a position closes and the
+// same symbol is recommended again on the same calendar day. Unreachable with one
+// run per day; reachable the moment an external scheduler double-fires.
+{
+  const closedSameDay = [
+    {
+      id: "US:MSFT@2026-09-16",
+      symbol: "MSFT",
+      score: 8,
+      confidence: 0.7,
+      entryPrice: 400,
+      dataQuality: 90,
+      action: "accumulate" as const,
+      horizonDays: 30,
+      market: "US" as const,
+      recommendedAt: "2026-09-16T06:00:00.000Z",
+      targetDate: "2026-10-16T06:00:00.000Z",
+      status: "closed" as const,
+    },
+  ];
+  const after = recordRecommendations(
+    closedSameDay,
+    "US",
+    [
+      {
+        symbol: "MSFT",
+        score: 9,
+        confidence: 0.8,
+        entryPrice: 420,
+        dataQuality: 95,
+        action: "accumulate",
+        horizonDays: 30,
+      },
+    ],
+    "2026-09-16T12:58:00.000Z"
+  );
+  assert(after.length === 2, "the symbol is re-opened after its earlier position closed");
+  assert(
+    new Set(after.map((r) => r.id)).size === after.length,
+    `ledger ids remain unique after a same-day close-and-reopen (got ${after.map((r) => r.id).join(", ")})`
+  );
+}
+
+// ===== The production-run gate lives in the workflow, so assert it there =====
+//
+// IS_PRODUCTION_RUN is defined in YAML on purpose: both the Node process and the
+// state-persistence step must agree on one answer, and deriving it twice is how a
+// test run ends up mailing the real distribution list and writing shared state.
+// That puts the single most safety-critical expression in the repo outside
+// TypeScript's reach, so it is pinned here as text instead of left unguarded.
+{
+  const wf = fs.readFileSync(path.join(".github", "workflows", "daily-stock-report.yml"), "utf8");
+
+  // --- the authorized external trigger ---
+  assert(/^\s*workflow_dispatch:/m.test(wf), "the workflow is triggerable by workflow_dispatch (the external scheduler's endpoint)");
+  assert(
+    !/^\s*repository_dispatch:/m.test(wf),
+    "no repository_dispatch TRIGGER remains – it would require a Contents: write PAT, which can push code and therefore read the email/API secrets"
+  );
+  assert(
+    /production_run:\s*\n\s*description:[\s\S]*?required:\s*false\s*\n\s*default:\s*false\s*\n\s*type:\s*boolean/.test(wf),
+    "production_run is declared with an explicit `default: false` and `type: boolean` – the default is what makes an unset value deterministic rather than empty"
+  );
+
+  // --- the production condition itself ---
+  const prodCondition = wf.match(/IS_PRODUCTION_RUN:\s*\$\{\{([\s\S]*?)\}\}/);
+  assert(!!prodCondition, "IS_PRODUCTION_RUN is defined once, at job level");
+  const cond = prodCondition![1].replace(/\s+/g, " ");
+  assert(
+    cond.includes("github.event_name == 'schedule'"),
+    `the native cron still counts as production during migration phase 1, so we never create a day with no scheduler (got: ${cond})`
+  );
+  assert(
+    cond.includes("github.event_name == 'workflow_dispatch'") && cond.includes("github.event.inputs.production_run == 'true'"),
+    `an external workflow_dispatch is production ONLY when production_run is the string 'true' (got: ${cond})`
+  );
+  assert(
+    !/&&\s*github\.event\.inputs\.production_run\s*\)/.test(wf),
+    "production_run is never used as a bare truthy value – a boolean input arrives as the STRING 'false', which is truthy, so a bare test would make every manual run production"
+  );
+
+  // --- a manual run cannot reach the real distribution list ---
+  assert(
+    /EMAIL_TO:\s*\$\{\{\s*github\.event\.inputs\.test_recipient\s*\|\|\s*secrets\.EMAIL_TO\s*\}\}/.test(wf),
+    "a test_recipient override replaces the real EMAIL_TO list"
+  );
+  assert(
+    /EMAIL_BCC:\s*\$\{\{\s*github\.event\.inputs\.test_recipient\s*&&\s*''\s*\|\|\s*secrets\.EMAIL_BCC\s*\}\}/.test(wf),
+    "a test_recipient override also empties EMAIL_BCC – otherwise a 'test' would still blind-copy the real distribution list"
+  );
+  assert(
+    /production_run == 'true'[\s\S]{0,160}test_recipient != ''/.test(wf),
+    "production_run combined with test_recipient is rejected – it would mail the test address and then record the trading date as delivered, suppressing the day's real report"
+  );
+
+  // --- state persistence is gated on the same single definition ---
+  assert(
+    /if:\s*always\(\)\s*&&\s*env\.IS_PRODUCTION_RUN\s*==\s*'true'/.test(wf),
+    "the persist step is gated on the same IS_PRODUCTION_RUN, not on a second, independently-derived condition"
+  );
+  for (const p of ["data/earnings-tracker.json", "data/report-state.json", "reports/performance"]) {
+    assert(wf.includes(`git add -- ${p}`), `the persist step stages ${p}`);
+  }
+  assert(
+    !/git add -- reports\/(daily-stock-report|latest|run-status|email-preview)/.test(wf),
+    "the persist step never stages generated report output – only rolling state"
+  );
+
+  // --- migration phase 1 must not leave a scheduler gap ---
+  assert(
+    /-\s*cron:\s*'58 12 \* 3-10 1-5'/.test(wf) && /-\s*cron:\s*'58 13 \* 1-3,10-12 1-5'/.test(wf),
+    "both seasonal production crons are still present during migration – they are the only delivery path until cron-job.org is proven"
+  );
+  assert(
+    /MAX_LATENESS_MINUTES:\s*"240"/.test(wf),
+    "the migration-phase lateness override is present, so cron runs still deliver while GitHub starts them 41–204 min late"
+  );
+  assert(
+    MAX_LATENESS_MINUTES === 30,
+    `the CODE default remains the intended production value of 30, so phase 2 is a YAML-only change (got ${MAX_LATENESS_MINUTES})`
   );
 }
 

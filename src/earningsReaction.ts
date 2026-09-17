@@ -1,5 +1,22 @@
+import { usMarketDateIso } from "./dateUtils";
 import { DatedClose } from "./marketData";
+import { usMarketState } from "./reportTiming";
 import { EarningsFigureStatus, EarningsReaction, EarningsTimingExpectation } from "./types";
+
+// Yahoo's daily series includes the CURRENT session as its last bar while
+// that session is still trading, and that bar's "close" is just the latest
+// intraday print. Finalizing a reaction against it would lock in a number
+// that is not a close at all – and the record is then marked "reported" and
+// never recomputed. Once the session has actually ended (or it's the
+// weekend) the last bar is a real close and is kept.
+export function excludeUnsettledSession(closes: DatedClose[], now: Date): DatedClose[] {
+  const state = usMarketState(now);
+  // No session in progress: today's bar (if any) is either a finished close
+  // or shouldn't exist at all. Only an actually-trading session is unsafe.
+  if (state === "after-hours" || state === "weekend" || state === "holiday") return closes;
+  const todayUs = usMarketDateIso(now);
+  return closes.filter((c) => c.date !== todayUs);
+}
 
 // ===== Stock reaction to an earnings report =====
 //
@@ -22,12 +39,15 @@ import { EarningsFigureStatus, EarningsReaction, EarningsTimingExpectation } fro
 export function computeEarningsReaction(
   closes: DatedClose[] | null | undefined,
   earningsDateIso: string,
-  timing: EarningsTimingExpectation
+  timing: EarningsTimingExpectation,
+  now: Date = new Date()
 ): EarningsReaction | null {
   if (timing === "unknown") return null;
   if (!closes || closes.length < 2) return null;
 
-  const sorted = dedupeSortedAscending(closes);
+  const settled = excludeUnsettledSession(closes, now);
+  if (settled.length < 2) return null;
+  const sorted = dedupeSortedAscending(settled);
 
   // The earnings-day trading reference: the first REAL trading day on or
   // after the nominal earnings date. Handles both a nominal date that itself

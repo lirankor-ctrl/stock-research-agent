@@ -1,4 +1,5 @@
 import axios from "axios";
+import { throttleFinnhub } from "./finnhubThrottle";
 import { EarningsTimingExpectation } from "./types";
 
 // ===== Actual reported earnings results =====
@@ -59,10 +60,12 @@ export async function fetchFinnhubEarningsResult(
   const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
   try {
-    const { data } = await axios.get(FINNHUB_EARNINGS_URL, {
-      timeout: 10000,
-      params: { symbol, from: ymd(from), to: ymd(to), token: apiKey },
-    });
+    const { data } = await throttleFinnhub(() =>
+      axios.get(FINNHUB_EARNINGS_URL, {
+        timeout: 10000,
+        params: { symbol, from: ymd(from), to: ymd(to), token: apiKey },
+      })
+    );
     const rows: any[] = Array.isArray(data?.earningsCalendar) ? data.earningsCalendar : [];
     return rows
       .map((r): EarningsResultRow | null => {

@@ -1,5 +1,13 @@
-import { isDirectlyAboutCompany, isPromotionalOrLegalNews, materiality } from "./newsFilter";
-import { EnrichedStock, MarketStory, NewsItem, ReportData } from "./types";
+import {
+  isDirectlyAboutCompany,
+  isPromotionalOrLegalNews,
+  materiality,
+  MaterialityCategory,
+  MATERIALITY_HEBREW,
+  sourceQualityScore,
+  sourceTier,
+} from "./newsFilter";
+import { EarningsCalendarEntry, EnrichedStock, MarketStory, NewsItem, ReportData } from "./types";
 import { watchlistName } from "./universe";
 
 // ===== helpers =====
@@ -92,16 +100,34 @@ function scoreNews(
   const hoursAgo = (now - date.getTime()) / 3_600_000;
   if (hoursAgo < 0 || hoursAgo > windowHours) return null; // not recent enough for this window
 
-  const relevance = item.relevanceScore ?? 0.3;
-  const impact = Math.min(Math.abs(item.sentimentScore ?? 0), 1);
   const recency = Math.max(0, 1 - hoursAgo / windowHours);
-  // Materiality boost ranked by category (earnings/guidance and M&A rank
+  // Materiality boost ranked by category (earnings/results and guidance rank
   // above a bare analyst price-target tweak) so genuinely material
   // developments win ties against generic market-noise headlines – never a
   // hard requirement, see newsFilter.ts's materiality().
   const materialityBoost = materiality(item).weight;
 
-  const score = relevance * 0.4 + impact * 0.35 + recency * 0.25 + materialityBoost;
+  // Scored as a weighted average over the factors that are ACTUALLY present,
+  // renormalized by the weights used. Relevance and sentiment are supplied by
+  // Alpha Vantage but not by Finnhub's free company-news endpoint; scoring a
+  // missing factor as a low default (the previous behaviour: relevance 0.3,
+  // impact 0) systematically ranked every Finnhub headline below every Alpha
+  // Vantage one regardless of the story itself. Renormalizing removes that
+  // provider bias without fabricating scores Finnhub never sent.
+  const factors: Array<{ value: number; weight: number }> = [
+    { value: recency, weight: 0.22 },
+    { value: sourceQualityScore(item), weight: 0.15 },
+  ];
+  if (item.relevanceScore !== undefined) {
+    factors.push({ value: Math.min(Math.max(item.relevanceScore, 0), 1), weight: 0.35 });
+  }
+  if (item.sentimentScore !== undefined) {
+    factors.push({ value: Math.min(Math.abs(item.sentimentScore), 1), weight: 0.28 });
+  }
+  const totalWeight = factors.reduce((acc, f) => acc + f.weight, 0);
+  const base = factors.reduce((acc, f) => acc + f.value * f.weight, 0) / totalWeight;
+
+  const score = base + materialityBoost;
   return { stock, item, date, score };
 }
 
@@ -113,43 +139,143 @@ function sentimentHebrew(item: NewsItem): string {
   return "ניטרלי";
 }
 
+// Numbers that appear in the headline itself (percentages, dollar amounts,
+// explicit figures) – quoted back verbatim so "what happened" carries the
+// actual facts rather than a paraphrase. Never computed or inferred.
+function headlineFigures(title: string): string[] {
+  const found = title.match(/\$\s?[\d.,]+\s*(?:billion|million|bn|m\b)?|\b\d+(?:\.\d+)?%/gi) ?? [];
+  return Array.from(new Set(found.map((f) => f.trim()))).slice(0, 4);
+}
+
+// ===== WHAT HAPPENED =====
 function buildSummaryHebrew(s: ScoredNews): string {
   const name = displayName(s.stock);
   const sector = s.stock.profile?.industry || s.stock.profile?.sector;
-  const tone = sentimentHebrew(s.item);
+  const cat = materiality(s.item).category;
+  const tier = sourceTier(s.item);
   const sentences: string[] = [];
 
   sentences.push(
-    `${name} (${s.stock.ticker})${sector ? ` מסקטור ${sector}` : ""} בכותרות היום.`
+    `${name} (${s.stock.ticker})${sector ? ` מסקטור ${sector}` : ""} – ${MATERIALITY_HEBREW[cat]}.`
   );
-  sentences.push(`הידיעה המרכזית: "${s.item.title}" (מקור: ${s.item.source}).`);
-  sentences.push(`הסנטימנט שזוהה בכתבה הוא ${tone}.`);
+  sentences.push(`הידיעה: "${s.item.title}" (${s.item.source}, ${fmtPublished(s.date)}).`);
 
-  if (s.stock.price > 0) {
-    const dir = s.stock.changePercent >= 0 ? "עלתה" : "ירדה";
-    sentences.push(
-      `המניה ${dir} ב-${Math.abs(s.stock.changePercent).toFixed(2)}% ונסחרת סביב $${s.stock.price.toFixed(2)}.`
-    );
+  const figures = headlineFigures(s.item.title);
+  if (figures.length > 0) {
+    sentences.push(`נתונים שמופיעים בכותרת: ${figures.join(" · ")}.`);
   }
-
-  sentences.push("לפרטים המלאים יש לעיין במקור המקושר – אין לראות בכך ייעוץ השקעות.");
+  if (tier === "promotional") {
+    sentences.push("הידיעה הגיעה דרך ערוץ הודעות לעיתונות של החברה – מקור מעניין אך לא בלתי-תלוי.");
+  }
   return sentences.join(" ");
 }
 
-function buildWhyMattersHebrew(s: ScoredNews): string {
-  // Anchor on the stock's existing long-term rationale, then connect the news.
-  const base = s.stock.longTermWhyHebrew?.trim();
-  const tone = sentimentHebrew(s.item);
-  const newsAngle =
-    tone === "חיובי"
-      ? "זרם חדשות חיובי עשוי לחזק את התזה ארוכת-הטווח, אך יש לאמת שהשיפור מבני ולא רעש קצר-טווח."
-      : tone === "שלילי"
-      ? "חדשות שליליות עשויות ליצור הזדמנות כניסה אם היסודות נותרו איתנים – או להיות סימן אזהרה; נדרשת בדיקה."
-      : "ללא הטיה סנטימנטלית חזקה, הערך למשקיע ארוך-טווח תלוי ביסודות החברה יותר מבכותרת הבודדת.";
-  return base ? `${base} ${newsAngle}` : newsAngle;
+// ===== MARKET REACTION =====
+// Reports the move that was actually measured, and explicitly declines to
+// attribute it to the story. A headline appearing on the same day as a price
+// move is not evidence that it caused it.
+function buildMarketReactionHebrew(s: ScoredNews): string {
+  if (!(s.stock.price > 0)) {
+    return "לא נרשם מחיר עדכני זמין למניה בזמן הפקת הדוח, ולכן לא ניתן להציג את תגובת השוק.";
+  }
+  const dir = s.stock.changePercent >= 0 ? "עלתה" : "ירדה";
+  const move = Math.abs(s.stock.changePercent).toFixed(2);
+  const parts = [
+    `המניה ${dir} ב-${move}% ונסחרת סביב $${s.stock.price.toFixed(2)}.`,
+  ];
+  if (s.stock.volume > 0) {
+    parts.push(`המחזור עמד על כ-${(s.stock.volume / 1_000_000).toFixed(1)}M מניות.`);
+  }
+  parts.push("הקשר הסיבתי בין הידיעה לתנועת המחיר לא אומת – מדובר בשני נתונים שנצפו באותו יום.");
+  return parts.join(" ");
 }
 
-function toMarketStory(s: ScoredNews, isFallback: boolean): MarketStory {
+// ===== WHY IT MATTERS =====
+// Grounded in the KIND of event that actually happened plus this company's
+// own verified numbers. Deliberately does NOT seed from
+// explainLongTermWhyHebrew: that produces generic index-membership /
+// market-cap-stability / growth-sector boilerplate which says nothing about
+// today's event and was appearing verbatim as the explanation for it.
+const WHY_BY_CATEGORY: Record<MaterialityCategory, string> = {
+  earnings:
+    "תוצאות בפועל הן הנתון היחיד שמאמת או מפריך את התזה – הן קובעות את קצב הצמיחה והרווחיות שהשוק מתמחר קדימה.",
+  guidance:
+    "עדכון תחזית משנה את הציפיות העתידיות, ולרוב משפיע על התמחור יותר מהרבעון שכבר דווח.",
+  ma: "מיזוג או רכישה משנים את מבנה החברה, את הקצאת ההון ואת תמונת התחרות – השפעה מבנית ולא רבעונית.",
+  contract:
+    "חוזה או שותפות מהותית מתורגמים להכנסות עתידיות, ומעידים על מיצוב תחרותי מול לקוחות גדולים.",
+  regulation:
+    "התפתחות רגולטורית או משפטית יכולה להגביל מודל עסקי או ליצור חשיפה כספית – סיכון שאינו מופיע בדוחות הרבעוניים.",
+  management:
+    "חילופי הנהלה בכירה משפיעים על אסטרטגיה והמשכיות ניהולית, במיוחד כשהם לא מתוכננים.",
+  analystAction:
+    "עדכון אנליסטים משקף שינוי בציפיות השוק, אך אינו נתון עסקי של החברה עצמה – משקל מוגבל בתזה ארוכת טווח.",
+  productStrategic:
+    "מהלך מוצרי או אסטרטגי מעיד על כיוון ההשקעה של החברה ועל מקורות הצמיחה שהיא מכוונת אליהם.",
+  marketImpact:
+    "מדובר בתנועה רוחבית בשוק ולא באירוע ספציפי לחברה – ההשפעה על התזה הפרטנית מוגבלת.",
+  none: "לא זוהתה קטגוריית אירוע מובהקת, ולכן המשקל של הידיעה בתזה ארוכת הטווח מוגבל.",
+};
+
+function buildWhyMattersHebrew(s: ScoredNews): string {
+  const cat = materiality(s.item).category;
+  const parts: string[] = [WHY_BY_CATEGORY[cat]];
+
+  // One concrete, verified company fact tied to the event – never a generic
+  // "large cap provides stability" line.
+  const p = s.stock.profile;
+  if (cat === "earnings" || cat === "guidance") {
+    if (p?.eps !== undefined) {
+      parts.push(
+        p.eps > 0
+          ? `נקודת הייחוס: החברה רווחית כיום (EPS ${p.eps.toFixed(2)})${p.profitMargin !== undefined ? `, שולי רווח כ-${(p.profitMargin * 100).toFixed(0)}%` : ""}.`
+          : `נקודת הייחוס: החברה עדיין לא רווחית (EPS ${p.eps.toFixed(2)}), ולכן לתוצאות משקל גבוה במיוחד.`
+      );
+    }
+    if (p?.peRatio !== undefined && p.peRatio > 0) {
+      parts.push(`המכפיל הנוכחי עומד על כ-${p.peRatio.toFixed(1)}, והוא זה שנבחן מול התוצאות.`);
+    }
+  } else if (p?.marketCap !== undefined && (cat === "ma" || cat === "contract" || cat === "regulation")) {
+    parts.push(
+      `סדר הגודל הרלוונטי: שווי שוק של כ-$${(p.marketCap / 1_000_000_000).toFixed(1)}B, שמולו יש למדוד את היקף האירוע.`
+    );
+  }
+
+  return parts.join(" ");
+}
+
+// ===== WHAT TO WATCH NEXT =====
+// Prefers a real, verified date from the earnings calendar. Falls back to the
+// concrete open question implied by the event category. Never invents a date.
+const WATCH_BY_CATEGORY: Record<MaterialityCategory, string> = {
+  earnings: "האם קצב הצמיחה והשוליים שדווחו יישמרו ברבעון הבא, ומה תהיה התחזית שתלווה אותו.",
+  guidance: "האם התחזית המעודכנת תאושר בתוצאות בפועל, או תעודכן שוב.",
+  ma: "אישורים רגולטוריים, מועד ההשלמה בפועל, ותנאי המימון של העסקה.",
+  contract: "מתי ההכנסות מהחוזה יתחילו להיכנס לדוחות, והאם ייחתמו חוזים דומים נוספים.",
+  regulation: "לוח הזמנים של ההליך, החלטות ביניים, וההיקף הכספי שייקבע בסופו.",
+  management: "מינוי הקבוע לתפקיד והאם האסטרטגיה המוצהרת משתנה בעקבותיו.",
+  analystAction: "האם בתי השקעות נוספים יעדכנו את המלצותיהם באותו כיוון.",
+  productStrategic: "קצב האימוץ בפועל והשפעתו על ההכנסות ברבעונים הקרובים.",
+  marketImpact: "נתוני מאקרו והחלטות ריבית שימשיכו להניע את המגמה הרוחבית.",
+  none: "התפתחויות מהותיות נוספות שיבססו או יסתרו את הידיעה.",
+};
+
+function buildWhatToWatchHebrew(s: ScoredNews, calendar: EarningsCalendarEntry[]): string {
+  const cat = materiality(s.item).category;
+  const parts: string[] = [];
+
+  const upcoming = calendar.find((e) => e.ticker === s.stock.ticker && e.daysRemaining >= 0);
+  if (upcoming) {
+    const timing = upcoming.timeOfDay === "pre-market" ? " (לפני הפתיחה)" : upcoming.timeOfDay === "post-market" ? " (אחרי הסגירה)" : "";
+    parts.push(
+      `קטליזטור מאומת בלוח השנה: דוח כספי ב-${upcoming.reportDate}${timing}, בעוד ${upcoming.daysRemaining} ימים.`
+    );
+  }
+  parts.push(WATCH_BY_CATEGORY[cat]);
+  return parts.join(" ");
+}
+
+function toMarketStory(s: ScoredNews, isFallback: boolean, calendar: EarningsCalendarEntry[]): MarketStory {
   return {
     ticker: s.stock.ticker,
     companyName: displayName(s.stock),
@@ -160,7 +286,9 @@ function toMarketStory(s: ScoredNews, isFallback: boolean): MarketStory {
     publishedDisplay: fmtPublished(s.date),
     sentimentLabel: s.item.sentimentLabel,
     summaryHebrew: buildSummaryHebrew(s),
+    marketReactionHebrew: buildMarketReactionHebrew(s),
     whyMattersHebrew: buildWhyMattersHebrew(s),
+    whatToWatchHebrew: buildWhatToWatchHebrew(s, calendar),
     originalSummary: s.item.summary,
     priceMove: s.stock.price > 0 ? { price: s.stock.price, changePercent: s.stock.changePercent } : undefined,
     // No safe/licensed logo source is wired in, so renderers use the ticker
@@ -246,7 +374,9 @@ export function selectMarketStory(
   windowHours: number = PRIMARY_WINDOW_HOURS
 ): MarketStory | null {
   const candidates = scoreAllCandidates(data, nowMs, windowHours);
-  return candidates.length > 0 ? toMarketStory(candidates[0], windowHours > PRIMARY_WINDOW_HOURS) : null;
+  return candidates.length > 0
+    ? toMarketStory(candidates[0], windowHours > PRIMARY_WINDOW_HOURS, data.earningsCalendar ?? [])
+    : null;
 }
 
 // Up to `count` more relevant, distinct-ticker headlines beyond the hero
@@ -260,8 +390,9 @@ export function selectAdditionalHeadlines(
   const candidates = scoreAllCandidates(data, nowMs, windowHours);
   if (candidates.length === 0) return [];
   const [hero, ...rest] = candidates;
+  const calendar = data.earningsCalendar ?? [];
   return rest
     .filter((c) => c.stock.ticker !== hero.stock.ticker)
     .slice(0, count)
-    .map((c) => toMarketStory(c, windowHours > PRIMARY_WINDOW_HOURS));
+    .map((c) => toMarketStory(c, windowHours > PRIMARY_WINDOW_HOURS, calendar));
 }

@@ -2,7 +2,7 @@ import "dotenv/config";
 import { categorize } from "./categorizer";
 import { computeDataQuality, dataQualityDebugSummary } from "./dataQuality";
 import { getTopMovers } from "./dataSources";
-import { buildTopOpportunities, EMERGENCY_MODE_LABEL, explainTopOpportunityRejection } from "./emergencyMode";
+import { buildTopOpportunities, EMERGENCY_MODE_LABEL, explainTopOpportunityRejection, summarizeRejections } from "./emergencyMode";
 import {
   buildSkeletonEnriched,
   buildWatchlistStocks,
@@ -25,7 +25,7 @@ import { buildOpportunityThesis } from "./opportunityThesis";
 import { preRank } from "./ranker";
 import { computeReportQuality, evaluateSendGate, formatReportQuality, formatSendGate, SEND_THRESHOLD } from "./reportQuality";
 import { generateDiagnosticReport, generateReport, writeReport } from "./reportGenerator";
-import { buildTechnicalAlerts, resolveTechnicalWatchPrice, technicalStatusHebrew } from "./technicalAlerts";
+import { buildTechnicalAlerts, resolveTechnicalWatchPrice, technicalStatusHebrew, trendLabelHebrew } from "./technicalAlerts";
 import { WATCHLIST, watchlistName } from "./universe";
 import { buildWeekAhead } from "./weekAhead";
 import {
@@ -217,7 +217,16 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   // Bollinger Bands + RSI, computed LOCALLY from Yahoo Finance daily closes –
   // independent of Alpha Vantage, never touches the AV daily-call budget.
   log("📊 [4/5] Computing technicals locally (Yahoo daily closes → RSI/Bollinger)...");
-  const technicalUniverse = [...watchlist, ...cats.core, ...cats.growth, ...cats.speculative];
+  // Deduplicated by ticker: a watchlist name is normally ALSO in core/growth,
+  // so the naive concatenation counted it twice. techResult.available is a Set
+  // of unique tickers, so comparing it against the non-deduped length reported
+  // technical coverage as roughly half its real value (10/19 for 10 unique
+  // names, all of which succeeded) and dragged down the Report Quality Score.
+  const technicalUniverse = Array.from(
+    new Map(
+      [...watchlist, ...cats.core, ...cats.growth, ...cats.speculative].map((s) => [s.ticker, s])
+    ).values()
+  );
   const techResult = await buildTechnicalAlerts(technicalUniverse, {
     onProgress: (m) => log(m),
   });
@@ -273,15 +282,28 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   // Rejection reasons for the top 10 ranked candidates that did NOT become a
   // normal Top Opportunity – "Top Opportunities: none" must never be a
   // silent mystery when candidates were actually scanned and qualified.
-  const topRankedNotSelected = rankedCandidates
-    .filter((s) => !topOpportunities.includes(s))
-    .slice(0, 10);
+  const allNotSelected = rankedCandidates.filter((s) => !topOpportunities.includes(s));
+  const topRankedNotSelected = allNotSelected.slice(0, 10);
   if (topRankedNotSelected.length > 0) {
     log(`   🔎 Rejection reasons for top ${topRankedNotSelected.length} ranked candidates not in Top Opportunities:`);
     for (const s of topRankedNotSelected) {
       log(`      ${s.ticker.padEnd(6)} score=${s.finalScore.toFixed(1)} – ${explainTopOpportunityRejection(s)}`);
     }
   }
+  // Counted across EVERY non-selected candidate, not just the printed top 10,
+  // so the Report Health totals actually add up to the funnel.
+  const rejectionCounts = summarizeRejections(allNotSelected);
+  const opportunityFunnel = {
+    candidatesEvaluated: rankedCandidates.length,
+    topOpportunities: topOpportunities.length,
+    reducedConfidence: emergencyWatch.length,
+    rejectionCounts,
+  };
+  log(
+    `   funnel: scanned=${scanned} · qualified=${qualified} · evaluated=${rankedCandidates.length} · ` +
+      `top=${topOpportunities.length} · reduced=${emergencyWatch.length} · ` +
+      `rejections[${Object.entries(rejectionCounts).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(" ") || "none"}]`
+  );
 
   // Technical Watch – one compact row per tracked watchlist stock. When the
   // live/cached quote is unavailable but RSI/Bollinger were still computed
@@ -299,6 +321,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
       isLastClose: resolved.isLastClose,
       rsi14: rec?.rsi14 ?? null,
       statusHebrew: technicalStatusHebrew(s.ticker, technicalAlerts),
+      trendHebrew: trendLabelHebrew(rec?.trend),
     };
   });
 
@@ -441,7 +464,14 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     `   market overview: ${marketOverview.filter((i) => i.value !== null).length}/${marketOverview.length} indicators with a value`
   );
 
-  const weekAhead = buildWeekAhead(earningsCalendarRes, economicReadings);
+  // Built from the FILTERED calendar, exactly like marketCatalyst above.
+  // earningsCalendarRes.entries is the pre-tracking list, so passing it
+  // directly let a company that has already reported resurface under
+  // "This Week To Watch" as if it were still upcoming.
+  const weekAhead = buildWeekAhead(
+    { ...earningsCalendarRes, entries: earningsCalendar },
+    economicReadings
+  );
 
   // Structured, non-generic thesis per Top Opportunity (Priority 5) – every
   // field is built from that stock's own real numbers.
@@ -468,6 +498,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
     status,
     scanned,
     qualified,
+    opportunityFunnel,
     fearGreed,
     earningsCalendar,
     earningsCalendarStatus: earningsCalendarRes.status,

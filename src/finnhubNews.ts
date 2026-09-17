@@ -1,4 +1,5 @@
 import axios from "axios";
+import { throttleFinnhub } from "./finnhubThrottle";
 import { NewsItem } from "./types";
 
 // Alternative news provider tried BEFORE Alpha Vantage's NEWS_SENTIMENT (see
@@ -29,10 +30,12 @@ export async function fetchFinnhubCompanyNews(symbol: string, lookbackDays = 5):
   const from = new Date(to.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
 
   try {
-    const { data } = await axios.get(FINNHUB_NEWS_URL, {
-      timeout: 10000,
-      params: { symbol, from: ymd(from), to: ymd(to), token: apiKey },
-    });
+    const { data } = await throttleFinnhub(() =>
+      axios.get(FINNHUB_NEWS_URL, {
+        timeout: 10000,
+        params: { symbol, from: ymd(from), to: ymd(to), token: apiKey },
+      })
+    );
     const rows: any[] = Array.isArray(data) ? data : [];
     return rows
       .filter((r) => r.headline && r.url && typeof r.datetime === "number")
@@ -43,8 +46,12 @@ export async function fetchFinnhubCompanyNews(symbol: string, lookbackDays = 5):
         publishedAt: toAlphaTimestamp(r.datetime),
         summary: r.summary ? String(r.summary) : undefined,
         // Finnhub's free company-news endpoint carries no sentiment/relevance
-        // scoring – left undefined rather than fabricated; scoreNews() in
-        // marketStory.ts already has honest defaults for both.
+        // scoring – left undefined rather than fabricated. scoreNews() in
+        // marketStory.ts renormalizes over whichever factors are actually
+        // present, so an absent score is NOT treated as a low score: scoring
+        // these as defaults (0.3 relevance / 0 impact) previously ranked every
+        // Finnhub headline below every Alpha Vantage one on provider identity
+        // alone, regardless of the story.
         sentimentScore: undefined,
         sentimentLabel: undefined,
         relevanceScore: undefined,

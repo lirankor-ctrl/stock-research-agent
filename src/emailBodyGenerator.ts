@@ -202,7 +202,9 @@ function htmlMarketStory(story: MarketStory | null): string {
     <div style="font-size:12px;color:${PALETTE.muted};margin-bottom:10px;">${esc(story.source)} · ${ltr(esc(story.publishedDisplay))}</div>
     ${story.isFallback ? `<div style="font-size:11.5px;color:${PALETTE.amber};font-weight:700;margin-bottom:8px;">⚠️ ${esc(FALLBACK_NOTICE)}</div>` : ""}
     <div style="margin-bottom:8px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">מה קרה</strong><br><span style="font-size:13.5px;">${esc(story.summaryHebrew)}</span></div>
-    <div style="margin-bottom:10px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">למה זה חשוב</strong><br><span style="font-size:13.5px;">${esc(story.whyMattersHebrew)}</span></div>
+    <div style="margin-bottom:8px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">תגובת השוק</strong><br><span style="font-size:13.5px;">${esc(story.marketReactionHebrew)}</span></div>
+    <div style="margin-bottom:8px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">למה זה חשוב</strong><br><span style="font-size:13.5px;">${esc(story.whyMattersHebrew)}</span></div>
+    <div style="margin-bottom:10px;"><strong style="font-size:12.5px;color:${PALETTE.navy};">מה לעקוב הלאה</strong><br><span style="font-size:13.5px;">${esc(story.whatToWatchHebrew)}</span></div>
     <a href="${esc(story.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${PALETTE.navyAccent};color:#ffffff;font-weight:700;font-size:12.5px;text-decoration:none;padding:8px 16px;border-radius:999px;">Read full article</a>`;
   return sectionWrap(`${h("Market Story of the Day")}${card(inner)}`);
 }
@@ -278,7 +280,11 @@ function htmlTechnicalWatch(items: ReportData["technicalWatch"], dataUnavailable
         <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:13px;"><strong style="color:${PALETTE.navy};">${ltr(esc(i.ticker))}</strong></td>
         <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:13px;">${priceCell}</td>
         <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:12.5px;">${esc(rsi)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:12.5px;">${esc(i.statusHebrew)}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid ${PALETTE.border};font-size:12.5px;">${esc(i.statusHebrew)}${
+          i.trendHebrew
+            ? `<div style="font-size:11px;color:${PALETTE.muted};margin-top:3px;">${esc(i.trendHebrew)}</div>`
+            : ""
+        }</td>
       </tr>`;
     })
     .join("");
@@ -653,8 +659,10 @@ function textMarketStory(story: MarketStory | null): string {
   ${story.ticker} – ${story.companyName}
   "${story.headline}"
   🗞️ ${story.source} · 🕒 ${story.publishedDisplay}${fallbackLine}
-  ${story.summaryHebrew}
-  למה זה חשוב למשקיע לטווח ארוך: ${story.whyMattersHebrew}
+  מה קרה: ${story.summaryHebrew}
+  תגובת השוק: ${story.marketReactionHebrew}
+  למה זה חשוב: ${story.whyMattersHebrew}
+  מה לעקוב הלאה: ${story.whatToWatchHebrew}
   🔗 ${story.url}`;
 }
 
@@ -678,7 +686,7 @@ function textTechnicalWatch(items: ReportData["technicalWatch"], dataUnavailable
   const lines = items
     .map((i) => {
       const priceLabel = i.price > 0 ? `${fmtPrice(i.price)}${i.isLastClose ? " (Last close)" : ""}` : "Price unavailable";
-      return `  • ${i.ticker} – ${priceLabel} · ${i.statusHebrew}`;
+      return `  • ${i.ticker} – ${priceLabel} · ${i.statusHebrew}${i.trendHebrew ? ` · ${i.trendHebrew}` : ""}`;
     })
     .join("\n");
   return `📊 Technical Watch:\n${lines}`;

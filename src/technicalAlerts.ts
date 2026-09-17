@@ -1,5 +1,5 @@
 import { getYahooDailyCloses } from "./dataSources";
-import { computeTechnicals } from "./technicals";
+import { computeTechnicals, movingAverageTrend, MovingAverageTrend } from "./technicals";
 import { watchlistName } from "./universe";
 import {
   BandProximity,
@@ -40,6 +40,21 @@ export interface TechnicalRecord {
   lower: number;
   rsi14: number;
   widthChangePct: number | null;
+  // Long-term trend context for the Technical Watch row. Computed from the
+  // SAME Yahoo daily-close series that already produces RSI/Bollinger – no
+  // extra call, no new provider. Null when the series is genuinely too short.
+  trend?: MovingAverageTrend | null;
+}
+
+// Compact Hebrew label for the moving-average trend, e.g. "מעל 50 ו-200".
+// Returns null when neither average is computable, so the caller can omit the
+// cell entirely rather than print a placeholder.
+export function trendLabelHebrew(trend: MovingAverageTrend | null | undefined): string | null {
+  if (!trend) return null;
+  const parts: string[] = [];
+  if (trend.aboveMa50 !== null) parts.push(`${trend.aboveMa50 ? "מעל" : "מתחת"} MA50`);
+  if (trend.aboveMa200 !== null) parts.push(`${trend.aboveMa200 ? "מעל" : "מתחת"} MA200`);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export interface TechnicalResult {
@@ -94,6 +109,7 @@ export async function buildTechnicalAlerts(
       lower: tech.bands.lower,
       rsi14: tech.rsi14,
       widthChangePct: tech.widthChangePct,
+      trend: movingAverageTrend(closes),
     };
     records.push(record);
     byTicker.set(s.ticker, record);

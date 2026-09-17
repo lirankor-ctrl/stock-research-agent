@@ -22,6 +22,31 @@ function sma(values: number[], period: number): number {
   return sum / slice.length;
 }
 
+// Moving-average trend for a long-term holder: is the latest close above or
+// below its 50- and 200-day averages? Returns null for an average when there
+// genuinely isn't enough history, rather than averaging over a short slice and
+// presenting it as a "200-day" figure — sma() above pads short slices, which
+// would silently produce a confident-looking wrong number.
+export interface MovingAverageTrend {
+  ma50: number | null;
+  ma200: number | null;
+  aboveMa50: boolean | null;
+  aboveMa200: boolean | null;
+}
+
+export function movingAverageTrend(closes: number[]): MovingAverageTrend | null {
+  if (closes.length === 0) return null;
+  const price = closes[closes.length - 1];
+  const ma50 = closes.length >= 50 ? sma(closes, 50) : null;
+  const ma200 = closes.length >= 200 ? sma(closes, 200) : null;
+  return {
+    ma50,
+    ma200,
+    aboveMa50: ma50 === null ? null : price > ma50,
+    aboveMa200: ma200 === null ? null : price > ma200,
+  };
+}
+
 // Population standard deviation of the last `period` values around their mean.
 function stdDev(values: number[], period: number, mean: number): number {
   const slice = values.slice(-period);

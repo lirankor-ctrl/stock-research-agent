@@ -4,3 +4,16 @@ cache/
 .env
 *.log
 .DS_Store
+
+# Per-run diagnostics, not state. The workflow reads reports/run-status.json
+# to tell REPORT_GENERATION / EMAIL_SEND / STATE_PERSISTENCE apart and uploads
+# it as a build artifact; it must never be committed back to the repo.
+reports/run-status.json
+reports/run-status.json.tmp
+
+# Per-run generated output, regenerated from scratch every run and uploaded as
+# a build artifact. Never rolling state, so it must never be committed —
+# committing it is also what makes the worktree dirty and broke the
+# state-persistence rebase.
+reports/latest.json
+reports/email-preview.html

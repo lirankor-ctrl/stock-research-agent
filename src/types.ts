@@ -227,8 +227,16 @@ export interface MarketStory {
   publishedAt: string;        // raw Alpha Vantage timestamp (YYYYMMDDTHHMMSS)
   publishedDisplay: string;   // formatted "YYYY-MM-DD HH:MM"
   sentimentLabel?: string;    // raw label from the feed (e.g. "Bullish")
-  summaryHebrew: string;      // 3–5 sentence Hebrew framing built from real facts
-  whyMattersHebrew: string;   // why a long-term investor should care
+  // The Market Story is rendered as four explicit parts, in this order, on
+  // every surface (Markdown, HTML attachment, email HTML, email text):
+  //   summaryHebrew        – WHAT HAPPENED: the specific event and its numbers
+  //   marketReactionHebrew – MARKET REACTION: the actual observed move
+  //   whyMattersHebrew     – WHY IT MATTERS: implication OF THIS EVENT
+  //   whatToWatchHebrew    – WHAT TO WATCH NEXT: the next concrete catalyst
+  summaryHebrew: string;
+  marketReactionHebrew: string;
+  whyMattersHebrew: string;
+  whatToWatchHebrew: string;
   originalSummary?: string;   // the source's own (English) summary, verbatim
   priceMove?: { price: number; changePercent: number };
   logoUrl?: string;           // only when a safe public logo is available
@@ -490,9 +498,26 @@ export interface TechnicalWatchItem {
   isLastClose: boolean;
   rsi14: number | null;
   statusHebrew: string; // e.g. "מעל הרצועה העליונה", "ניטרלי", "לא זמין"
+  // Long-term trend vs the 50/200-day moving averages, e.g. "מעל MA50 · מעל
+  // MA200". Computed from the same Yahoo daily-close series that already
+  // produces RSI/Bollinger – no extra API call. null when the series is too
+  // short to compute either average honestly, in which case nothing is shown
+  // rather than a placeholder. Rendered inside the existing signal cell so
+  // the table stays four columns wide on mobile.
+  trendHebrew?: string | null;
 }
 
 // Everything the report renderers need, already filtered & categorized.
+// Diagnostics for the Top Opportunities funnel: how many candidates were
+// actually evaluated, how many survived, and why the rest did not. Lives in
+// Report Health rather than the reader-facing newsletter.
+export interface OpportunityFunnel {
+  candidatesEvaluated: number;
+  topOpportunities: number;
+  reducedConfidence: number;
+  rejectionCounts: Record<string, number>;
+}
+
 export interface ReportData {
   // Single shared "generated at" timestamp for the entire run (ISO string).
   // Every renderer (Markdown, HTML, HTML email, text email) MUST derive its
@@ -519,6 +544,9 @@ export interface ReportData {
   status: RunStatus;
   scanned: number;   // total raw movers scanned from Alpha Vantage
   qualified: number; // candidates that passed the long-term filter
+  // Top Opportunities funnel diagnostics – so "0 Top Opportunities" always
+  // carries an attributable reason. Optional so existing fixtures stay valid.
+  opportunityFunnel?: OpportunityFunnel;
   fearGreed: FearGreed | null; // null when CNN data is unavailable
   earningsCalendar: EarningsCalendarEntry[];   // next 14 days, prioritized
   earningsCalendarStatus: EarningsCalendarStatus;

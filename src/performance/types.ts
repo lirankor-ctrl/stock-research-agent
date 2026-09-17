@@ -84,8 +84,12 @@ export interface Metrics {
   avgConfidence: number | null;
 }
 
-// One line appended to runs.jsonl per run – the trend over time.
+// One line in runs.jsonl per TRADING DATE – the trend over time.
 export interface RunSnapshot {
+  // US trading date (YYYY-MM-DD) this snapshot describes. The dedupe key:
+  // re-running on the same day replaces the day's snapshot instead of
+  // appending a second one. See upsertRunSnapshot in store.ts.
+  tradingDate: string;
   generatedAt: string;
   market: Market;
   runDataQuality: number;

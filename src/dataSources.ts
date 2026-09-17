@@ -13,6 +13,12 @@ import { readCache, TTL, writeCache } from "./cache";
 import { EarningsResultRow, fetchFinnhubEarningsResult } from "./earningsResults";
 import { fetchFinnhubEarningsForDate } from "./finnhubEarnings";
 import { fetchFinnhubCompanyNews } from "./finnhubNews";
+import { fetchFinnhubProfile } from "./finnhubProfile";
+import {
+  providerForCacheKey,
+  recordProviderFailure,
+  UnavailableCause,
+} from "./providerLedger";
 import { DatedClose, fetchYahooDailyCloses, fetchYahooDailyClosesWithDates, fetchYahooQuote, YahooQuote } from "./marketData";
 import { fetchNasdaqEarningsForDate, NasdaqEarningsRow } from "./nasdaqEarnings";
 import {
@@ -48,6 +54,8 @@ export async function cacheFirst<T>(
     };
   }
 
+  const provider = providerForCacheKey(cacheKey);
+
   if (!allowLive) {
     const cached = readCache<T>(cacheKey, STALE_FALLBACK_MS);
     if (cached) {
@@ -56,10 +64,16 @@ export async function cacheFirst<T>(
         source: { source: "cached", ageHours: round1(cached.ageHours) },
       };
     }
+    // Never attempted – the live-call budget was already spent. This is an
+    // availability decision we made, not a provider or data problem, and
+    // conflating it with the two below is what made the "Unavailable" count
+    // impossible to act on.
+    recordProviderFailure(provider, "budgetSkipped", cacheKey);
     return { value: null, source: { source: "unavailable" } };
   }
 
   // 2. Try live API
+  let cause: UnavailableCause = "genuinelyAbsent";
   try {
     const live = await fetcher();
     if (live !== null && live !== undefined) {
@@ -69,8 +83,10 @@ export async function cacheFirst<T>(
     // API returned nothing – fall through to stale fallback
   } catch (err: any) {
     if (err instanceof RateLimitError) {
+      cause = "rateLimit";
       onNote(`⚠️  rate limit on ${cacheKey} – trying stale cache`);
     } else {
+      cause = "networkError";
       onNote(`⚠️  API error on ${cacheKey}: ${err.message} – trying stale cache`);
     }
   }
@@ -85,6 +101,7 @@ export async function cacheFirst<T>(
   }
 
   // 4. Nothing
+  recordProviderFailure(provider, cause, cacheKey);
   return { value: null, source: { source: "unavailable" } };
 }
 
@@ -107,22 +124,49 @@ export async function getTopMovers(
 }
 
 // Fundamentals (name/sector/marketCap/P-E/EPS/margin/dividends) barely move
-// day to day – a 7-day cache means most days re-use yesterday's OVERVIEW
-// call for free instead of spending part of the 25/day Alpha Vantage budget
-// on data that hasn't actually changed.
+// day to day – a 7-day cache means most days re-use an earlier call for free
+// instead of spending part of the 25/day Alpha Vantage budget on data that
+// hasn't actually changed.
+//
+// Finnhub is tried FIRST, for the same reason as getNews/getQuote: one Alpha
+// Vantage OVERVIEW call per stock across ~27 stocks does not fit in a 25/day
+// free-tier ceiling, so on a cold cache the budget ran out mid-universe and
+// the remaining stocks ended up with no profile at all – which then
+// eliminated them from Top Opportunities (see emergencyMode.ts). Finnhub's
+// free tier covers the same fields and is not Alpha-Vantage-budgeted.
 export async function getOverview(
   symbol: string,
   apiKey: string,
   onNote: (msg: string) => void = () => {},
   allowLive = true
-): Promise<SourcedValue<CompanyProfile>> {
-  return cacheFirst<CompanyProfile>(
-    `overview_${symbol}`,
+): Promise<ProviderResult<CompanyProfile>> {
+  const cacheKey = `overview_${symbol}`;
+  // Fresh cache short-circuits before touching either provider. Both
+  // providers produce the same CompanyProfile shape, so entries cached by
+  // either one stay valid.
+  const fresh = readCache<CompanyProfile>(cacheKey, TTL.DAYS_7);
+  if (fresh) {
+    return { value: fresh.data, source: { source: "cached", ageHours: round1(fresh.ageHours) }, usedAlpha: false };
+  }
+
+  const finnhub = await fetchFinnhubProfile(symbol);
+  if (finnhub !== null) {
+    writeCache(cacheKey, finnhub);
+    return { value: finnhub, source: { source: "live" }, usedAlpha: false };
+  }
+
+  // "Not configured" and "configured but the call failed" are different
+  // operational problems and must not be reported as the same thing.
+  recordProviderFailure("finnhub", process.env.FINNHUB_API_KEY ? "networkError" : "missingApiKey", cacheKey);
+  onNote(`Finnhub profile unavailable for ${symbol} (not configured or fetch failed) – falling back to Alpha Vantage`);
+  const alpha = await cacheFirst<CompanyProfile>(
+    cacheKey,
     TTL.DAYS_7,
     () => fetchCompanyOverview(symbol, apiKey),
     onNote,
     allowLive
   );
+  return { ...alpha, usedAlpha: true };
 }
 
 // Both getQuote and getNews try a non-Alpha provider FIRST and only fall
@@ -162,6 +206,7 @@ export async function getNews(
     writeCache(cacheKey, finnhub);
     return { value: finnhub, source: { source: "live" }, usedAlpha: false };
   }
+  recordProviderFailure("finnhub", process.env.FINNHUB_API_KEY ? "networkError" : "missingApiKey", cacheKey);
   onNote(`Finnhub news unavailable for ${symbol} (not configured or fetch failed) – falling back to Alpha Vantage`);
   const alpha = await cacheFirst<NewsItem[]>(cacheKey, TTL.HOURS_24, () => fetchNewsForTicker(symbol, apiKey, 5), onNote, allowLive);
   return { ...alpha, usedAlpha: true };
@@ -240,7 +285,9 @@ export async function getYahooDailyCloses(
   onNote: (msg: string) => void = () => {}
 ): Promise<SourcedValue<number[]>> {
   return cacheFirst<number[]>(
-    `yahoo_daily_${symbol}`,
+    // Key carries the range: entries cached under the old 6mo key are too
+    // short for the 200-day average and must not be silently reused.
+    `yahoo_daily_1y_${symbol}`,
     TTL.HOURS_12,
     () => fetchYahooDailyCloses(symbol),
     onNote

@@ -62,11 +62,33 @@ export function loadTracker(filePath: string = DEFAULT_TRACKER_FILE): EarningsTr
   }
 }
 
+// Written through a temp file + atomic rename. loadTracker deliberately
+// swallows a parse error and returns [], so a half-written file would not
+// crash the run – it would silently erase every tracked earnings event and
+// all reported history instead, which is far worse. rename() is atomic on
+// both POSIX and Windows (same directory), so a reader only ever sees the
+// complete previous file or the complete new one.
 export function saveTracker(records: EarningsTrackingRecord[], filePath: string = DEFAULT_TRACKER_FILE): string {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(records, null, 2), "utf8");
+  const tmp = `${filePath}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(records, null, 2), "utf8");
+  fs.renameSync(tmp, filePath);
   return filePath;
+}
+
+// Finnhub's `hour` field parses to the literal string "unknown" when it is
+// absent or unrecognized – never to undefined – so a plain `??` fallback
+// never fires. Without this, one unrecognized Finnhub row overrides a
+// perfectly good expected timing from the calendar, and because
+// computeEarningsReaction returns null for "unknown" the record is pinned in
+// "reportedAwaitingReaction" forever and never completes.
+export function resolveReportedTiming(
+  fromProvider: EarningsTimingExpectation | undefined,
+  expected: EarningsTimingExpectation
+): EarningsTimingExpectation {
+  if (fromProvider && fromProvider !== "unknown") return fromProvider;
+  return expected;
 }
 
 export function recordKey(ticker: string, earningsDate: string): string {
@@ -163,7 +185,7 @@ function buildResult(
   return {
     status: "available",
     reportedDate: matched.date,
-    reportedTiming: matched.timeOfDay ?? rec.expectedTiming,
+    reportedTiming: resolveReportedTiming(matched.timeOfDay, rec.expectedTiming),
     actualEps: matched.epsActual,
     expectedEpsAtReport: matched.epsEstimate ?? rec.expectedEps,
     epsSurprisePct,
@@ -211,7 +233,8 @@ export async function refreshTrackedEarnings(
       const reaction = computeEarningsReaction(
         closesRes.value,
         rec.result.reportedDate ?? rec.earningsDate,
-        rec.result.reportedTiming ?? rec.expectedTiming
+        resolveReportedTiming(rec.result.reportedTiming, rec.expectedTiming),
+        new Date(nowTimestampIso)
       );
       if (!reaction) {
         updated.push({ ...rec, lastSeenAt: nowTimestampIso }); // still awaiting the next session's close
@@ -273,9 +296,14 @@ export async function refreshTrackedEarnings(
       continue;
     }
 
-    const reportedTiming: EarningsTimingExpectation = matched!.timeOfDay ?? rec.expectedTiming;
+    const reportedTiming = resolveReportedTiming(matched!.timeOfDay, rec.expectedTiming);
     const closesRes = await fetchCloses(rec.ticker);
-    const reaction = computeEarningsReaction(closesRes.value, matched!.date, reportedTiming);
+    const reaction = computeEarningsReaction(
+      closesRes.value,
+      matched!.date,
+      reportedTiming,
+      new Date(nowTimestampIso)
+    );
     const result = buildResult(matched!, rec, reaction, nowTimestampIso);
 
     // Section 4: never mark fully "reported" before the required

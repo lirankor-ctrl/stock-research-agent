@@ -52,10 +52,14 @@ export async function fetchYahooQuote(symbol: string): Promise<YahooQuote | null
   };
 }
 
-// ~6 months of daily closes – enough for 20-day Bollinger Bands, RSI(14),
-// and a 5-day band-width trend, computed locally in technicals.ts.
+// ~1 year of daily closes – enough for 20-day Bollinger Bands, RSI(14), a
+// 5-day band-width trend AND the 50/200-day moving averages, all computed
+// locally in technicals.ts. This is the same endpoint and the same single
+// call as the previous 6mo range (which was ~126 bars, short of the 200
+// needed): a bigger payload, not a new API dependency. A short series simply
+// yields a null 200-day average rather than a misleading short-slice one.
 export async function fetchYahooDailyCloses(symbol: string): Promise<number[] | null> {
-  const result = await fetchYahooChart(symbol, { range: "6mo", interval: "1d" });
+  const result = await fetchYahooChart(symbol, { range: "1y", interval: "1d" });
   if (!result) return null;
   const raw: Array<number | null> = result.indicators?.quote?.[0]?.close ?? [];
   const closes = raw.filter((c): c is number => typeof c === "number" && c > 0);

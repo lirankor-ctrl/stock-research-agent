@@ -1,4 +1,5 @@
 import axios from "axios";
+import { throttleFinnhub } from "./finnhubThrottle";
 import { NasdaqEarningsRow } from "./nasdaqEarnings";
 
 // Secondary earnings-calendar provider – independent of both Alpha Vantage
@@ -23,10 +24,12 @@ export async function fetchFinnhubEarningsForDate(
   if (!apiKey) return null;
 
   try {
-    const { data } = await axios.get(FINNHUB_EARNINGS_URL, {
-      timeout: 10000,
-      params: { from: dateIso, to: dateIso, token: apiKey },
-    });
+    const { data } = await throttleFinnhub(() =>
+      axios.get(FINNHUB_EARNINGS_URL, {
+        timeout: 10000,
+        params: { from: dateIso, to: dateIso, token: apiKey },
+      })
+    );
     const rows: any[] = Array.isArray(data?.earningsCalendar) ? data.earningsCalendar : [];
     return rows
       .map((r) => {

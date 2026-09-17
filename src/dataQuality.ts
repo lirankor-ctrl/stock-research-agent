@@ -20,6 +20,27 @@ const WEIGHTS = {
 type Dim = keyof DataQualityStatuses;
 export const DIMS: Dim[] = ["price", "volume", "marketCap", "profile", "news", "technical"];
 
+// OPTIONAL enrichment dimensions. These are reported and they cost confidence
+// when absent, but they never sit in the coverage DENOMINATOR — so their
+// absence cannot by itself drag a liquid, well-priced candidate under the
+// Medium label and thereby eliminate it from Top Opportunities.
+//
+// Why these three and not the others: company identity (name/sector/industry),
+// company news and the locally-computed technicals are all enrichment that a
+// provider outage can remove without saying anything about the stock itself.
+// price, volume and marketCap stay in the denominator because they are core
+// safety/eligibility data — marketCap in particular backs the $2B floor in
+// filters.ts, and a candidate whose size cannot be verified must not be
+// recommended.
+const OPTIONAL_DIMS: ReadonlySet<Dim> = new Set<Dim>(["profile", "news", "technical"]);
+
+// Confidence cost of each missing optional dimension.
+const OPTIONAL_PENALTY: Record<string, number> = {
+  profile: 12,
+  news: 10,
+  technical: 15,
+};
+
 // A stock is recommendable only when its quality clears this label.
 const RECOMMEND_LABELS: ReadonlySet<DataQualityLabel> = new Set<DataQualityLabel>([
   "High",
@@ -148,6 +169,7 @@ export function computeDataQuality(
   for (const d of DIMS) {
     const st = statuses[d];
     if (st === "rateLimited" || st === "notRequested") continue; // not a coverage issue
+    if (OPTIONAL_DIMS.has(d)) continue; // scored as a confidence penalty instead
     assessable += WEIGHTS[d];
     if (st === "available" || st === "cached") earned += WEIGHTS[d];
   }
@@ -172,9 +194,19 @@ export function computeDataQuality(
   }
   const avgAge = cachedAges.length > 0 ? cachedAges.reduce((a, b) => a + b, 0) / cachedAges.length : 0;
   const freshnessPenalty = cachedAges.length > 0 ? clamp(avgAge * 1.5, 5, 30) : 0;
-  // Optional technical data is never a reason to exclude a stock, but its
-  // absence must always keep confidence below a perfect score.
-  const technicalGapPenalty = statuses.technical === "available" ? 0 : 15;
+  // Every OPTIONAL dimension that isn't actually present costs confidence.
+  // This is the only place their absence is scored – they are deliberately
+  // kept out of the coverage denominator above so they can never eliminate a
+  // candidate outright.
+  let optionalGapPenalty = 0;
+  const optionalGaps: Dim[] = [];
+  for (const d of DIMS) {
+    if (!OPTIONAL_DIMS.has(d)) continue;
+    const st = statuses[d];
+    if (st === "available" || st === "cached") continue;
+    optionalGapPenalty += OPTIONAL_PENALTY[d] ?? 0;
+    optionalGaps.push(d);
+  }
   // Optional valuation depth (P/E, EPS, profit margin – all from Alpha
   // Vantage's OVERVIEW call) is likewise never a reason to exclude a stock
   // (see meetsNormalTopOpportunityBar in emergencyMode.ts, which used to
@@ -188,7 +220,7 @@ export function computeDataQuality(
   );
   const valuationDepthPenalty = priceUsable && p && !hasValuationDepth ? 8 : 0;
   const confidenceScore = clamp(
-    coverageScore - freshnessPenalty - technicalGapPenalty - valuationDepthPenalty,
+    coverageScore - freshnessPenalty - optionalGapPenalty - valuationDepthPenalty,
     0,
     100
   );
@@ -198,14 +230,18 @@ export function computeDataQuality(
     (d) => statuses[d] === "rateLimited" || statuses[d] === "notRequested"
   ).map((d) => DIM_HEBREW[d]);
 
-  const criticalGenuineMissing = (["price", "volume", "marketCap", "profile"] as Dim[]).filter(
+  // Only CORE dimensions can force an exclusion. `profile` was removed from
+  // this list deliberately: company identity is optional enrichment from the
+  // same provider call as P/E and margins, and losing it must reduce
+  // confidence, not eliminate an otherwise valid liquid candidate.
+  const criticalGenuineMissing = (["price", "volume", "marketCap"] as Dim[]).filter(
     (d) => statuses[d] === "genuinelyMissing"
   ).length;
 
   const excluded =
     assessable === 0 || // nothing usable at all
     !priceUsable ||      // no usable price, live or cached – can't rank it, full stop
-    criticalGenuineMissing >= 3; // too much genuinely missing
+    criticalGenuineMissing >= 2; // too much core data genuinely missing
 
   let label: DataQualityLabel;
   if (excluded) label = "Excluded";

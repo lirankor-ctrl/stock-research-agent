@@ -36,6 +36,23 @@ export function makeId(market: Market, symbol: string, recommendedAtIso: string)
   return `${market}:${symbol}@${isoDateOnly(recommendedAtIso)}`;
 }
 
+// The id is `market:symbol@date`, which is NOT unique on its own: if a position
+// closes and the same symbol is recommended again on the SAME calendar day, the
+// new record collides with the closed one. With a single run per day that is
+// unreachable, which is why it never showed up — but an external scheduler that
+// double-fires makes it reachable, and a duplicate primary key in the ledger
+// would quietly corrupt every per-id lookup and metric built on it.
+//
+// Rather than change the id format (which would orphan the existing committed
+// history), disambiguate only on an actual collision.
+function uniqueId(taken: Set<string>, base: string): string {
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base}#${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
 function classifyOutcome(returnPct: number): Outcome {
   if (returnPct > FLAT_DEADBAND_PCT) return "win";
   if (returnPct < -FLAT_DEADBAND_PCT) return "loss";
@@ -114,13 +131,16 @@ export function recordRecommendations(
   const openSymbols = new Set(
     ledger.filter((r) => r.status === "open").map((r) => r.symbol)
   );
+  const takenIds = new Set(ledger.map((r) => r.id));
   const additions: RecommendationRecord[] = [];
   for (const rec of recs) {
     if (rec.entryPrice <= 0) continue; // can't track a position without a price
     if (openSymbols.has(rec.symbol)) continue; // already have an open position
+    const id = uniqueId(takenIds, makeId(market, rec.symbol, nowIso));
+    takenIds.add(id);
     additions.push({
       ...rec,
-      id: makeId(market, rec.symbol, nowIso),
+      id,
       market,
       recommendedAt: nowIso,
       targetDate: addDays(nowIso, rec.horizonDays),

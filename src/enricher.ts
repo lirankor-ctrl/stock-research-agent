@@ -131,8 +131,13 @@ export async function enrichStocks(
       budget.allow
     );
     recordTally(tally, profileRes.source);
-    budget.note(profileRes.source);
-    if (profileRes.source.source === "live") await sleep(delayMs);
+    // Only an actual Alpha Vantage call touches the shared live-call budget
+    // and its 5/min rate limit – the Finnhub-first path is unbudgeted and
+    // needs no rate-limit sleep. See dataSources.ts's ProviderResult.
+    if (profileRes.usedAlpha) {
+      budget.note(profileRes.source);
+      if (profileRes.source.source === "live") await sleep(delayMs);
+    }
 
     const newsRes = await getNews(
       s.ticker,

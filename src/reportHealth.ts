@@ -1,4 +1,5 @@
 import { ISRAEL_TZ, zonedParts } from "./dateUtils";
+import { ProviderFailureBreakdown, summarizeProviderFailures } from "./providerLedger";
 import { ReportQuality } from "./reportQuality";
 import { ReportTimingResult } from "./reportTiming";
 import { ReportData } from "./types";
@@ -49,7 +50,16 @@ export function computeProviderFailureCounts(notes: string[]): Record<string, nu
 export interface ReportHealth {
   scheduledIsrael: string;
   actualStartIsrael: string;
+  // The instant GitHub actually started the job (WORKFLOW_STARTED_AT), which
+  // is BEFORE the delivery-window wait and before generation. Distinct from
+  // actualStartIsrael, which is the moment generation finished and the
+  // staleness guard ran.
+  workflowStartedIsrael: string | null;
+  reportGeneratedIsrael: string | null;
   emailSentIsrael: string | null;
+  // Generation start → email sent. Excludes the delivery-window wait, so it
+  // measures the pipeline itself rather than how early the cron fired.
+  totalRuntimeSeconds: number | null;
   delayMinutes: number;
   timingStatus: string;
   reportLabel: string;
@@ -65,7 +75,16 @@ export interface ReportHealth {
   marketOverviewUsableCount: number;
   topOpportunitiesNormal: number;
   topOpportunitiesReduced: number;
+  scanned: number;
+  qualified: number;
+  candidatesEvaluated: number | null;
+  rejectionCounts: Record<string, number> | null;
   providerFailures: Record<string, number>;
+  // Exact, recorded attribution for every unavailable field (see
+  // src/providerLedger.ts) – as opposed to `providerFailures` above, which is
+  // a keyword heuristic over free-text notes and is kept for continuity.
+  unavailableByCause: Record<string, number>;
+  unavailableByProvider: Record<string, number>;
   // Earnings follow-up tracker (src/earningsTracker.ts) – section 8.
   earningsTracked: number;
   earningsAwaiting: number;
@@ -78,12 +97,25 @@ export function buildReportHealth(opts: {
   data: ReportData;
   timing: ReportTimingResult;
   emailSentAtIso: string | null;
+  workflowStartedAtIso?: string | null;
+  generationStartedAtIso?: string | null;
+  // Defaults to the live ledger; injectable so tests stay deterministic.
+  providerFailureBreakdown?: ProviderFailureBreakdown;
 }): ReportHealth {
-  const { data, timing, emailSentAtIso } = opts;
+  const { data, timing, emailSentAtIso, workflowStartedAtIso, generationStartedAtIso } = opts;
+  const breakdown = opts.providerFailureBreakdown ?? summarizeProviderFailures();
+  const runtimeFrom = generationStartedAtIso ?? null;
+  const totalRuntimeSeconds =
+    runtimeFrom && emailSentAtIso
+      ? Math.round((Date.parse(emailSentAtIso) - Date.parse(runtimeFrom)) / 1000)
+      : null;
   return {
     scheduledIsrael: timing.scheduledIsraelDisplay,
     actualStartIsrael: timing.actualIsraelDisplay,
+    workflowStartedIsrael: workflowStartedAtIso ? israelDisplay(workflowStartedAtIso) : null,
+    reportGeneratedIsrael: israelDisplay(data.generatedAt),
     emailSentIsrael: emailSentAtIso ? israelDisplay(emailSentAtIso) : null,
+    totalRuntimeSeconds,
     delayMinutes: timing.delayMinutes,
     timingStatus: timing.status,
     reportLabel: timing.reportLabel,
@@ -99,7 +131,13 @@ export function buildReportHealth(opts: {
     marketOverviewUsableCount: data.marketOverview.filter((i) => i.value !== null).length,
     topOpportunitiesNormal: data.topOpportunities.length,
     topOpportunitiesReduced: data.emergencyWatch.length,
+    scanned: data.scanned,
+    qualified: data.qualified,
+    candidatesEvaluated: data.opportunityFunnel?.candidatesEvaluated ?? null,
+    rejectionCounts: data.opportunityFunnel?.rejectionCounts ?? null,
     providerFailures: computeProviderFailureCounts(data.status.notes),
+    unavailableByCause: breakdown.byCause,
+    unavailableByProvider: breakdown.byProvider,
     earningsTracked: data.earningsFollowUp.coverage.tracked,
     earningsAwaiting: data.earningsFollowUp.coverage.awaiting,
     earningsResultsFound: data.earningsFollowUp.coverage.resultsFound,
@@ -112,8 +150,11 @@ export function formatReportHealth(h: ReportHealth): string[] {
   const lines = [
     "🩺 REPORT HEALTH",
     `   Scheduled time:  ${h.scheduledIsrael} (Israel)`,
+    `   Workflow started: ${h.workflowStartedIsrael ?? "n/a (not run from GitHub Actions)"}`,
+    `   Report generated: ${h.reportGeneratedIsrael ?? "n/a"}`,
     `   Actual start:    ${h.actualStartIsrael} (Israel)`,
     `   Email sent:      ${h.emailSentIsrael ?? "not sent yet"}`,
+    `   Total runtime:   ${h.totalRuntimeSeconds === null ? "n/a" : `${h.totalRuntimeSeconds}s`}`,
     `   Delay:           ${h.delayMinutes} min · status: ${h.timingStatus} · label: ${h.reportLabel}`,
     `   Report Quality Score: ${h.qualityScore}/100 (${h.qualityBand})`,
     `   Live: ${h.live} · Cached: ${h.cached} · Unavailable: ${h.unavailable}`,
@@ -122,8 +163,20 @@ export function formatReportHealth(h: ReportHealth): string[] {
     `   Technical coverage:     ${h.technicalCoveragePct ?? "n/a"}%`,
     `   Fundamentals coverage:  ${h.fundamentalsCoveragePct ?? "n/a"}%`,
     `   Market Overview usable metrics: ${h.marketOverviewUsableCount}`,
+    `   Funnel: scanned=${h.scanned} · qualified=${h.qualified} · evaluated=${h.candidatesEvaluated ?? "n/a"}`,
     `   Top Opportunities: Normal=${h.topOpportunitiesNormal} · Reduced Confidence=${h.topOpportunitiesReduced}`,
+    `   Rejection reasons: ${
+      h.rejectionCounts
+        ? Object.entries(h.rejectionCounts).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(" · ") || "none"
+        : "n/a"
+    }`,
     `   Provider failures: ${Object.entries(h.providerFailures).map(([k, v]) => `${k}=${v}`).join(" · ")}`,
+    `   Unavailable by cause:    ${
+      Object.entries(h.unavailableByCause).map(([k, v]) => `${k}=${v}`).join(" · ") || "none"
+    }`,
+    `   Unavailable by provider: ${
+      Object.entries(h.unavailableByProvider).map(([k, v]) => `${k}=${v}`).join(" · ") || "none"
+    }`,
     `   Tracked earnings: ${h.earningsTracked}`,
     `   Awaiting results: ${h.earningsAwaiting}`,
     `   Results found: ${h.earningsResultsFound}`,

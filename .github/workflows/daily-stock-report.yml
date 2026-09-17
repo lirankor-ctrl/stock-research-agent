@@ -1,46 +1,146 @@
 name: Daily Stock Report
 
 on:
-  schedule:
-    # GitHub Actions added native timezone-aware scheduling in March 2026: an
-    # optional IANA `timezone` field as a sibling of `cron` on a schedule
-    # entry, with automatic DST handling (see the GitHub Actions changelog,
-    # "Late March 2026 updates"). One entry now covers 16:05 Israel time
-    # year-round — no manual summer/winter cron split needed. A non-round
-    # minute (:05) is used deliberately to avoid the top-of-hour congestion
-    # where GitHub delays scheduled runs the most.
-    #
-    # Root cause of the 2026-08-28 incident (email arrived 02:04 IDT):
-    # confirmed via the GitHub Actions API that the cron ITSELF never changed
-    # (stable at '10 13 * * 1-5' since 2026-08-07) — the run that produced
-    # that email was created by GitHub at 23:00:33 UTC, ~9h50m after its
-    # 13:10 UTC trigger time, with no corresponding code/workflow change and
-    # no other workflow in this repo. That is GitHub's scheduler itself
-    # firing (or queueing) the job hours late, a documented-but-unbounded
-    # GitHub Actions reliability gap for `schedule` triggers — not a wrong
-    # cron, not a timezone bug, not a retry/overlap in this repo's own code.
-    # A correct timezone (this fix) cannot bound GitHub's own scheduling
-    # delay, so the app-level staleness guard in src/reportTiming.ts remains
-    # the real fix for THAT failure mode: it detects a late/stale run at run
-    # time and refuses to silently mail a stale "pre-market" report,
-    # regardless of why GitHub ran late.
-    - cron: '5 16 * * 1-5'
-      timezone: "Asia/Jerusalem"
+  # ===== PRODUCTION TRIGGER: external scheduler via workflow_dispatch =====
+  #
+  # The report is delivered by an EXTERNAL scheduler (cron-job.org) which POSTs
+  # to the GitHub API at 15:58 Asia/Jerusalem on weekdays:
+  #
+  #   POST https://api.github.com/repos/lirankor-ctrl/stock-research-agent/actions/workflows/daily-stock-report.yml/dispatches
+  #   Authorization: Bearer <fine-grained PAT>
+  #   Accept: application/vnd.github+json
+  #   X-GitHub-Api-Version: 2022-11-28
+  #   {"ref":"main","inputs":{"production_run":"true"}}
+  #   → 204 No Content
+  #
+  # ===== Why workflow_dispatch and NOT repository_dispatch =====
+  # Least privilege, and the difference is large. Per GitHub's "Permissions
+  # required for fine-grained personal access tokens":
+  #   POST .../actions/workflows/{id}/dispatches  → Actions: write
+  #   POST .../dispatches (repository_dispatch)   → Contents: write
+  # Contents: write would let whoever holds that token PUSH CODE to this repo,
+  # and therefore add a workflow that reads EMAIL_PASS and ALPHA_VANTAGE_API_KEY.
+  # Actions: write can only start/stop workflows that already exist. Since a
+  # free third-party service holds this token, that distinction is the whole
+  # point. The token is scoped to this one repository, Actions: Read and write,
+  # Contents: No access. (Metadata: Read is added by GitHub automatically to
+  # every fine-grained PAT and cannot be removed; it is read-only.)
+  #
+  # The workflow's own GITHUB_TOKEN separately keeps `contents: write` for the
+  # state-persistence step below. The two tokens never mix.
+  #
+  # `production_run` is what separates this authorized external run from an
+  # ordinary manual test — see the input definition and IS_PRODUCTION_RUN below.
+  #
+  # Why an external scheduler at all: GitHub's own cron cannot hit a 10-minute
+  # window. Across all 47 historical scheduled runs in this repo the delay
+  # between the cron instant and the job actually starting was:
+  #
+  #   cron '0 12' / '10 12'  (n=20)  median 145 min   range 116–313
+  #   cron '10 13'           (n=15)  median  52 min   range  41–83  (+2 at ~590)
+  #   cron '5 16'            (n=12)  median  68 min   range  45–204
+  #
+  # The minimum delay EVER observed is 41 minutes. Not one run has ever started
+  # within 40 minutes of its cron. A dispatch, by contrast, starts in seconds.
+  #
+  # DST is handled entirely by cron-job.org's per-job IANA timezone
+  # (Asia/Jerusalem) — that whole class of bug becomes somebody else's tzdata.
   workflow_dispatch:
     inputs:
+      production_run:
+        description: >-
+          Production send. ONLY the external scheduler sets this. Leave it off
+          for manual testing — a manual run with this off never mails the real
+          distribution list and never writes shared state.
+        required: false
+        default: false
+        type: boolean
       test_recipient:
         description: >-
           One-off override: send ONLY to this address (BCC disabled for the
           run) instead of the configured EMAIL_TO/EMAIL_BCC secrets. Leave
-          empty for the normal recipient list. Never persisted — scheduled
-          runs and dispatch runs without this input are unaffected.
+          empty for the normal recipient list. Rejected if combined with
+          production_run.
         required: false
         type: string
+
+  schedule:
+    # ===== MIGRATION PHASE 1: this cron is still a PRODUCTION trigger =====
+    #
+    # Deliberately NOT yet the watchdog. Until cron-job.org is configured and
+    # proven, this is the only thing that delivers the report, and removing it
+    # now would create a stretch of days with no scheduler at all.
+    #
+    # Two entries, one per Israeli UTC offset, both meaning 15:58 Israel:
+    #   15:58 IDT (UTC+3) = 12:58 UTC
+    #   15:58 IST (UTC+2) = 13:58 UTC
+    # The month ranges OVERLAP in March and October so the correct one always
+    # fires during the changeover; the off-season one lands ~60 min out and is
+    # discarded by MAX_EARLINESS_MINUTES before any API budget is spent.
+    - cron: '58 12 * 3-10 1-5'      # 15:58 Israel while on IDT (UTC+3)
+    - cron: '58 13 * 1-3,10-12 1-5' # 15:58 Israel while on IST (UTC+2)
+    #
+    # These runs still deliver because MAX_LATENESS_MINUTES is temporarily
+    # raised to 240 in the report step below. GitHub starts them 41–204 minutes
+    # late, so the email lands ~17:00–19:00 Israel — not the 16:00–16:10 target,
+    # but earlier than the ~20:30 it arrives today, so migration is strictly an
+    # improvement rather than a regression.
+    #
+    # ===== MIGRATION PHASE 2 (only after the external trigger is proven) =====
+    # Replace both crons above with the single watchdog entry:
+    #
+    #     - cron: '0 15 * * 1-5'
+    #
+    # and delete the MAX_LATENESS_MINUTES override in the report step. 15:00 UTC
+    # is 18:00 Israel (IDT) / 17:00 (IST) — 122 / 62 minutes past target even if
+    # GitHub were punctual, so with the restored 30-minute cap that cron can
+    # never deliver and becomes a pure heartbeat: it reads
+    # data/report-state.json from origin/main and, if no report went out for
+    # today's US trading date, emits ::error:: so GitHub notifies you that the
+    # external scheduler has stopped firing. Both changes are YAML-only.
+
+# Serializes every run of this workflow. Necessary but NOT sufficient for
+# duplicate protection: it stops two runs executing at the same time, but the
+# second one would still run afterwards and mail a second identical report. The
+# actual idempotency is the trading-date guard in src/reportState.ts; this group
+# is what makes that guard's read-then-write safe, by guaranteeing the second run
+# starts only after the first has finished and pushed its state.
+#
+# cancel-in-progress is deliberately false: cancelling a run that may already
+# have sent the email would leave state unwritten and the send unrecorded.
+concurrency:
+  group: daily-stock-report-production
+  cancel-in-progress: false
 
 jobs:
   email-report:
     runs-on: ubuntu-latest
+    # Generation measures 108–247s; 15 minutes is ample. The runner is never
+    # parked waiting for a delivery window any more.
     timeout-minutes: 15
+    env:
+      # ===== The single definition of "this is a production run" =====
+      # Computed once, here, and consumed by BOTH the Node process (which
+      # decides whether to apply the staleness/duplicate guards and whether to
+      # record the send) and the persist step (which decides whether to push
+      # state). Deriving it twice is exactly how a test run ends up writing to
+      # shared production state.
+      #
+      #   schedule                              → production (migration phase 1;
+      #                                           becomes the watchdog in phase 2)
+      #   workflow_dispatch + production_run=true → the authorized external
+      #                                           scheduler
+      #   workflow_dispatch (default)           → manual/dev, NEVER production
+      #
+      # The comparison is against the STRING 'true' on purpose. A
+      # `type: boolean` workflow_dispatch input arrives in the event payload as
+      # the string 'true'/'false', not as a JSON boolean (actions/runner#1483,
+      # community#29796) — which is also why the external scheduler sends
+      # {"production_run":"true"} quoted. `default: false` on the input is what
+      # makes an unset value deterministic rather than empty.
+      IS_PRODUCTION_RUN: ${{ github.event_name == 'schedule'
+                          || (github.event_name == 'workflow_dispatch'
+                              && github.event.inputs.production_run == 'true') }}
     # Required for the "Persist rolling state" step below to push a commit
     # back to this repo (data/earnings-tracker.json, reports/performance/).
     # Some orgs default GITHUB_TOKEN to read-only, which would otherwise
@@ -49,10 +149,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          # The "Persist rolling state" step below rebases onto origin/main and
+          # pushes. actions/checkout defaults to a depth-1 shallow clone, which
+          # makes `git pull --rebase` unreliable (it can only see one commit of
+          # history to replay against). Full history is what makes the rebase
+          # deterministic.
+          fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -60,11 +167,74 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Refuses the one input combination that would silently break the day's
+      # real report: a production run that also redirects delivery to a test
+      # address. It would mail the test recipient, then record the US trading
+      # date as delivered — and the duplicate guard would suppress the genuine
+      # report for the rest of the day. Failing loudly here is far better than
+      # discovering it from a missing email.
+      - name: Reject unsafe production/test input combination
+        if: ${{ github.event_name == 'workflow_dispatch'
+                && github.event.inputs.production_run == 'true'
+                && github.event.inputs.test_recipient != '' }}
+        run: |
+          echo "::error::production_run=true cannot be combined with test_recipient."
+          echo "A production run records the trading date as delivered, so redirecting it to a"
+          echo "test address would suppress the real report for the rest of the day."
+          echo "Run it with production_run OFF to test, or without test_recipient to send for real."
+          exit 1
+
       - name: Record actual workflow start time
         id: timing
         run: echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
+      # Reads the duplicate-guard state as it exists on origin/main RIGHT NOW,
+      # not as it exists in this job's checkout.
+      #
+      # The distinction is the whole point. A run triggered at 15:58 checks out
+      # the SHA that was current at 15:58; if a slightly earlier run sent the
+      # report and pushed at 15:59, this checkout still shows the pre-send state
+      # and the guard would wave a second email through. An explicit fetch of
+      # origin/main closes that window. Combined with the `concurrency` group
+      # above (which guarantees the earlier run has already finished and pushed),
+      # the read is accurate.
+      #
+      # Every failure path yields an empty value, which means "nothing sent yet"
+      # — the safe direction: at worst one duplicate email, never a permanently
+      # suppressed report.
+      - name: Read committed send-state from origin/main
+        id: sentstate
+        run: |
+          git fetch --quiet origin main || true
+          LAST_SENT=$(git show origin/main:data/report-state.json 2>/dev/null \
+            | node -e '
+                let s = "";
+                process.stdin.on("data", d => s += d).on("end", () => {
+                  try { console.log(JSON.parse(s).lastSentUsTradingDate || ""); }
+                  catch { console.log(""); }
+                });
+              ' || echo "")
+          echo "last_sent_trading_date=$LAST_SENT" >> "$GITHUB_OUTPUT"
+          echo "origin/main last recorded send: ${LAST_SENT:-<none>}"
+
+      # The provider cache (cache/) is gitignored and every run previously
+      # started completely cold, so the 7-day Alpha Vantage OVERVIEW cache and
+      # 7-day macro cache never actually survived — each run paid full live
+      # price for ~32 AV calls against a 25/day free-tier ceiling and blew the
+      # live-call budget mid-universe. That is the structural cause of the
+      # high "Unavailable" counts in production. restore/save are used as
+      # separate steps (rather than actions/cache) so the cache is still
+      # written when a later step fails.
+      - name: Restore provider cache
+        uses: actions/cache/restore@v6
+        with:
+          path: cache
+          key: provider-cache-${{ github.run_id }}
+          restore-keys: |
+            provider-cache-
+
       - name: Generate and email report
+        id: report
         env:
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
           EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
@@ -75,20 +245,44 @@ jobs:
           EMAIL_TO: ${{ github.event.inputs.test_recipient || secrets.EMAIL_TO }}
           EMAIL_BCC: ${{ github.event.inputs.test_recipient && '' || secrets.EMAIL_BCC }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-          # Report-health / staleness-guard inputs (src/reportTiming.ts) —
-          # this is the actual fix for the 2026-08-28 02:04 IDT incident:
-          # GitHub can still run a scheduled job late, but the app now
-          # detects it and refuses to silently mail a stale "pre-market"
-          # report regardless of why GitHub ran late.
+          # Report-health / staleness-guard inputs (src/reportTiming.ts).
+          # These must match the cron above: they are the target the run's
+          # lateness is measured against, and they drive the decision to
+          # relabel or refuse a stale send.
           GITHUB_EVENT_NAME: ${{ github.event_name }}
-          SCHEDULED_HOUR_ISRAEL: "16"
-          SCHEDULED_MINUTE_ISRAEL: "5"
+          # MUST match the external scheduler's cron (cron-job.org: 15:58
+          # Asia/Jerusalem): this is the Israel wall-clock target that lateness
+          # is measured against, and it drives the decision to relabel or refuse
+          # a stale send. Change one without the other and the guard measures
+          # against the wrong target.
+          SCHEDULED_HOUR_ISRAEL: "15"
+          SCHEDULED_MINUTE_ISRAEL: "58"
+          # ===== MIGRATION PHASE 1 ONLY — delete this line in phase 2 =====
+          # src/reportTiming.ts defaults MAX_LATENESS_MINUTES to 30, which is the
+          # real production rule (start by 16:28 → delivery by ~16:31). But
+          # GitHub's scheduler has never started a run within 41 minutes of its
+          # cron, so with 30 in force the phase-1 `schedule` trigger would skip
+          # every single day and there would be no report at all until
+          # cron-job.org is live. 240 keeps those runs delivering during the
+          # migration. Deleting this line restores the intended 30 with no code
+          # change — the threshold is read from env by design.
+          MAX_LATENESS_MINUTES: "240"
+          # Duplicate guard: the trading date of the last recorded send, read
+          # fresh from origin/main by the step above.
+          LAST_SENT_TRADING_DATE: ${{ steps.sentstate.outputs.last_sent_trading_date }}
           WORKFLOW_STARTED_AT: ${{ steps.timing.outputs.started_at }}
         run: npm run email-report
 
+      - name: Save provider cache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: cache
+          key: provider-cache-${{ github.run_id }}
+
       - name: Upload report artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: daily-stock-report
           path: reports/
@@ -96,47 +290,137 @@ jobs:
           retention-days: 14
 
       # Persists the earnings tracker (data/earnings-tracker.json) and the
-      # pre-existing performance ledger (reports/performance/) — BOTH are
-      # rolling state that must survive GitHub Actions' fresh checkout every
-      # run. Neither had a persistence mechanism before this commit (a
-      # pre-existing gap for the performance ledger, confirmed by inspecting
-      # this workflow and this repo's .gitignore before writing this step —
-      # there was no actions/cache, no commit-back, nothing). This is the
-      # one mechanism now used for both, rather than inventing a second one.
+      # performance ledger (reports/performance/) — BOTH are rolling state
+      # that must survive GitHub Actions' fresh checkout every run.
+      #
+      # ===== The 2026-08-31 → 2026-09-15 failure this fixes =====
+      # All 12 scheduled runs on d47abf9 failed here with exit 128 while the
+      # email itself was sent successfully each time — including run
+      # 35002540222, whose only failure annotation is literally "Process
+      # completed with exit code 128" against this step.
+      #
+      # Cause, reproduced locally against a scratch repo: report generation
+      # rewrites reports/daily-stock-report.html and .md, which are TRACKED
+      # files, so the worktree always has unstaged changes by the time this
+      # step runs. `git pull --rebase` refuses to run against a dirty worktree
+      # ("error: cannot pull with rebase: You have unstaged changes." → exit
+      # 128), and because GitHub runs `run:` blocks under `bash -e`, the step
+      # aborted there and never reached `git push`. The state was committed on
+      # the runner and then thrown away with it — which is why origin/main
+      # still has zero bot commits and the tracker is frozen at its Aug 30
+      # snapshot. `--autostash` makes the rebase stash and restore those
+      # generated files around itself, which is the actual fix.
       #
       # Requirements this step satisfies:
-      #  - scheduled runs only (`github.event_name == 'schedule'`) — a
-      #    manual/test run (workflow_dispatch, including one-off
-      #    test_recipient sends) NEVER commits to the shared tracked state,
-      #    so testing never pollutes production data. The report for a
-      #    manual run still reads/writes these files locally during
-      #    generation (so it renders correctly), it just never pushes that
-      #    back.
+      #  - production runs only (`env.IS_PRODUCTION_RUN`, defined once at job
+      #    level: `schedule`, or `workflow_dispatch` with production_run=true
+      #    from the authorized external scheduler). An ordinary manual run —
+      #    production_run left at its `false` default, including one-off
+      #    test_recipient sends — NEVER commits to the shared tracked state, so
+      #    testing cannot pollute production data.
       #  - `always()` so state is persisted even if the email SEND step
-      #    failed (report generation — and the tracker/ledger writes it
-      #    does — happens before the send; losing that work because SMTP
-      #    hiccuped would be wasteful and wrong).
-      #  - only commits when something actually changed (`git diff --cached
-      #    --quiet` short-circuits to a no-op commit-free run on days with
-      #    no new tracked/reported earnings and no ledger change).
-      #  - only ever stages these two paths — never reports/*.md,
-      #    reports/*.html, reports/latest.json, or reports/email-preview.html.
-      #  - cannot create an infinite loop: this workflow's only triggers are
-      #    `schedule` and `workflow_dispatch` — there is no `on: push`
-      #    anywhere in this repo (verified: this is the only workflow file),
-      #    so a commit pushed here can never re-trigger this (or any) run.
-      #    `[skip ci]` is included anyway as a harmless, standard defensive
-      #    convention in case a push-triggered workflow is ever added later.
-      - name: Persist rolling state (earnings tracker + performance ledger)
-        if: always() && github.event_name == 'schedule'
+      #    failed (generation, and the tracker/ledger writes it does, happen
+      #    before the send).
+      #  - only commits when something actually changed.
+      #  - only ever stages these three state paths — never reports/*.md,
+      #    reports/*.html, reports/latest.json, reports/run-status.json or
+      #    reports/email-preview.html.
+      #  - cannot create a workflow loop: this workflow's only triggers are
+      #    `workflow_dispatch` and `schedule`, and there is no `on: push`
+      #    anywhere in this repo, so a commit pushed here can never re-trigger a
+      #    run. `[skip ci]` is kept as a defensive convention.
+      #  - retries the rebase+push so a racing push cannot lose the tracker.
+      - name: Persist rolling state (earnings tracker + send-state + performance ledger)
+        id: persist
+        if: always() && env.IS_PRODUCTION_RUN == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/earnings-tracker.json reports/performance/ 2>/dev/null || true
+          # Staged separately so a missing path cannot cause git to stage neither.
+          git add -- data/earnings-tracker.json || true
+          git add -- data/report-state.json || true
+          git add -- reports/performance || true
           if git diff --cached --quiet; then
-            echo "No rolling-state changes to commit."
-          else
-            git commit -m "chore: persist earnings tracker / performance state [skip ci]"
-            git pull --rebase origin main
-            git push origin HEAD:main
+            echo "PHASE|STATE_PERSISTENCE|ok|no rolling-state changes to commit"
+            echo "result=nochange" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "chore: persist earnings tracker / performance state [skip ci]"
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash origin main && git push origin HEAD:main; then
+              echo "PHASE|STATE_PERSISTENCE|ok|pushed on attempt $attempt"
+              echo "result=pushed" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::warning::State persistence attempt $attempt failed; retrying."
+            sleep 5
+          done
+          echo "PHASE|STATE_PERSISTENCE|failed|rebase/push failed after 3 attempts"
+          echo "result=failed" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      # Makes "the email went out but state persistence broke" impossible to
+      # confuse with "no report was sent". Reads the phase records the Node
+      # process wrote to reports/run-status.json, and surfaces the schedule
+      # diagnosis that tells us whether the `timezone` key took effect.
+      - name: Report run status
+        if: always()
+        env:
+          PERSIST_RESULT: ${{ steps.persist.outputs.result || 'not-run' }}
+        run: |
+          # Raw phase outcome recorded by the Node process ("ok" / "skipped" /
+          # "failed"), mapped to the blunt SUCCESS/FAILED/SKIPPED vocabulary the
+          # summary needs. "unknown" means the process died before it could
+          # record anything.
+          EMAIL_OUTCOME=$(node -e '
+            try {
+              const s = require("./reports/run-status.json");
+              const e = s.phases.filter(p => p.phase === "EMAIL_SEND").pop();
+              console.log(e ? e.outcome : "unknown");
+            } catch { console.log("unknown"); }
+          ')
+          case "$EMAIL_OUTCOME" in
+            ok)      EMAIL_STATE=SUCCESS ;;
+            skipped) EMAIL_STATE=SKIPPED ;;
+            failed)  EMAIL_STATE=FAILED ;;
+            *)       EMAIL_STATE=UNKNOWN ;;
+          esac
+          case "$PERSIST_RESULT" in
+            pushed|nochange) PERSIST_STATE=SUCCESS ;;
+            failed)          PERSIST_STATE=FAILED ;;
+            not-run)         PERSIST_STATE=NOT-RUN ;;
+            *)               PERSIST_STATE=UNKNOWN ;;
+          esac
+
+          # The two lines that must never be collapsed into a generic
+          # "report failed": they are what distinguishes "no email went out"
+          # from "the email went out and only the state write broke".
+          {
+            echo "## Daily Stock Report — run phases"
+            echo ""
+            echo '```'
+            echo "EMAIL_SEND: $EMAIL_STATE"
+            echo "STATE_PERSISTENCE: $PERSIST_STATE"
+            echo '```'
+            echo ""
+            if [ -f reports/run-status.json ]; then
+              node -e '
+                const s = require("./reports/run-status.json");
+                for (const p of s.phases) {
+                  console.log("- **" + p.phase + "**: `" + p.outcome + "`" + (p.detail ? " — " + p.detail : ""));
+                }
+              '
+            else
+              echo "- **REPORT_GENERATION**: \`failed\` — reports/run-status.json was never written."
+            fi
+            echo "- **STATE_PERSISTENCE**: \`$PERSIST_RESULT\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "EMAIL_SEND: $EMAIL_STATE"
+          echo "STATE_PERSISTENCE: $PERSIST_STATE"
+
+          if [ "$PERSIST_STATE" = "FAILED" ] && [ "$EMAIL_STATE" = "SUCCESS" ]; then
+            echo "::error::EMAIL_SEND: SUCCESS / STATE_PERSISTENCE: FAILED — the email WAS delivered; only the earnings-tracker/performance write-back failed. This is a state bug, not an email failure."
+          elif [ "$EMAIL_STATE" = "SKIPPED" ]; then
+            echo "::notice::EMAIL_SEND: SKIPPED — the staleness guard refused to send. See the DELIVERY_WINDOW phase above for the exact reason."
           fi

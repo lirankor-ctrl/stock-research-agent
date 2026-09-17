@@ -244,8 +244,16 @@ function renderMarketStory(story: MarketStory | null): string {
           <p>${esc(story.summaryHebrew)}</p>
         </div>
         <div class="story-block">
+          <h4>תגובת השוק</h4>
+          <p>${esc(story.marketReactionHebrew)}</p>
+        </div>
+        <div class="story-block">
           <h4>למה זה חשוב</h4>
           <p>${esc(story.whyMattersHebrew)}</p>
+        </div>
+        <div class="story-block">
+          <h4>מה לעקוב הלאה</h4>
+          <p>${esc(story.whatToWatchHebrew)}</p>
         </div>
         <a class="btn-link" href="${esc(story.url)}" target="_blank" rel="noopener noreferrer">Read full article</a>
       </div>
@@ -353,7 +361,9 @@ function renderTechnicalWatch(items: TechnicalWatchItem[], dataUnavailable: bool
           <td class="symbol">${ltr(esc(i.ticker))}<span class="alert-name">${esc(i.name)}</span></td>
           <td>${priceCell}</td>
           <td>${rsiHtml}</td>
-          <td><span class="signal-badge">${esc(i.statusHebrew)}</span></td>
+          <td><span class="signal-badge">${esc(i.statusHebrew)}</span>${
+            i.trendHebrew ? `<div style="font-size:11px;opacity:0.75;margin-top:3px;">${esc(i.trendHebrew)}</div>` : ""
+          }</td>
         </tr>`;
     })
     .join("");

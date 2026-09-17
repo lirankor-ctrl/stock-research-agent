@@ -146,9 +146,13 @@ _לא נמצאה ידיעה חדשותית מהותית היום._`;
 - 🗞️ **מקור:** ${story.source}
 - 🕒 **תאריך:** ${story.publishedDisplay}${moveLine}${fallbackLine}
 
-${story.summaryHebrew}
+**מה קרה:** ${story.summaryHebrew}
 
-**למה זה חשוב למשקיע לטווח ארוך:** ${story.whyMattersHebrew}
+**תגובת השוק:** ${story.marketReactionHebrew}
+
+**למה זה חשוב:** ${story.whyMattersHebrew}
+
+**מה לעקוב הלאה:** ${story.whatToWatchHebrew}
 
 🔗 [קריאת הידיעה המלאה במקור](${story.url})${original}`;
 }
@@ -267,7 +271,8 @@ _נתונים טכניים (RSI / Bollinger Bands, מחושבים מקומית) 
     const rsi = i.rsi14 !== null ? `${Math.round(i.rsi14)} (${rsiInterpretation(i.rsi14).label})` : "—";
     const priceCell = i.price > 0 ? `${fmtPrice(i.price)}${i.isLastClose ? " (Last close)" : ""}` : "Unavailable";
     const changeCell = i.price > 0 && !i.isLastClose ? fmtChange(i.changePercent) : "—";
-    return `| **${i.ticker}** | ${priceCell} | ${changeCell} | ${rsi} | ${i.statusHebrew} |`;
+    const signalCell = i.trendHebrew ? `${i.statusHebrew} · ${i.trendHebrew}` : i.statusHebrew;
+    return `| **${i.ticker}** | ${priceCell} | ${changeCell} | ${rsi} | ${signalCell} |`;
   });
   return `## 📊 Technical Watch
 
