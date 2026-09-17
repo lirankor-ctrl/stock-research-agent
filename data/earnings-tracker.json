@@ -6,8 +6,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.51,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-01",
+      "reportedTiming": "post-market",
+      "actualEps": 1.02,
+      "expectedEpsAtReport": 0.9959,
+      "epsSurprisePct": 2.4,
+      "actualRevenue": 3410000000,
+      "expectedRevenueAtReport": 3418599992,
+      "revenueSurprisePct": -0.3,
+      "reaction": {
+        "baselineDate": "2026-09-01",
+        "baselinePrice": 362.0899963378906,
+        "newDate": "2026-09-02",
+        "newPrice": 328.4800109863281,
+        "reactionPercent": -9.3,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "DELL",
@@ -16,8 +37,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.72,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-01",
+      "reportedTiming": "post-market",
+      "actualEps": 7.04,
+      "expectedEpsAtReport": 5.0105,
+      "epsSurprisePct": 40.5,
+      "actualRevenue": 46971000000,
+      "expectedRevenueAtReport": 45813383476,
+      "revenueSurprisePct": 2.5,
+      "reaction": {
+        "baselineDate": "2026-09-01",
+        "baselinePrice": 425,
+        "newDate": "2026-09-02",
+        "newPrice": 492.20001220703125,
+        "reactionPercent": 15.8,
+        "basis": "post-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "MDT",
@@ -26,8 +68,29 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.38,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-01",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.45,
+      "expectedEpsAtReport": 1.4017,
+      "epsSurprisePct": 3.4,
+      "actualRevenue": 9756000000,
+      "expectedRevenueAtReport": 9640136374,
+      "revenueSurprisePct": 1.2,
+      "reaction": {
+        "baselineDate": "2026-08-31",
+        "baselinePrice": 90.6500015258789,
+        "newDate": "2026-09-01",
+        "newPrice": 92.04000091552734,
+        "reactionPercent": 1.5,
+        "basis": "pre-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "CRDO",
@@ -36,8 +99,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.91,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-01",
+      "reportedTiming": "post-market",
+      "actualEps": 1.2,
+      "expectedEpsAtReport": 1.1912,
+      "epsSurprisePct": 0.7,
+      "actualRevenue": 479003000,
+      "expectedRevenueAtReport": 481201320,
+      "revenueSurprisePct": -0.5,
+      "reaction": {
+        "baselineDate": "2026-09-01",
+        "baselinePrice": 206.6300048828125,
+        "newDate": "2026-09-02",
+        "newPrice": 165.22000122070312,
+        "reactionPercent": -20,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "AVGO",
@@ -46,8 +130,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.83,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-02",
+      "reportedTiming": "post-market",
+      "actualEps": 3.32,
+      "expectedEpsAtReport": 3.3013,
+      "epsSurprisePct": 0.6,
+      "actualRevenue": 29591000000,
+      "expectedRevenueAtReport": 29949335931,
+      "revenueSurprisePct": -1.2,
+      "reaction": {
+        "baselineDate": "2026-09-02",
+        "baselinePrice": 367.239990234375,
+        "newDate": "2026-09-03",
+        "newPrice": 357.1600036621094,
+        "reactionPercent": -2.7,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "SNOW",
@@ -55,8 +160,29 @@
     "earningsDate": "2026-09-02",
     "expectedTiming": "post-market",
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-02",
+      "reportedTiming": "post-market",
+      "actualEps": 0.62,
+      "expectedEpsAtReport": 0.4552,
+      "epsSurprisePct": 36.2,
+      "actualRevenue": 1546793000,
+      "expectedRevenueAtReport": 1512146205,
+      "revenueSurprisePct": 2.3,
+      "reaction": {
+        "baselineDate": "2026-09-02",
+        "baselinePrice": 305.8399963378906,
+        "newDate": "2026-09-03",
+        "newPrice": 356.4700012207031,
+        "reactionPercent": 16.6,
+        "basis": "post-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "HPE",
@@ -65,8 +191,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.82,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-02",
+      "reportedTiming": "post-market",
+      "actualEps": 1.11,
+      "expectedEpsAtReport": 0.9406,
+      "epsSurprisePct": 18,
+      "actualRevenue": 12213000000,
+      "expectedRevenueAtReport": 12031198911,
+      "revenueSurprisePct": 1.5,
+      "reaction": {
+        "baselineDate": "2026-09-02",
+        "baselinePrice": 51.83000183105469,
+        "newDate": "2026-09-03",
+        "newPrice": 54.439998626708984,
+        "reactionPercent": 5,
+        "basis": "post-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "NTAP",
@@ -75,8 +222,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.72,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-02",
+      "reportedTiming": "post-market",
+      "actualEps": 2.58,
+      "expectedEpsAtReport": 2.163,
+      "epsSurprisePct": 19.3,
+      "actualRevenue": 2025000000,
+      "expectedRevenueAtReport": 1875464881,
+      "revenueSurprisePct": 8,
+      "reaction": {
+        "baselineDate": "2026-09-02",
+        "baselinePrice": 180.77000427246094,
+        "newDate": "2026-09-03",
+        "newPrice": 185.3800048828125,
+        "reactionPercent": 2.6,
+        "basis": "post-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "CIEN",
@@ -85,8 +253,29 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.45,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-03",
+      "reportedTiming": "pre-market",
+      "actualEps": 2.11,
+      "expectedEpsAtReport": 1.7641,
+      "epsSurprisePct": 19.6,
+      "actualRevenue": 1671129000,
+      "expectedRevenueAtReport": 1665708021,
+      "revenueSurprisePct": 0.3,
+      "reaction": {
+        "baselineDate": "2026-09-02",
+        "baselinePrice": 354.1600036621094,
+        "newDate": "2026-09-03",
+        "newPrice": 317.4599914550781,
+        "reactionPercent": -10.4,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
   },
   {
     "ticker": "CPRT",
@@ -95,7 +284,109 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.39,
     "firstSeenAt": "2026-08-30T13:54:21.493Z",
-    "lastSeenAt": "2026-08-30T14:26:37.069Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "resultsUnavailable",
+    "result": {
+      "status": "unavailable",
+      "checkedAt": "2026-09-17T12:59:17.930Z"
+    }
+  },
+  {
+    "ticker": "VFS",
+    "name": "VinFast Auto Ltd.",
+    "earningsDate": "2026-09-17",
+    "expectedTiming": "unknown",
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "GRFS",
+    "name": "Grifols, S.A.",
+    "earningsDate": "2026-09-21",
+    "expectedTiming": "unknown",
+    "expectedEps": 0.27,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "ABVX",
+    "name": "Abivax SA",
+    "earningsDate": "2026-09-21",
+    "expectedTiming": "post-market",
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AZO",
+    "name": "AutoZone, Inc.",
+    "earningsDate": "2026-09-22",
+    "expectedTiming": "pre-market",
+    "expectedEps": 54.97,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CTAS",
+    "name": "Cintas Corporation",
+    "earningsDate": "2026-09-23",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.35,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "PAYX",
+    "name": "Paychex, Inc.",
+    "earningsDate": "2026-09-23",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.33,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "GIS",
+    "name": "General Mills, Inc.",
+    "earningsDate": "2026-09-23",
+    "expectedTiming": "pre-market",
+    "expectedEps": 0.72,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "COST",
+    "name": "Costco Wholesale Corporation",
+    "earningsDate": "2026-09-24",
+    "expectedTiming": "post-market",
+    "expectedEps": 6.48,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "DRI",
+    "name": "Darden Restaurants, Inc.",
+    "earningsDate": "2026-09-24",
+    "expectedTiming": "pre-market",
+    "expectedEps": 2.05,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "SNX",
+    "name": "TD SYNNEX Corporation",
+    "earningsDate": "2026-09-24",
+    "expectedTiming": "pre-market",
+    "expectedEps": 4.38,
+    "firstSeenAt": "2026-09-17T12:59:17.930Z",
+    "lastSeenAt": "2026-09-17T12:59:17.930Z",
     "status": "awaiting"
   }
 ]

@@ -1,0 +1,53 @@
+[
+  {
+    "symbol": "PANW",
+    "name": "Palo Alto Networks Inc",
+    "score": 8,
+    "confidence": 0.77,
+    "entryPrice": 375.65,
+    "dataQuality": 100,
+    "action": "accumulate",
+    "horizonDays": 90,
+    "sector": "Technology",
+    "marketCap": 307281696999.52704,
+    "id": "US:PANW@2026-09-17",
+    "market": "US",
+    "recommendedAt": "2026-09-17T12:59:17.930Z",
+    "targetDate": "2026-12-16T12:59:17.930Z",
+    "status": "open"
+  },
+  {
+    "symbol": "META",
+    "name": "Meta Platforms Inc",
+    "score": 7.7,
+    "confidence": 0.737,
+    "entryPrice": 673.31,
+    "dataQuality": 100,
+    "action": "watch",
+    "horizonDays": 90,
+    "sector": "Media",
+    "marketCap": 1715261330070.3306,
+    "id": "US:META@2026-09-17",
+    "market": "US",
+    "recommendedAt": "2026-09-17T12:59:17.930Z",
+    "targetDate": "2026-12-16T12:59:17.930Z",
+    "status": "open"
+  },
+  {
+    "symbol": "GOOGL",
+    "name": "Alphabet Inc",
+    "score": 7.7,
+    "confidence": 0.737,
+    "entryPrice": 342.87,
+    "dataQuality": 100,
+    "action": "watch",
+    "horizonDays": 90,
+    "sector": "Media",
+    "marketCap": 4193300100000,
+    "id": "US:GOOGL@2026-09-17",
+    "market": "US",
+    "recommendedAt": "2026-09-17T12:59:17.930Z",
+    "targetDate": "2026-12-16T12:59:17.930Z",
+    "status": "open"
+  }
+]

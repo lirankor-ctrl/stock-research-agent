@@ -1,7 +1,7 @@
 {
-  "lastSentUsTradingDate": null,
-  "lastSentAtIso": null,
-  "lastSentMessageId": null,
-  "lastSentRunId": null,
-  "lastSentEvent": null
+  "lastSentUsTradingDate": "2026-09-17",
+  "lastSentAtIso": "2026-09-17T13:00:25.921Z",
+  "lastSentMessageId": "<7b578aa9-98e3-fb45-465e-e174804af5b7@gmail.com>",
+  "lastSentRunId": "35224174403",
+  "lastSentEvent": "workflow_dispatch"
 }

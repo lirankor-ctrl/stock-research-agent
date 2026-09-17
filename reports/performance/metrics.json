@@ -1,0 +1,57 @@
+{
+  "market": "US",
+  "generatedAt": "2026-09-17T12:59:17.930Z",
+  "closedCount": 0,
+  "winRate": null,
+  "accuracy": null,
+  "avgReturnPct": null,
+  "medianReturnPct": null,
+  "openCount": 3,
+  "avgOpenReturnPct": null,
+  "brierScore": null,
+  "calibrationError": null,
+  "calibration": [
+    {
+      "label": "0.00–0.50",
+      "lo": 0,
+      "hi": 0.5,
+      "count": 0,
+      "avgConfidence": 0,
+      "winRate": 0,
+      "gap": 0
+    },
+    {
+      "label": "0.50–0.70",
+      "lo": 0.5,
+      "hi": 0.7,
+      "count": 0,
+      "avgConfidence": 0,
+      "winRate": 0,
+      "gap": 0
+    },
+    {
+      "label": "0.70–0.85",
+      "lo": 0.7,
+      "hi": 0.85,
+      "count": 0,
+      "avgConfidence": 0,
+      "winRate": 0,
+      "gap": 0
+    },
+    {
+      "label": "0.85–1.00",
+      "lo": 0.85,
+      "hi": 1.0001,
+      "count": 0,
+      "avgConfidence": 0,
+      "winRate": 0,
+      "gap": 0
+    }
+  ],
+  "runDataQuality": 98,
+  "freshness": "degraded",
+  "recommendationsThisRun": 3,
+  "reportQualityScore": 100,
+  "actionabilityScore": 100,
+  "avgConfidence": 0.748
+}
