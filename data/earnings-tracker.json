@@ -297,7 +297,7 @@
     "earningsDate": "2026-09-17",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -307,7 +307,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -316,7 +316,7 @@
     "earningsDate": "2026-09-21",
     "expectedTiming": "post-market",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -324,9 +324,9 @@
     "name": "AutoZone, Inc.",
     "earningsDate": "2026-09-22",
     "expectedTiming": "pre-market",
-    "expectedEps": 54.97,
+    "expectedEps": 54.78,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -336,7 +336,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.35,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -346,7 +346,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.33,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -356,7 +356,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -366,7 +366,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 6.48,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -374,9 +374,9 @@
     "name": "Darden Restaurants, Inc.",
     "earningsDate": "2026-09-24",
     "expectedTiming": "pre-market",
-    "expectedEps": 2.05,
+    "expectedEps": 2.06,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -384,9 +384,9 @@
     "name": "TD SYNNEX Corporation",
     "earningsDate": "2026-09-24",
     "expectedTiming": "pre-market",
-    "expectedEps": 4.38,
+    "expectedEps": 4.46,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   },
   {
@@ -397,6 +397,16 @@
     "expectedEps": 0.76,
     "firstSeenAt": "2026-09-18T12:58:34.153Z",
     "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "JEF",
+    "name": "Jefferies Financial Group Inc.",
+    "earningsDate": "2026-09-28",
+    "expectedTiming": "post-market",
+    "expectedEps": 1.04,
+    "firstSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-21T12:58:53.961Z",
     "status": "awaiting"
   }
 ]

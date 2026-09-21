@@ -15,9 +15,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 375.06,
-    "lastObservedAt": "2026-09-18T12:58:34.153Z",
-    "returnPct": -0.15706109410354718
+    "lastPrice": 363.58,
+    "lastObservedAt": "2026-09-21T12:58:53.961Z",
+    "returnPct": -3.213097298016769
   },
   {
     "symbol": "META",
@@ -35,9 +35,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 682.31,
-    "lastObservedAt": "2026-09-18T12:58:34.153Z",
-    "returnPct": 1.3366799839598404
+    "lastPrice": 665.75,
+    "lastObservedAt": "2026-09-21T12:58:53.961Z",
+    "returnPct": -1.1228111865262578
   },
   {
     "symbol": "GOOGL",
@@ -55,9 +55,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 347.33,
-    "lastObservedAt": "2026-09-18T12:58:34.153Z",
-    "returnPct": 1.3007845539125555
+    "lastPrice": 349.54,
+    "lastObservedAt": "2026-09-21T12:58:53.961Z",
+    "returnPct": 1.9453437162773108
   },
   {
     "symbol": "PLTR",
@@ -74,6 +74,26 @@
     "market": "US",
     "recommendedAt": "2026-09-18T12:58:34.153Z",
     "targetDate": "2026-12-17T12:58:34.153Z",
+    "status": "open",
+    "lastPrice": 177.64,
+    "lastObservedAt": "2026-09-21T12:58:53.961Z",
+    "returnPct": 0.7943713118474678
+  },
+  {
+    "symbol": "CRWD",
+    "name": "CrowdStrike Holdings Inc",
+    "score": 8.3,
+    "confidence": 0.6273944444444445,
+    "entryPrice": 237.65,
+    "dataQuality": 100,
+    "action": "accumulate",
+    "horizonDays": 90,
+    "sector": "Technology",
+    "marketCap": 247136912414.459,
+    "id": "US:CRWD@2026-09-21",
+    "market": "US",
+    "recommendedAt": "2026-09-21T12:58:53.961Z",
+    "targetDate": "2026-12-20T12:58:53.961Z",
     "status": "open"
   }
 ]
