@@ -15,9 +15,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 363.58,
-    "lastObservedAt": "2026-09-21T12:58:53.961Z",
-    "returnPct": -3.213097298016769
+    "lastPrice": 371.76,
+    "lastObservedAt": "2026-09-22T12:58:40.109Z",
+    "returnPct": -1.0355384001064787
   },
   {
     "symbol": "META",
@@ -35,9 +35,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 665.75,
-    "lastObservedAt": "2026-09-21T12:58:53.961Z",
-    "returnPct": -1.1228111865262578
+    "lastPrice": 741.245,
+    "lastObservedAt": "2026-09-22T12:58:40.109Z",
+    "returnPct": 10.089706078923538
   },
   {
     "symbol": "GOOGL",
@@ -55,9 +55,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 349.54,
-    "lastObservedAt": "2026-09-21T12:58:53.961Z",
-    "returnPct": 1.9453437162773108
+    "lastPrice": 354.97,
+    "lastObservedAt": "2026-09-22T12:58:40.109Z",
+    "returnPct": 3.5290343278793777
   },
   {
     "symbol": "PLTR",
@@ -75,9 +75,9 @@
     "recommendedAt": "2026-09-18T12:58:34.153Z",
     "targetDate": "2026-12-17T12:58:34.153Z",
     "status": "open",
-    "lastPrice": 177.64,
-    "lastObservedAt": "2026-09-21T12:58:53.961Z",
-    "returnPct": 0.7943713118474678
+    "lastPrice": 183.09,
+    "lastObservedAt": "2026-09-22T12:58:40.109Z",
+    "returnPct": 3.8867453472537417
   },
   {
     "symbol": "CRWD",
@@ -94,6 +94,26 @@
     "market": "US",
     "recommendedAt": "2026-09-21T12:58:53.961Z",
     "targetDate": "2026-12-20T12:58:53.961Z",
+    "status": "open",
+    "lastPrice": 249.35,
+    "lastObservedAt": "2026-09-22T12:58:40.109Z",
+    "returnPct": 4.923206395960441
+  },
+  {
+    "symbol": "NVDA",
+    "name": "NVIDIA Corp",
+    "score": 8,
+    "confidence": 0.5487222222222222,
+    "entryPrice": 227.38,
+    "dataQuality": 100,
+    "action": "accumulate",
+    "horizonDays": 90,
+    "sector": "Semiconductors",
+    "marketCap": 5154989955512.188,
+    "id": "US:NVDA@2026-09-22",
+    "market": "US",
+    "recommendedAt": "2026-09-22T12:58:40.109Z",
+    "targetDate": "2026-12-21T12:58:40.109Z",
     "status": "open"
   }
 ]

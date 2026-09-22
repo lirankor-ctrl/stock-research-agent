@@ -297,7 +297,7 @@
     "earningsDate": "2026-09-17",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -307,7 +307,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -316,7 +316,7 @@
     "earningsDate": "2026-09-21",
     "expectedTiming": "post-market",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -326,8 +326,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 54.78,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-22",
+      "reportedTiming": "pre-market",
+      "actualEps": 56.05,
+      "expectedEpsAtReport": 54.8009,
+      "epsSurprisePct": 2.3,
+      "actualRevenue": 6594880000,
+      "expectedRevenueAtReport": 6782842405,
+      "revenueSurprisePct": -2.8,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-09-22T12:58:40.109Z"
+    }
   },
   {
     "ticker": "CTAS",
@@ -336,7 +350,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.35,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -346,7 +360,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.33,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -356,7 +370,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -366,7 +380,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 6.48,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -376,7 +390,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.06,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -386,7 +400,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.46,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -396,7 +410,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.76,
     "firstSeenAt": "2026-09-18T12:58:34.153Z",
-    "lastSeenAt": "2026-09-18T12:58:34.153Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   },
   {
@@ -406,7 +420,27 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.04,
     "firstSeenAt": "2026-09-21T12:58:53.961Z",
-    "lastSeenAt": "2026-09-21T12:58:53.961Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CCL",
+    "name": "Carnival Corporation Ltd.",
+    "earningsDate": "2026-09-29",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.36,
+    "firstSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "KMX",
+    "name": "CarMax Inc",
+    "earningsDate": "2026-09-29",
+    "expectedTiming": "pre-market",
+    "expectedEps": 0.66,
+    "firstSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-22T12:58:40.109Z",
     "status": "awaiting"
   }
 ]
