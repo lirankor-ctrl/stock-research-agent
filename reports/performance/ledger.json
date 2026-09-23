@@ -15,9 +15,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 371.76,
-    "lastObservedAt": "2026-09-22T12:58:40.109Z",
-    "returnPct": -1.0355384001064787
+    "lastPrice": 374.57,
+    "lastObservedAt": "2026-09-23T12:58:56.976Z",
+    "returnPct": -0.2875016637827723
   },
   {
     "symbol": "META",
@@ -35,9 +35,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 741.245,
-    "lastObservedAt": "2026-09-22T12:58:40.109Z",
-    "returnPct": 10.089706078923538
+    "lastPrice": 736.595,
+    "lastObservedAt": "2026-09-23T12:58:56.976Z",
+    "returnPct": 9.399088087210956
   },
   {
     "symbol": "GOOGL",
@@ -55,9 +55,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 354.97,
-    "lastObservedAt": "2026-09-22T12:58:40.109Z",
-    "returnPct": 3.5290343278793777
+    "lastPrice": 351.16,
+    "lastObservedAt": "2026-09-23T12:58:56.976Z",
+    "returnPct": 2.4178259981917405
   },
   {
     "symbol": "PLTR",
@@ -75,9 +75,9 @@
     "recommendedAt": "2026-09-18T12:58:34.153Z",
     "targetDate": "2026-12-17T12:58:34.153Z",
     "status": "open",
-    "lastPrice": 183.09,
-    "lastObservedAt": "2026-09-22T12:58:40.109Z",
-    "returnPct": 3.8867453472537417
+    "lastPrice": 184.99,
+    "lastObservedAt": "2026-09-23T12:58:56.976Z",
+    "returnPct": 4.964820699046754
   },
   {
     "symbol": "CRWD",
@@ -95,9 +95,9 @@
     "recommendedAt": "2026-09-21T12:58:53.961Z",
     "targetDate": "2026-12-20T12:58:53.961Z",
     "status": "open",
-    "lastPrice": 249.35,
-    "lastObservedAt": "2026-09-22T12:58:40.109Z",
-    "returnPct": 4.923206395960441
+    "lastPrice": 250.06,
+    "lastObservedAt": "2026-09-23T12:58:56.976Z",
+    "returnPct": 5.221965074689669
   },
   {
     "symbol": "NVDA",
@@ -114,6 +114,9 @@
     "market": "US",
     "recommendedAt": "2026-09-22T12:58:40.109Z",
     "targetDate": "2026-12-21T12:58:40.109Z",
-    "status": "open"
+    "status": "open",
+    "lastPrice": 228.87,
+    "lastObservedAt": "2026-09-23T12:58:56.976Z",
+    "returnPct": 0.6552907027882879
   }
 ]

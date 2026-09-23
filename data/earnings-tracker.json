@@ -297,7 +297,7 @@
     "earningsDate": "2026-09-17",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -307,7 +307,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -316,8 +316,22 @@
     "earningsDate": "2026-09-21",
     "expectedTiming": "post-market",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-21",
+      "reportedTiming": "post-market",
+      "actualEps": -2.09,
+      "expectedEpsAtReport": -1.8258,
+      "epsSurprisePct": -14.5,
+      "actualRevenue": 2545000,
+      "expectedRevenueAtReport": 2550000,
+      "revenueSurprisePct": -0.2,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-09-23T12:58:56.976Z"
+    }
   },
   {
     "ticker": "AZO",
@@ -326,7 +340,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 54.78,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -350,8 +364,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.35,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-23",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.39,
+      "expectedEpsAtReport": 1.3817,
+      "epsSurprisePct": 0.6,
+      "actualRevenue": 3013980000,
+      "expectedRevenueAtReport": 3043574328,
+      "revenueSurprisePct": -1,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-09-23T12:58:56.976Z"
+    }
   },
   {
     "ticker": "PAYX",
@@ -360,8 +388,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.33,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-23",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.34,
+      "expectedEpsAtReport": 1.3465,
+      "epsSurprisePct": -0.5,
+      "actualRevenue": 1630500000,
+      "expectedRevenueAtReport": 1659391284,
+      "revenueSurprisePct": -1.7,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-09-23T12:58:56.976Z"
+    }
   },
   {
     "ticker": "GIS",
@@ -370,7 +412,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -380,7 +422,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 6.48,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -390,7 +432,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.06,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -400,7 +442,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.46,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -410,8 +452,22 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.76,
     "firstSeenAt": "2026-09-18T12:58:34.153Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-22",
+      "reportedTiming": "post-market",
+      "actualEps": 0.82,
+      "expectedEpsAtReport": 0.7575,
+      "epsSurprisePct": 8.3,
+      "actualRevenue": 343890000,
+      "expectedRevenueAtReport": 334579872,
+      "revenueSurprisePct": 2.8,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-09-23T12:58:56.976Z"
+    }
   },
   {
     "ticker": "JEF",
@@ -430,7 +486,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.36,
     "firstSeenAt": "2026-09-22T12:58:40.109Z",
-    "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   },
   {
@@ -441,6 +497,36 @@
     "expectedEps": 0.66,
     "firstSeenAt": "2026-09-22T12:58:40.109Z",
     "lastSeenAt": "2026-09-22T12:58:40.109Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "BB",
+    "name": "BlackBerry Limited",
+    "earningsDate": "2026-09-24",
+    "expectedTiming": "pre-market",
+    "expectedEps": 0.03,
+    "firstSeenAt": "2026-09-23T12:58:56.976Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "MU",
+    "name": "Micron Technology, Inc.",
+    "earningsDate": "2026-09-30",
+    "expectedTiming": "post-market",
+    "expectedEps": 31.24,
+    "firstSeenAt": "2026-09-23T12:58:56.976Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "JBL",
+    "name": "Jabil Inc.",
+    "earningsDate": "2026-09-30",
+    "expectedTiming": "pre-market",
+    "expectedEps": 3.86,
+    "firstSeenAt": "2026-09-23T12:58:56.976Z",
+    "lastSeenAt": "2026-09-23T12:58:56.976Z",
     "status": "awaiting"
   }
 ]
