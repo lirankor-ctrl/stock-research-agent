@@ -297,8 +297,12 @@
     "earningsDate": "2026-09-17",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "status": "resultsUnavailable",
+    "result": {
+      "status": "unavailable",
+      "checkedAt": "2026-09-28T12:58:54.389Z"
+    }
   },
   {
     "ticker": "GRFS",
@@ -307,7 +311,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -440,7 +444,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -450,8 +454,8 @@
     "expectedTiming": "post-market",
     "expectedEps": 6.48,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-09-24",
@@ -462,9 +466,16 @@
       "actualRevenue": 95723000000,
       "expectedRevenueAtReport": 96756018064,
       "revenueSurprisePct": -1.1,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-09-25T12:59:15.092Z"
+      "reaction": {
+        "baselineDate": "2026-09-24",
+        "baselinePrice": 896.47998046875,
+        "newDate": "2026-09-25",
+        "newPrice": 922.77001953125,
+        "reactionPercent": 2.9,
+        "basis": "post-market"
+      },
+      "interpretation": "Results missed estimates, but the stock rose — the reaction may be pricing in other factors.",
+      "checkedAt": "2026-09-28T12:58:54.389Z"
     }
   },
   {
@@ -567,7 +578,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.04,
     "firstSeenAt": "2026-09-21T12:58:53.961Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -577,7 +588,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.36,
     "firstSeenAt": "2026-09-22T12:58:40.109Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -585,9 +596,9 @@
     "name": "CarMax Inc",
     "earningsDate": "2026-09-29",
     "expectedTiming": "pre-market",
-    "expectedEps": 0.67,
+    "expectedEps": 0.68,
     "firstSeenAt": "2026-09-22T12:58:40.109Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -628,7 +639,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 31.24,
     "firstSeenAt": "2026-09-23T12:58:56.976Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -638,7 +649,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.86,
     "firstSeenAt": "2026-09-23T12:58:56.976Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -648,7 +659,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.19,
     "firstSeenAt": "2026-09-24T12:58:39.536Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -658,7 +669,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.44,
     "firstSeenAt": "2026-09-24T12:58:39.536Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -668,7 +679,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.32,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -678,7 +689,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.31,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   },
   {
@@ -688,7 +699,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.75,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-09-25T12:59:15.092Z",
+    "lastSeenAt": "2026-09-28T12:58:54.389Z",
     "status": "awaiting"
   }
 ]
