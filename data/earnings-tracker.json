@@ -311,7 +311,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -444,7 +444,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-09-17T12:59:17.930Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -578,7 +578,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.04,
     "firstSeenAt": "2026-09-21T12:58:53.961Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -588,7 +588,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.36,
     "firstSeenAt": "2026-09-22T12:58:40.109Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -598,8 +598,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.68,
     "firstSeenAt": "2026-09-22T12:58:40.109Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-09-29",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.16,
+      "expectedEpsAtReport": 0.7199,
+      "epsSurprisePct": 61.1,
+      "actualRevenue": 7877910000,
+      "expectedRevenueAtReport": 7045509833,
+      "revenueSurprisePct": 11.8,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-09-29T12:58:38.427Z"
+    }
   },
   {
     "ticker": "BB",
@@ -639,7 +653,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 31.24,
     "firstSeenAt": "2026-09-23T12:58:56.976Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -649,7 +663,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.86,
     "firstSeenAt": "2026-09-23T12:58:56.976Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -659,7 +673,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.19,
     "firstSeenAt": "2026-09-24T12:58:39.536Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -669,7 +683,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.44,
     "firstSeenAt": "2026-09-24T12:58:39.536Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -679,7 +693,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.32,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -689,7 +703,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.31,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   },
   {
@@ -699,7 +713,17 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.75,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-09-28T12:58:54.389Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AYI",
+    "name": "Acuity Inc.",
+    "earningsDate": "2026-10-01",
+    "expectedTiming": "pre-market",
+    "expectedEps": 5.32,
+    "firstSeenAt": "2026-09-29T12:58:38.427Z",
+    "lastSeenAt": "2026-09-29T12:58:38.427Z",
     "status": "awaiting"
   }
 ]
