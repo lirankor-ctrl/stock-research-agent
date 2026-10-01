@@ -1,13 +1,13 @@
 {
   "market": "US",
-  "generatedAt": "2026-09-30T12:58:50.577Z",
+  "generatedAt": "2026-10-01T12:58:49.127Z",
   "closedCount": 0,
   "winRate": null,
   "accuracy": null,
   "avgReturnPct": null,
   "medianReturnPct": null,
   "openCount": 7,
-  "avgOpenReturnPct": 3.96,
+  "avgOpenReturnPct": 4.45,
   "brierScore": null,
   "calibrationError": null,
   "calibration": [
@@ -48,10 +48,10 @@
       "gap": 0
     }
   ],
-  "runDataQuality": 80,
+  "runDataQuality": 75,
   "freshness": "degraded",
   "recommendationsThisRun": 3,
   "reportQualityScore": 100,
   "actionabilityScore": 100,
-  "avgConfidence": 0.564
+  "avgConfidence": 0.554
 }
