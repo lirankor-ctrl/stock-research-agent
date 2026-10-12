@@ -1,7 +1,7 @@
 {
-  "lastSentUsTradingDate": "2026-10-09",
-  "lastSentAtIso": "2026-10-09T13:00:50.911Z",
-  "lastSentMessageId": "<d61dfcd6-8fce-4364-a862-8abf30dcbbe4@gmail.com>",
-  "lastSentRunId": "37933545858",
+  "lastSentUsTradingDate": "2026-10-12",
+  "lastSentAtIso": "2026-10-12T12:58:57.938Z",
+  "lastSentMessageId": "<ce4bc9a8-9526-22cb-69fc-a93a867ef519@gmail.com>",
+  "lastSentRunId": "38252418618",
   "lastSentEvent": "workflow_dispatch"
 }

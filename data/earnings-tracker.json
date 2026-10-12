@@ -913,8 +913,12 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.75,
     "firstSeenAt": "2026-09-25T12:59:15.092Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "status": "resultsUnavailable",
+    "result": {
+      "status": "unavailable",
+      "checkedAt": "2026-10-12T12:58:52.067Z"
+    }
   },
   {
     "ticker": "AYI",
@@ -954,7 +958,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-30T12:58:50.577Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1119,7 +1123,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.05,
     "firstSeenAt": "2026-10-02T12:59:14.703Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1221,8 +1225,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.96,
     "firstSeenAt": "2026-10-02T12:59:14.703Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-09",
@@ -1233,9 +1237,16 @@
       "actualRevenue": 17585000000,
       "expectedRevenueAtReport": 17778762279,
       "revenueSurprisePct": -1.1,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-09T12:59:20.885Z"
+      "reaction": {
+        "baselineDate": "2026-10-08",
+        "baselinePrice": 82.13999938964844,
+        "newDate": "2026-10-09",
+        "newPrice": 82.16999816894531,
+        "reactionPercent": 0,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-12T12:58:52.067Z"
     }
   },
   {
@@ -1245,7 +1256,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 5.94,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1255,7 +1266,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.53,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1265,7 +1276,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.12,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1275,7 +1286,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 12.9,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1285,7 +1296,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.66,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1295,7 +1306,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.85,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1305,7 +1316,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 12.47,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1315,7 +1326,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.11,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1325,7 +1336,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.83,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   },
   {
@@ -1335,7 +1346,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 14.01,
     "firstSeenAt": "2026-10-09T12:59:20.885Z",
-    "lastSeenAt": "2026-10-09T12:59:20.885Z",
+    "lastSeenAt": "2026-10-12T12:58:52.067Z",
     "status": "awaiting"
   }
 ]
