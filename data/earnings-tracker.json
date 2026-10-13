@@ -958,7 +958,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-30T12:58:50.577Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
     "status": "awaiting"
   },
   {
@@ -1123,7 +1123,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.05,
     "firstSeenAt": "2026-10-02T12:59:14.703Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
     "status": "awaiting"
   },
   {
@@ -1256,8 +1256,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 5.94,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-13",
+      "reportedTiming": "pre-market",
+      "actualEps": 5.75,
+      "expectedEpsAtReport": 5.9185,
+      "epsSurprisePct": -2.8,
+      "actualRevenue": 50172000000,
+      "expectedRevenueAtReport": 51650095706,
+      "revenueSurprisePct": -2.9,
+      "reaction": null,
+      "interpretation": "Results missed estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-13T12:58:39.632Z"
+    }
   },
   {
     "ticker": "JNJ",
@@ -1266,8 +1280,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.53,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-13",
+      "reportedTiming": "pre-market",
+      "actualEps": 2.59,
+      "expectedEpsAtReport": 2.5881,
+      "epsSurprisePct": 0.1,
+      "actualRevenue": 25399000000,
+      "expectedRevenueAtReport": 25578220205,
+      "revenueSurprisePct": -0.7,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-13T12:58:39.632Z"
+    }
   },
   {
     "ticker": "UNH",
@@ -1276,8 +1304,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.12,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-13",
+      "reportedTiming": "pre-market",
+      "actualEps": 4.69,
+      "expectedEpsAtReport": 4.1893,
+      "epsSurprisePct": 12,
+      "actualRevenue": 112694000000,
+      "expectedRevenueAtReport": 112517286035,
+      "revenueSurprisePct": 0.2,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-13T12:58:39.632Z"
+    }
   },
   {
     "ticker": "GS",
@@ -1286,8 +1328,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 12.9,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-13",
+      "reportedTiming": "pre-market",
+      "actualEps": 17.01,
+      "expectedEpsAtReport": 15.0539,
+      "epsSurprisePct": 13,
+      "actualRevenue": 18679000000,
+      "expectedRevenueAtReport": 17518648518,
+      "revenueSurprisePct": 6.6,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-13T12:58:39.632Z"
+    }
   },
   {
     "ticker": "C",
@@ -1296,8 +1352,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.66,
     "firstSeenAt": "2026-10-06T12:58:37.385Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-13",
+      "reportedTiming": "pre-market",
+      "actualEps": 2.85,
+      "expectedEpsAtReport": 2.7311,
+      "epsSurprisePct": 4.4,
+      "actualRevenue": 23845000000,
+      "expectedRevenueAtReport": 24202452747,
+      "revenueSurprisePct": -1.5,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-13T12:58:39.632Z"
+    }
   },
   {
     "ticker": "WFC",
@@ -1306,8 +1376,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.85,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-13",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.87,
+      "expectedEpsAtReport": 1.8754,
+      "epsSurprisePct": -0.3,
+      "actualRevenue": 21870000000,
+      "expectedRevenueAtReport": 22605326382,
+      "revenueSurprisePct": -3.3,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-13T12:58:39.632Z"
+    }
   },
   {
     "ticker": "ASML",
@@ -1316,7 +1400,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 12.47,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
     "status": "awaiting"
   },
   {
@@ -1326,7 +1410,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.11,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
     "status": "awaiting"
   },
   {
@@ -1336,7 +1420,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.83,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
     "status": "awaiting"
   },
   {
@@ -1346,7 +1430,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 14.01,
     "firstSeenAt": "2026-10-09T12:59:20.885Z",
-    "lastSeenAt": "2026-10-12T12:58:52.067Z",
+    "lastSeenAt": "2026-10-13T12:58:39.632Z",
     "status": "awaiting"
   }
 ]
