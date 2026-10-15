@@ -958,7 +958,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-30T12:58:50.577Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1123,7 +1123,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.05,
     "firstSeenAt": "2026-10-02T12:59:14.703Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1442,8 +1442,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 12.47,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-14",
@@ -1454,9 +1454,16 @@
       "actualRevenue": 11989990842,
       "expectedRevenueAtReport": 11847121347,
       "revenueSurprisePct": 1.2,
-      "reaction": null,
-      "interpretation": "Results beat estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-14T12:58:55.715Z"
+      "reaction": {
+        "baselineDate": "2026-10-13",
+        "baselinePrice": 1717.760009765625,
+        "newDate": "2026-10-14",
+        "newPrice": 1650,
+        "reactionPercent": -3.9,
+        "basis": "pre-market"
+      },
+      "interpretation": "Results beat estimates, but the stock fell — expectations may have been higher.",
+      "checkedAt": "2026-10-15T12:58:42.394Z"
     }
   },
   {
@@ -1466,8 +1473,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.11,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-14",
@@ -1478,9 +1485,16 @@
       "actualRevenue": 29958000000,
       "expectedRevenueAtReport": 31315190571,
       "revenueSurprisePct": -4.3,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-14T12:58:55.715Z"
+      "reaction": {
+        "baselineDate": "2026-10-13",
+        "baselinePrice": 53.959999084472656,
+        "newDate": "2026-10-14",
+        "newPrice": 51.38999938964844,
+        "reactionPercent": -4.8,
+        "basis": "pre-market"
+      },
+      "interpretation": "Weak report confirmed by negative market reaction.",
+      "checkedAt": "2026-10-15T12:58:42.394Z"
     }
   },
   {
@@ -1490,8 +1504,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.83,
     "firstSeenAt": "2026-10-07T12:58:58.994Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-14",
@@ -1502,9 +1516,16 @@
       "actualRevenue": 20338000000,
       "expectedRevenueAtReport": 20872373838,
       "revenueSurprisePct": -2.6,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-14T12:58:55.715Z"
+      "reaction": {
+        "baselineDate": "2026-10-13",
+        "baselinePrice": 186.63999938964844,
+        "newDate": "2026-10-14",
+        "newPrice": 181.50999450683594,
+        "reactionPercent": -2.7,
+        "basis": "pre-market"
+      },
+      "interpretation": "Weak report confirmed by negative market reaction.",
+      "checkedAt": "2026-10-15T12:58:42.394Z"
     }
   },
   {
@@ -1514,8 +1535,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 14.01,
     "firstSeenAt": "2026-10-09T12:59:20.885Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-14",
@@ -1526,9 +1547,16 @@
       "actualRevenue": 7752000000,
       "expectedRevenueAtReport": 7629624436,
       "revenueSurprisePct": 1.6,
-      "reaction": null,
-      "interpretation": "Results beat estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-14T12:58:55.715Z"
+      "reaction": {
+        "baselineDate": "2026-10-13",
+        "baselinePrice": 1066.1199951171875,
+        "newDate": "2026-10-14",
+        "newPrice": 1073.7900390625,
+        "reactionPercent": 0.7,
+        "basis": "pre-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-10-15T12:58:42.394Z"
     }
   },
   {
@@ -1538,7 +1566,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 6.39,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1548,7 +1576,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.31,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1558,7 +1586,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.82,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1568,7 +1596,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.76,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1578,7 +1606,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.13,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   },
   {
@@ -1588,7 +1616,47 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.21,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "LRCX",
+    "name": "Lam Research Corporation",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.17,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "TXN",
+    "name": "Texas Instruments Incorporated",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.39,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "TMO",
+    "name": "Thermo Fisher Scientific Inc",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "pre-market",
+    "expectedEps": 6.4,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "ABT",
+    "name": "Abbott Laboratories",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.42,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-15T12:58:42.394Z",
     "status": "awaiting"
   }
 ]
