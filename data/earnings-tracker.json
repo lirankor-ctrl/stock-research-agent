@@ -958,8 +958,12 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.27,
     "firstSeenAt": "2026-09-30T12:58:50.577Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "status": "resultsUnavailable",
+    "result": {
+      "status": "unavailable",
+      "checkedAt": "2026-10-16T12:58:54.511Z"
+    }
   },
   {
     "ticker": "STZ",
@@ -1123,8 +1127,12 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.05,
     "firstSeenAt": "2026-10-02T12:59:14.703Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "status": "resultsUnavailable",
+    "result": {
+      "status": "unavailable",
+      "checkedAt": "2026-10-16T12:58:54.511Z"
+    }
   },
   {
     "ticker": "PENG",
@@ -1564,9 +1572,9 @@
     "name": "Meta Platforms, Inc.",
     "earningsDate": "2026-10-21",
     "expectedTiming": "post-market",
-    "expectedEps": 6.39,
+    "expectedEps": 6.67,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1586,7 +1594,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.82,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1596,7 +1604,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.76,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1606,7 +1614,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.13,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1616,7 +1624,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.21,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1626,7 +1634,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.17,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1636,7 +1644,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.39,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1646,7 +1654,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 6.4,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   },
   {
@@ -1656,7 +1664,17 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.42,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "PM",
+    "name": "Philip Morris International Inc",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "pre-market",
+    "expectedEps": 2.3,
+    "firstSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-16T12:58:54.511Z",
     "status": "awaiting"
   }
 ]
