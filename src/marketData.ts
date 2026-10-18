@@ -10,7 +10,7 @@ const YAHOO_CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 
 const HEADERS = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" };
 
-async function fetchYahooChart(
+export async function fetchYahooChart(
   symbol: string,
   params: { range: string; interval: string }
 ): Promise<any | null> {

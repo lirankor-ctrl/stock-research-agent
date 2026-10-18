@@ -17,3 +17,6 @@ reports/run-status.json.tmp
 # state-persistence rebase.
 reports/latest.json
 reports/email-preview.html
+
+# Local-only previews (Bollinger section, normal-layout render). Never committed.
+reports/preview/

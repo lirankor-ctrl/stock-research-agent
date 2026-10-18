@@ -1,4 +1,11 @@
-import { computeProvenance, computeReportFingerprint, extractFingerprint, extractProvenance } from "./reportFingerprint";
+import { BOLLINGER_TITLE } from "./bollinger/view";
+import {
+  computeProvenance,
+  computeReportFingerprint,
+  extractFingerprint,
+  extractProvenance,
+  provenanceTagValue,
+} from "./reportFingerprint";
 import { ReportData } from "./types";
 
 export interface ConsistencyCheckInputs {
@@ -68,6 +75,29 @@ export function validateReportConsistency(inputs: ConsistencyCheckInputs): strin
     }
   }
 
+  // The Bollinger section is the lead section: it must be present on every
+  // surface of a normal report, and the selected ticker must appear in all
+  // four – an email showing a different (or no) pick than its attachments is
+  // exactly the divergence this validator exists to catch. Applies to the
+  // reduced (diagnostic) template too – every production email carries it.
+  {
+    const surfaces: Array<[string, string]> = [
+      ["HTML attachment", htmlAttachment],
+      ["Markdown attachment", mdAttachment],
+      ["Email HTML body", emailHtml],
+      ["Email text body", emailText],
+    ];
+    const pick = data.bollinger.pick?.candidate.symbol;
+    for (const [label, rendered] of surfaces) {
+      if (!rendered.includes(BOLLINGER_TITLE)) {
+        violations.push(`${label} is missing the "${BOLLINGER_TITLE}" section`);
+      }
+      if (pick && !rendered.includes(pick)) {
+        violations.push(`Bollinger Opportunity "${pick}" is missing from the ${label}`);
+      }
+    }
+  }
+
   const expectedFingerprint = computeReportFingerprint(data);
   const outputs: Array<[string, string]> = [
     ["HTML attachment", htmlAttachment],
@@ -91,10 +121,7 @@ export function validateReportConsistency(inputs: ConsistencyCheckInputs): strin
   // exactly the failure mode once reported: one renderer (typically the
   // email) showing stale earnings/catalyst content while the others, from
   // the same run, show current data.
-  const expectedProvenance = computeProvenance(data);
-  const expectedProvenanceTag =
-    `date=${expectedProvenance.reportDate}|earnings=${expectedProvenance.earningsCount}` +
-    `|quality=${expectedProvenance.reportQualityScore}|firstOpp=${expectedProvenance.firstOpportunityTicker}`;
+  const expectedProvenanceTag = provenanceTagValue(computeProvenance(data));
   for (const [label, rendered] of outputs) {
     const found = extractProvenance(rendered);
     if (found === null) {

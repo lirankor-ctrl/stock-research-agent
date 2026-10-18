@@ -1,3 +1,4 @@
+import type { BollingerReport } from "./bollinger/types";
 import { ReportQuality } from "./reportQuality";
 
 export type StockCategory = "gainer" | "loser" | "active";
@@ -525,6 +526,10 @@ export interface ReportData {
   // independently, or two outputs of the same run can show different
   // timestamps despite being "the same report".
   generatedAt: string;
+  // Bollinger Opportunity of the Day – the primary research section, rendered
+  // first on every surface. status "none"/"unavailable" is an honest outcome,
+  // never backfilled with a weaker pick. See src/bollinger/.
+  bollinger: BollingerReport;
   marketStory: MarketStory | null; // null when no meaningful recent news exists
   additionalHeadlines: MarketStory[]; // up to 2 more relevant (non-promotional) stories
   core: EnrichedStock[];

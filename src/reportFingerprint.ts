@@ -8,6 +8,8 @@ import { ReportData } from "./types";
 export function computeReportFingerprint(data: ReportData): string {
   const shape = {
     generatedAt: data.generatedAt,
+    bollinger: data.bollinger.pick ? `${data.bollinger.pick.candidate.symbol}:${data.bollinger.pick.candidate.signal.type}` : data.bollinger.status,
+    bollingerRadar: data.bollinger.radar.map((r) => r.symbol),
     reportQualityScore: data.reportQuality.score,
     topOpportunities: data.topOpportunities.map((s) => s.ticker),
     emergencyWatch: data.emergencyWatch.map((s) => s.ticker),
@@ -64,6 +66,7 @@ export interface ReportProvenance {
   earningsCount: number;
   reportQualityScore: number;
   firstOpportunityTicker: string; // topOpportunities[0], else emergencyWatch[0], else "NONE"
+  bollingerTicker: string; // Bollinger Opportunity of the Day, else "NONE"
 }
 
 export function computeProvenance(data: ReportData): ReportProvenance {
@@ -72,7 +75,15 @@ export function computeProvenance(data: ReportData): ReportProvenance {
     earningsCount: data.earningsCalendar.length,
     reportQualityScore: data.reportQuality.score,
     firstOpportunityTicker: data.topOpportunities[0]?.ticker ?? data.emergencyWatch[0]?.ticker ?? "NONE",
+    bollingerTicker: data.bollinger.pick?.candidate.symbol ?? "NONE",
   };
+}
+
+export function provenanceTagValue(p: ReportProvenance): string {
+  return (
+    `date=${p.reportDate}|earnings=${p.earningsCount}|quality=${p.reportQualityScore}` +
+    `|firstOpp=${p.firstOpportunityTicker}|bollinger=${p.bollingerTicker}`
+  );
 }
 
 const PROVENANCE_MARKER = "REPORT-PROVENANCE";
@@ -81,8 +92,7 @@ const PROVENANCE_MARKER = "REPORT-PROVENANCE";
 const PROVENANCE_RE = new RegExp(`${PROVENANCE_MARKER}:([^\\s\\]]+)`);
 
 function formatProvenanceTag(data: ReportData): string {
-  const p = computeProvenance(data);
-  return `${PROVENANCE_MARKER}:date=${p.reportDate}|earnings=${p.earningsCount}|quality=${p.reportQualityScore}|firstOpp=${p.firstOpportunityTicker}`;
+  return `${PROVENANCE_MARKER}:${provenanceTagValue(computeProvenance(data))}`;
 }
 
 // HTML/Markdown-safe – renders as an invisible comment in both.

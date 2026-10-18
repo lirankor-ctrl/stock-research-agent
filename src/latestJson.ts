@@ -13,6 +13,7 @@ import {
   RunStatus,
 } from "./types";
 import { Metrics, RecAction } from "./performance/types";
+import { bollingerJsonSummary } from "./bollinger/view";
 
 export interface LatestJson {
   market: "US";
@@ -56,6 +57,8 @@ export interface LatestJson {
   earningsCalendarStatus: EarningsCalendarStatus;
   marketCatalyst: MarketCatalystResult;
   marketOverview: MarketOverviewItem[];
+  // Bollinger Opportunity of the Day (additive).
+  bollinger?: ReturnType<typeof bollingerJsonSummary>;
 }
 
 export interface OpportunityWithRec {

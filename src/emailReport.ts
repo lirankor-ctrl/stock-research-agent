@@ -253,8 +253,21 @@ async function main() {
     // Written only for production runs: a manual/test send must never mark the
     // trading date as delivered, or it would suppress the real report.
     if (IS_PRODUCTION_RUN) {
+      const previousState = loadReportState();
+      const bollingerPick = result.data.bollinger.pick?.candidate;
       saveReportState({
-        ...loadReportState(),
+        ...previousState,
+        // Only a pick that was actually MAILED is remembered for the
+        // anti-repeat rule. A "none" day keeps the previous record, so the
+        // repeat window still protects against X → none → X.
+        lastBollingerPick: bollingerPick
+          ? {
+              ticker: bollingerPick.symbol,
+              tradingDate,
+              setupType: bollingerPick.signal.type,
+              status: bollingerPick.signal.status,
+            }
+          : previousState.lastBollingerPick ?? null,
         lastSentUsTradingDate: tradingDate,
         lastSentAtIso: emailSentAtIso,
         lastSentMessageId: sent.messageId ?? null,

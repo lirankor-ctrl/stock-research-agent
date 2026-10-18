@@ -79,7 +79,10 @@ export function validatePresentation(inputs: PresentationCheckInputs): string[] 
 
   // 4. Top Opportunities are rendered as exactly N separate cards.
   const oppCount = data.topOpportunities.length;
-  if (oppCount > 0) {
+  // The diagnostic (below-threshold) template intentionally renders no
+  // opportunity cards, so checks 4 and 5 apply to the normal newsletter only
+  // – otherwise a diagnostic report could never pass validation and send.
+  if (oppCount > 0 && !data.belowSendThreshold) {
     for (const [label, html] of [
       ["HTML attachment", htmlAttachment],
       ["Email HTML body", emailHtml],
@@ -98,6 +101,7 @@ export function validatePresentation(inputs: PresentationCheckInputs): string[] 
     ["HTML attachment", htmlAttachment],
     ["Email HTML body", emailHtml],
   ] as const) {
+    if (data.belowSendThreshold) continue;
     const diagIdx = indexOfClassToken(html, "diagnostics-card");
     const anchorIdx = oppCount > 0 ? indexOfClassToken(html, "opportunity-card", true) : html.indexOf("Upcoming Earnings Calendar");
     if (diagIdx === -1 || anchorIdx === -1 || diagIdx < anchorIdx) {
@@ -137,6 +141,25 @@ export function validatePresentation(inputs: PresentationCheckInputs): string[] 
     }
     if (countClassToken(emailHtml, "week-ahead-earnings") > 0) {
       violations.push("Email HTML body: duplicated This Week To Watch earnings content is still shown");
+    }
+  }
+
+  // 9. Bollinger Opportunity of the Day: exactly one card, rendered as the
+  // lead section – ahead of the Market Overview tiles and Data Diagnostics.
+  // Applies to the diagnostic template too: every email carries it.
+  {
+    for (const [label, html] of [
+      ["HTML attachment", htmlAttachment],
+      ["Email HTML body", emailHtml],
+    ] as const) {
+      const cards = countClassToken(html, "bollinger-card");
+      if (cards !== 1) violations.push(`${label}: expected exactly 1 Bollinger card, found ${cards}`);
+      const sectionIdx = indexOfClassToken(html, "bollinger-section");
+      const diagIdx = indexOfClassToken(html, "diagnostics-card");
+      const overviewIdx = html.indexOf("data-metric-value-key=");
+      if (sectionIdx === -1 || (diagIdx !== -1 && sectionIdx > diagIdx) || (overviewIdx !== -1 && sectionIdx > overviewIdx)) {
+        violations.push(`${label}: the Bollinger section is not the lead section`);
+      }
     }
   }
 

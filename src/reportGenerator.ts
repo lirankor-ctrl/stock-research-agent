@@ -15,8 +15,10 @@ import {
   fmtRevenueLine,
   fmtSurpriseBadge,
   formatOverviewValue,
+  renderInSectionOrder,
   weekAheadExtraEarnings,
 } from "./reportPresentation";
+import { renderBollingerMarkdown } from "./bollinger/render";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
 import {
@@ -384,23 +386,34 @@ Live: ${status.liveCount} · Cached: ${status.cachedCount} · Unavailable: ${sta
 
 // ---------- main report ----------
 
-// Canonical section order shared with the email HTML/text renderers so the
-// attachment and the email body can never silently drift apart:
-//   1. Upcoming Earnings Calendar
-//   2. Next Major Market Catalyst
-//   3. Market Story of the Day
-//   4. Important Headlines
-//   5. Market Overview
-//   6. Technical Watch
-//   7. Earnings Follow-up
-//   8. Top Opportunities
-//   9. Dividend Information
-//  10. This Week To Watch
-//  11. Data Diagnostics
+// Section order is NOT defined here: it comes from
+// reportPresentation.newsletterSectionOrder, shared by all four renderers
+// (Markdown, HTML attachment, email HTML, email text). Bollinger Opportunity
+// of the Day always leads; outside earnings season the earnings calendar,
+// catalyst and follow-up move below the research sections (nothing is
+// removed). Data Diagnostics + footer always close the report.
 export function generateReport(data: ReportData): string {
   const now = new Date(data.generatedAt);
   const { earningsCalendar, earningsCalendarStatus, marketCatalyst } = data;
-  const emergencyWatch = emergencyWatchSection(data.emergencyWatch);
+  // Same section order as the HTML attachment and both email bodies (see
+  // reportPresentation.newsletterSectionOrder). Empty sections (no Emergency
+  // Watch, no extra week-ahead earnings) are dropped with their separator.
+  const sections = renderInSectionOrder(data, {
+    bollinger: () => renderBollingerMarkdown(data.bollinger),
+    earningsCalendar: () => earningsCalendarSection(earningsCalendar, earningsCalendarStatus),
+    marketCatalyst: () => marketCatalystSection(marketCatalyst),
+    marketStory: () => marketStorySection(data.marketStory),
+    headlines: () => importantHeadlinesSection(data.additionalHeadlines),
+    marketOverview: () => marketOverviewSection(data.marketOverview),
+    technicalWatch: () => technicalWatchSection(data.technicalWatch, data.technicalAlerts.dataUnavailable),
+    earningsFollowUp: () => earningsFollowUpSection(data.earningsFollowUp),
+    topOpportunities: () => topOpportunitiesSection(data.topOpportunities, data.opportunityTheses),
+    emergencyWatch: () => emergencyWatchSection(data.emergencyWatch),
+    dividends: () => dividendsSection(data.dividends, data.dividendsStatus),
+    weekAhead: () => weekAheadSection(data),
+    recentMacro: () => recentMacroSection(data.weekAhead),
+    diagnostics: () => diagnosticsSection(data),
+  }).filter((s) => s.trim().length > 0);
 
   return `# 📈 דוח מניות למשקיע לטווח ארוך
 
@@ -408,47 +421,7 @@ export function generateReport(data: ReportData): string {
 
 ---
 
-${earningsCalendarSection(earningsCalendar, earningsCalendarStatus)}
-
----
-
-${marketCatalystSection(marketCatalyst)}
-
----
-
-${marketStorySection(data.marketStory)}
-
----
-
-${importantHeadlinesSection(data.additionalHeadlines)}
-
----
-
-${marketOverviewSection(data.marketOverview)}
-
----
-
-${technicalWatchSection(data.technicalWatch, data.technicalAlerts.dataUnavailable)}
-
----
-
-${earningsFollowUpSection(data.earningsFollowUp)}
-
----
-
-${topOpportunitiesSection(data.topOpportunities, data.opportunityTheses)}
-${emergencyWatch ? `\n---\n\n${emergencyWatch}\n` : ""}
----
-
-${dividendsSection(data.dividends, data.dividendsStatus)}
-
----
-
-${weekAheadSection(data) ? `${weekAheadSection(data)}\n\n---\n\n` : ""}${recentMacroSection(data.weekAhead)}
-
----
-
-${diagnosticsSection(data)}
+${sections.join("\n\n---\n\n")}
 
 ---
 
@@ -512,6 +485,10 @@ export function generateDiagnosticReport(data: ReportData): string {
 ## ⚠️ הדוח היום לא הופק ברמת האיכות הרגילה
 
 _Today's market report could not be produced at normal quality (Report Quality Score: ${q.score}/100 – ${q.band}). Rather than send a misleading or near-empty newsletter, this is a short diagnostic summary of what we do know right now. The full report resumes automatically once data coverage recovers._
+
+---
+
+${renderBollingerMarkdown(data.bollinger)}
 
 ---
 

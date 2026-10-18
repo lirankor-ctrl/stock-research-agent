@@ -19,10 +19,12 @@ import {
   formatOverviewValue,
   ltr,
   ltrTagged,
+  renderInSectionOrder,
   riskLevelHebrew,
   sentimentTone,
   weekAheadExtraEarnings,
 } from "./reportPresentation";
+import { renderBollingerHtml } from "./bollinger/render";
 import { fingerprintHtmlComment, provenanceHtmlComment } from "./reportFingerprint";
 import { rsiInterpretation } from "./technicals";
 import { watchlistName } from "./universe";
@@ -1007,21 +1009,12 @@ const CSS = `
 
 // ===== top-level renderer =====
 
-// Canonical section order shared with the email HTML renderer so the
-// attachment and the email body can never silently drift apart:
-//   1. Header
-//   2. Upcoming Earnings Calendar
-//   3. Next Major Market Catalyst
-//   4. Market Story of the Day
-//   5. Important Headlines
-//   6. Market Overview
-//   7. Technical Watch
-//   8. Earnings Follow-up
-//   9. Top Opportunities
-//  10. Dividend Information
-//  11. This Week To Watch (macro only – earnings sub-list omitted when it
-//      would only repeat the Upcoming Earnings Calendar)
-//  12. Data Diagnostics + attachments/disclaimer footer
+// Section order is NOT defined here: it comes from
+// reportPresentation.newsletterSectionOrder, shared by all four renderers
+// (Markdown, HTML attachment, email HTML, email text). Bollinger Opportunity
+// of the Day always leads; outside earnings season the earnings calendar,
+// catalyst and follow-up move below the research sections (nothing is
+// removed). Data Diagnostics + footer always close the report.
 export function generateHtmlReport(data: ReportData): string {
   const now = new Date(data.generatedAt);
   const {
@@ -1042,19 +1035,24 @@ export function generateHtmlReport(data: ReportData): string {
   const body = [
     renderHeader(now, data),
     `<main class="container" dir="rtl">`,
-    renderEarningsCalendar(earningsCalendar, earningsCalendarStatus),
-    renderMarketCatalyst(marketCatalyst),
-    renderMarketStory(data.marketStory),
-    renderImportantHeadlines(data.additionalHeadlines),
-    renderMarketOverview(marketOverview),
-    renderTechnicalWatch(technicalWatch, technicalAlerts.dataUnavailable),
-    renderEarningsFollowUp(earningsFollowUp),
-    renderTopOpportunities(topOpportunities, opportunityTheses),
-    renderEmergencyWatch(emergencyWatch),
-    renderDividends(dividends, dividendsStatus),
-    renderWeekAhead(data),
-    renderRecentMacro(data),
-    renderDiagnostics(data),
+    // Section order comes from reportPresentation.newsletterSectionOrder –
+    // shared with the Markdown and both email renderers.
+    ...renderInSectionOrder(data, {
+      bollinger: () => `<section>${renderBollingerHtml(data.bollinger)}</section>`,
+      earningsCalendar: () => renderEarningsCalendar(earningsCalendar, earningsCalendarStatus),
+      marketCatalyst: () => renderMarketCatalyst(marketCatalyst),
+      marketStory: () => renderMarketStory(data.marketStory),
+      headlines: () => renderImportantHeadlines(data.additionalHeadlines),
+      marketOverview: () => renderMarketOverview(marketOverview),
+      technicalWatch: () => renderTechnicalWatch(technicalWatch, technicalAlerts.dataUnavailable),
+      earningsFollowUp: () => renderEarningsFollowUp(earningsFollowUp),
+      topOpportunities: () => renderTopOpportunities(topOpportunities, opportunityTheses),
+      emergencyWatch: () => renderEmergencyWatch(emergencyWatch),
+      dividends: () => renderDividends(dividends, dividendsStatus),
+      weekAhead: () => renderWeekAhead(data),
+      recentMacro: () => renderRecentMacro(data),
+      diagnostics: () => renderDiagnostics(data),
+    }),
     renderDisclaimer(data.generatedAt),
     `</main>`,
     fingerprintHtmlComment(data),
@@ -1127,6 +1125,10 @@ export function generateDiagnosticHtmlReport(data: ReportData): string {
       <h2 class="section-title">⚠️ הדוח היום לא הופק ברמת האיכות הרגילה</h2>
       <p class="empty">Today's market report could not be produced at normal quality (Report Quality Score: ${q.score}/100 – ${esc(q.band)}). Rather than send a misleading or near-empty newsletter, this is a short diagnostic summary of what we do know right now. The full report resumes automatically once data coverage recovers.</p>
     </div></section>`,
+    // The Bollinger scan depends only on Yahoo price data, not on the
+    // providers that pull the Report Quality Score down, so it stays in the
+    // reduced report too – every production email carries it.
+    `<section>${renderBollingerHtml(data.bollinger)}</section>`,
     renderMarketOverview(data.marketOverview),
     renderEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
     renderProviderIssues(data),

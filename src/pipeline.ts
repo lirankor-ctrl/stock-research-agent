@@ -45,6 +45,10 @@ import { computeConfidence, computeRunDataQuality } from "./performance/tracker"
 import { runTracking } from "./performance/run";
 import { RecAction, RecInput, Metrics } from "./performance/types";
 import { buildLatestJson, OpportunityWithRec, writeLatestJson } from "./latestJson";
+import { runBollingerScan } from "./bollinger/scan";
+import { BollingerReport, EMPTY_BOLLINGER_REPORT } from "./bollinger/types";
+import { bollingerJsonSummary } from "./bollinger/view";
+import { loadReportState } from "./reportState";
 
 // Long-term evaluation horizon for realized-return tracking.
 const RECOMMENDATION_HORIZON_DAYS = Number(
@@ -446,6 +450,34 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   const dividendInfo = buildDividendInfo([...watchlist, ...topOpportunities]);
   log(`   dividend info: ${dividendInfo.items.length} dividend-paying names (status: ${dividendInfo.status})`);
 
+  // 🎯 Bollinger Opportunity of the Day – the primary research section. Runs
+  // after the earnings calendar (its catalyst lookup reuses those cached
+  // Nasdaq rows) and BEFORE the macro readings so the finalist enrichment
+  // gets first claim on the remaining Alpha Vantage budget. A failure here
+  // degrades to an explicit "unavailable" section, never a crashed report.
+  log("🎯 Bollinger Opportunity of the Day – market-wide scan (Yahoo daily OHLCV, local calc)...");
+  let bollinger: BollingerReport;
+  try {
+    bollinger = await runBollingerScan({
+      now,
+      apiKey,
+      budget,
+      delayMs: ENRICH_DELAY_MS,
+      fearGreed,
+      lastPick: loadReportState().lastBollingerPick ?? null,
+      extraTickers: moversEnriched.stocks.map((s) => s.ticker),
+      onProgress: (m) => log(m),
+    });
+  } catch (err: any) {
+    log(`   ⚠️  Bollinger scan failed: ${err?.message ?? err} – section will show as unavailable`);
+    bollinger = { ...EMPTY_BOLLINGER_REPORT, noneReasonHebrew: "סריקת הבולינגר נכשלה בריצה זו." };
+  }
+  log(
+    bollinger.pick
+      ? `   bollinger pick: ${bollinger.pick.candidate.symbol} · ${bollinger.pick.candidate.signal.type} (${bollinger.pick.candidate.signal.status}) · score ${bollinger.pick.candidate.score.total}`
+      : `   bollinger pick: none (${bollinger.status}) – ${bollinger.noneReasonHebrew ?? ""}`
+  );
+
   const economicReadings = await buildEconomicReadings({
     apiKey,
     budget,
@@ -483,6 +515,7 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
   log("📝 Generating Hebrew reports (Markdown + HTML)...");
   const data: ReportData = {
     generatedAt,
+    bollinger,
     marketStory: null, // filled in below, once the report stocks are known
     additionalHeadlines: [],
     core: cats.core,
@@ -584,17 +617,20 @@ export async function runReport(opts: RunOptions = {}): Promise<ReportResult> {
 
   // Machine-readable contract for the Investment Committee (preferred over MD).
   const latestJsonPath = writeLatestJson(
-    buildLatestJson({
-      generatedAt,
-      status,
-      opportunities: oppsWithRec,
-      watchlist,
-      metrics,
-      earningsCalendar,
-      earningsCalendarStatus: earningsCalendarRes.status,
-      marketCatalyst,
-      marketOverview,
-    })
+    {
+      ...buildLatestJson({
+        generatedAt,
+        status,
+        opportunities: oppsWithRec,
+        watchlist,
+        metrics,
+        earningsCalendar,
+        earningsCalendarStatus: earningsCalendarRes.status,
+        marketCatalyst,
+        marketOverview,
+      }),
+      bollinger: bollingerJsonSummary(bollinger),
+    }
   );
   log(`✅ Markdown report: ${mdPath}`);
   log(`✅ HTML report:     ${htmlPath}`);

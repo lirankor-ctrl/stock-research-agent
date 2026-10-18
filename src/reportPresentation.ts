@@ -186,3 +186,69 @@ export function ltr(escapedHtml: string): string {
 export function ltrTagged(escapedHtml: string, attrs: string): string {
   return `<span dir="ltr" ${attrs} style="unicode-bidi:isolate;">${escapedHtml}</span>`;
 }
+
+// ===== Earnings-season awareness & the shared section order =====
+//
+// Outside US earnings season the earnings calendar / catalyst / follow-up
+// sections are still rendered (nothing is removed) but moved below the
+// research sections, so the Bollinger Opportunity and market context lead.
+//
+// Season = the peak reporting windows that follow each quarter end:
+// Jan 10–Feb 25, Apr 10–May 25, Jul 10–Aug 25, Oct 10–Nov 25 (US dates).
+// A genuinely busy calendar (≥ 5 tracked companies reporting within 7 days)
+// also counts, so an off-cycle cluster of big reports is never buried.
+export const BUSY_EARNINGS_WEEK = 5;
+
+export function isEarningsSeasonDate(dateIso: string): boolean {
+  const month = Number(dateIso.slice(5, 7));
+  const day = Number(dateIso.slice(8, 10));
+  const inQuarter = (month - 1) % 3; // 0 = first month of a quarter
+  if (inQuarter === 0) return day >= 10;
+  if (inQuarter === 1) return day <= 25;
+  return false;
+}
+
+export function isEarningsSeason(data: Pick<ReportData, "generatedAt" | "earningsCalendar">): boolean {
+  const busyWeek = data.earningsCalendar.filter((e) => e.daysRemaining <= 7).length >= BUSY_EARNINGS_WEEK;
+  return isEarningsSeasonDate(data.generatedAt.slice(0, 10)) || busyWeek;
+}
+
+export type NewsletterSection =
+  | "bollinger"
+  | "earningsCalendar"
+  | "marketCatalyst"
+  | "marketStory"
+  | "headlines"
+  | "marketOverview"
+  | "technicalWatch"
+  | "earningsFollowUp"
+  | "topOpportunities"
+  | "emergencyWatch"
+  | "dividends"
+  | "weekAhead"
+  | "recentMacro"
+  | "diagnostics";
+
+// The ONE section order every renderer (Markdown, HTML attachment, email
+// HTML, email text) follows – so the four outputs cannot drift apart.
+export function newsletterSectionOrder(data: Pick<ReportData, "generatedAt" | "earningsCalendar">): NewsletterSection[] {
+  if (isEarningsSeason(data)) {
+    return [
+      "bollinger", "earningsCalendar", "marketCatalyst", "marketStory", "headlines", "marketOverview",
+      "technicalWatch", "earningsFollowUp", "topOpportunities", "emergencyWatch", "dividends",
+      "weekAhead", "recentMacro", "diagnostics",
+    ];
+  }
+  return [
+    "bollinger", "marketStory", "headlines", "marketOverview", "technicalWatch", "topOpportunities",
+    "emergencyWatch", "earningsCalendar", "marketCatalyst", "earningsFollowUp", "dividends",
+    "weekAhead", "recentMacro", "diagnostics",
+  ];
+}
+
+export function renderInSectionOrder(
+  data: Pick<ReportData, "generatedAt" | "earningsCalendar">,
+  renderers: Record<NewsletterSection, () => string>
+): string[] {
+  return newsletterSectionOrder(data).map((k) => renderers[k]());
+}

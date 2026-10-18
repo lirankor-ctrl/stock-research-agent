@@ -6,6 +6,7 @@
 import fs from "fs";
 import path from "path";
 import { RateLimitError } from "./alphaVantage";
+import { EMPTY_BOLLINGER_REPORT } from "./bollinger/types";
 import { computeDataQuality } from "./dataQuality";
 import { cacheFirst } from "./dataSources";
 import { deriveEarningsCalendarFromRows } from "./earningsCalendar";
@@ -152,6 +153,7 @@ function makeDQ(overrides: Partial<DataQuality> = {}): DataQuality {
 function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   return {
     generatedAt: "2026-08-07T13:00:00.000Z",
+    bollinger: EMPTY_BOLLINGER_REPORT,
     marketStory: null,
     additionalHeadlines: [],
     core: [],
@@ -289,6 +291,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   const stockWithOnlyInstitutionalNews = makeStock({ ticker: "INSTONLY", news: [institutional] });
   const reportData: ReportData = {
     generatedAt: "2026-07-21T13:00:00.000Z",
+    bollinger: EMPTY_BOLLINGER_REPORT,
     marketStory: null,
     additionalHeadlines: [],
     core: [stockWithOnlyInstitutionalNews],
@@ -657,6 +660,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   });
   const baseData: ReportData = {
     generatedAt: "2026-08-07T13:00:00.000Z",
+    bollinger: EMPTY_BOLLINGER_REPORT,
     marketStory: null,
     additionalHeadlines: [],
     core: [opp],
@@ -909,6 +913,7 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
 
   const richData: ReportData = {
     generatedAt: "2026-08-07T13:00:00.000Z",
+    bollinger: EMPTY_BOLLINGER_REPORT,
     marketStory: null,
     additionalHeadlines: [],
     core: [oppA],
@@ -1461,6 +1466,18 @@ function makeReportData(overrides: Partial<ReportData> = {}): ReportData {
   assert(
     !diagEmailHtml.includes("Top Opportunities") && !diagEmailText.includes("🎯 Top Opportunities"),
     "a poor-quality diagnostic email never renders the normal Top Opportunities section, even though goodCandidate would have qualified"
+  );
+  assert(
+    [diagMd, diagHtml, diagEmailHtml, diagEmailText].every((s) => s.includes("🎯 Bollinger Opportunity of the Day")),
+    "the Bollinger section is in all four outputs of the reduced (diagnostic) report too – every production email carries it"
+  );
+  const diagViolations = [
+    ...validateReportConsistency({ data: poorReportData, htmlAttachment: diagHtml, mdAttachment: diagMd, emailHtml: diagEmailHtml, emailText: diagEmailText }),
+    ...validatePresentation({ data: poorReportData, htmlAttachment: diagHtml, emailHtml: diagEmailHtml }),
+  ];
+  assert(
+    diagViolations.length === 0,
+    `a diagnostic report with Top Opportunities in ReportData still passes validation and can be sent (got: ${diagViolations.join(" | ") || "none"})`
   );
 
   // Visual structure remains intact: the normal report still carries its

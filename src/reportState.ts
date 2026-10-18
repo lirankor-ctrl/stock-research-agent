@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { BollingerLastPick } from "./bollinger/types";
 
 // ===== "Did today's report already go out?" =====
 //
@@ -31,6 +32,10 @@ export interface ReportState {
   // Event that produced the send (workflow_dispatch / schedule), which is how
   // you tell "the external scheduler is working" from "only the fallback ran".
   lastSentEvent: string | null;
+  // The Bollinger Opportunity mailed with that report – read by the next run
+  // to avoid repeating yesterday's company without a materially new signal.
+  // Optional so older state files (and callers that don't care) stay valid.
+  lastBollingerPick?: BollingerLastPick | null;
 }
 
 export const EMPTY_REPORT_STATE: ReportState = {
@@ -57,10 +62,27 @@ export function parseReportState(raw: string | null | undefined): ReportState {
       lastSentMessageId: typeof data.lastSentMessageId === "string" ? data.lastSentMessageId : null,
       lastSentRunId: typeof data.lastSentRunId === "string" ? data.lastSentRunId : null,
       lastSentEvent: typeof data.lastSentEvent === "string" ? data.lastSentEvent : null,
+      lastBollingerPick: parseLastPick(data.lastBollingerPick),
     };
   } catch {
     return { ...EMPTY_REPORT_STATE };
   }
+}
+
+const SETUP_TYPES = new Set(["squeeze", "breakout", "meanReversion"]);
+
+// Anything malformed reads as "no previous pick" – the worst case is one
+// repeated company, never a suppressed or crashed report.
+function parseLastPick(raw: any): BollingerLastPick | null {
+  if (!raw || typeof raw !== "object") return null;
+  if (typeof raw.ticker !== "string" || typeof raw.tradingDate !== "string") return null;
+  if (!SETUP_TYPES.has(raw.setupType)) return null;
+  return {
+    ticker: raw.ticker,
+    tradingDate: raw.tradingDate,
+    setupType: raw.setupType,
+    status: raw.status === "emerging" ? "emerging" : "confirmed",
+  };
 }
 
 export function loadReportState(filePath: string = REPORT_STATE_FILE): ReportState {

@@ -10,6 +10,7 @@
     "email:preview": "ts-node src/emailPreview.ts",
     "perf:selftest": "ts-node src/performance/selftest.ts",
     "content:selftest": "ts-node src/contentValidation.selftest.ts",
+    "bollinger:selftest": "ts-node src/bollinger/selftest.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

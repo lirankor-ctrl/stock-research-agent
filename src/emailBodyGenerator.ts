@@ -31,11 +31,13 @@ import {
   ltr,
   ltrTagged,
   PALETTE,
+  renderInSectionOrder,
   riskLevelHebrew,
   sentimentTone,
   weekAheadExtraEarnings,
 } from "./reportPresentation";
 import { displayName, fmtChange, fmtPrice } from "./reportGenerator";
+import { renderBollingerHtml, renderBollingerText } from "./bollinger/render";
 import { rsiInterpretation } from "./technicals";
 import {
   DividendInfoItem,
@@ -571,6 +573,7 @@ function generateDiagnosticEmailHtmlBody(data: ReportData, today: string): strin
 
   const sections = [
     notice,
+    renderBollingerHtml(data.bollinger),
     htmlMarketOverview(data.marketOverview),
     htmlEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
     diagnosticProviderIssuesHtml(data),
@@ -597,19 +600,22 @@ function generateDiagnosticEmailHtmlBody(data: ReportData, today: string): strin
 export function generateEmailHtmlBody(data: ReportData, today: string): string {
   if (data.belowSendThreshold) return generateDiagnosticEmailHtmlBody(data, today);
   const sections = [
-    htmlEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
-    htmlMarketCatalyst(data.marketCatalyst),
-    htmlMarketStory(data.marketStory),
-    htmlImportantHeadlines(data.additionalHeadlines),
-    htmlMarketOverview(data.marketOverview),
-    htmlTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
-    htmlEarningsFollowUp(data.earningsFollowUp),
-    htmlTopOpportunities(data.topOpportunities, data.opportunityTheses),
-    htmlEmergencyWatch(data.emergencyWatch),
-    htmlDividends(data.dividends, data.dividendsStatus),
-    htmlWeekAhead(data),
-    htmlRecentMacro(data),
-    htmlDiagnostics(data),
+    ...renderInSectionOrder(data, {
+      bollinger: () => renderBollingerHtml(data.bollinger),
+      earningsCalendar: () => htmlEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
+      marketCatalyst: () => htmlMarketCatalyst(data.marketCatalyst),
+      marketStory: () => htmlMarketStory(data.marketStory),
+      headlines: () => htmlImportantHeadlines(data.additionalHeadlines),
+      marketOverview: () => htmlMarketOverview(data.marketOverview),
+      technicalWatch: () => htmlTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
+      earningsFollowUp: () => htmlEarningsFollowUp(data.earningsFollowUp),
+      topOpportunities: () => htmlTopOpportunities(data.topOpportunities, data.opportunityTheses),
+      emergencyWatch: () => htmlEmergencyWatch(data.emergencyWatch),
+      dividends: () => htmlDividends(data.dividends, data.dividendsStatus),
+      weekAhead: () => htmlWeekAhead(data),
+      recentMacro: () => htmlRecentMacro(data),
+      diagnostics: () => htmlDiagnostics(data),
+    }),
     htmlFooter(),
   ].join("\n");
 
@@ -797,6 +803,7 @@ function generateDiagnosticEmailTextBody(data: ReportData, today: string): strin
   const q = data.reportQuality;
   const sections = [
     `⚠️ הדוח היום לא הופק ברמת האיכות הרגילה (Report Quality Score: ${q.score}/100 – ${q.band})`,
+    renderBollingerText(data.bollinger),
     textMarketOverview(data.marketOverview),
     textEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
     diagnosticProviderIssuesText(data),
@@ -818,21 +825,22 @@ ${sections}
 
 export function generateEmailTextBody(data: ReportData, today: string): string {
   if (data.belowSendThreshold) return generateDiagnosticEmailTextBody(data, today);
-  const sections = [
-    textEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
-    textMarketCatalyst(data.marketCatalyst),
-    textMarketStory(data.marketStory),
-    textImportantHeadlines(data.additionalHeadlines),
-    textMarketOverview(data.marketOverview),
-    textTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
-    textEarningsFollowUp(data.earningsFollowUp),
-    textTopOpportunities(data.topOpportunities),
-    textEmergencyWatch(data.emergencyWatch),
-    textDividends(data.dividends, data.dividendsStatus),
-    textWeekAhead(data),
-    textRecentMacro(data.weekAhead),
-    textDiagnostics(data),
-  ]
+  const sections = renderInSectionOrder(data, {
+    bollinger: () => renderBollingerText(data.bollinger),
+    earningsCalendar: () => textEarningsCalendar(data.earningsCalendar, data.earningsCalendarStatus),
+    marketCatalyst: () => textMarketCatalyst(data.marketCatalyst),
+    marketStory: () => textMarketStory(data.marketStory),
+    headlines: () => textImportantHeadlines(data.additionalHeadlines),
+    marketOverview: () => textMarketOverview(data.marketOverview),
+    technicalWatch: () => textTechnicalWatch(data.technicalWatch, data.technicalAlerts.dataUnavailable),
+    earningsFollowUp: () => textEarningsFollowUp(data.earningsFollowUp),
+    topOpportunities: () => textTopOpportunities(data.topOpportunities),
+    emergencyWatch: () => textEmergencyWatch(data.emergencyWatch),
+    dividends: () => textDividends(data.dividends, data.dividendsStatus),
+    weekAhead: () => textWeekAhead(data),
+    recentMacro: () => textRecentMacro(data.weekAhead),
+    diagnostics: () => textDiagnostics(data),
+  })
     .filter((s) => s.length > 0)
     .join("\n\n");
 
