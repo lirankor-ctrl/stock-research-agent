@@ -1572,9 +1572,9 @@
     "name": "Meta Platforms, Inc.",
     "earningsDate": "2026-10-21",
     "expectedTiming": "post-market",
-    "expectedEps": 6.67,
+    "expectedEps": 6.54,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1594,7 +1594,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.82,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1602,9 +1602,9 @@
     "name": "RTX Corporation",
     "earningsDate": "2026-10-20",
     "expectedTiming": "pre-market",
-    "expectedEps": 1.76,
+    "expectedEps": 1.78,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1614,7 +1614,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.13,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1622,9 +1622,9 @@
     "name": "Tesla, Inc.",
     "earningsDate": "2026-10-21",
     "expectedTiming": "post-market",
-    "expectedEps": 0.21,
+    "expectedEps": 0.22,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1634,7 +1634,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.17,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1642,9 +1642,9 @@
     "name": "Texas Instruments Incorporated",
     "earningsDate": "2026-10-21",
     "expectedTiming": "post-market",
-    "expectedEps": 2.39,
+    "expectedEps": 2.4,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1654,7 +1654,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 6.4,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1664,7 +1664,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.42,
     "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   },
   {
@@ -1674,7 +1674,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.3,
     "firstSeenAt": "2026-10-16T12:58:54.511Z",
-    "lastSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-19T12:59:09.531Z",
     "status": "awaiting"
   }
 ]

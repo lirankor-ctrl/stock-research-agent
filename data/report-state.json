@@ -1,7 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-10-16",
-  "lastSentAtIso": "2026-10-16T12:59:09.706Z",
-  "lastSentMessageId": "<b3d8d77d-858a-f979-576d-283509f1e6e2@gmail.com>",
-  "lastSentRunId": "38904289922",
-  "lastSentEvent": "workflow_dispatch"
+  "lastSentUsTradingDate": "2026-10-19",
+  "lastSentAtIso": "2026-10-19T12:59:28.507Z",
+  "lastSentMessageId": "<e779c0b6-7daa-cf17-84ce-2a8d2ed71232@gmail.com>",
+  "lastSentRunId": "39256202915",
+  "lastSentEvent": "workflow_dispatch",
+  "lastBollingerPick": {
+    "ticker": "EOG",
+    "tradingDate": "2026-10-19",
+    "setupType": "breakout",
+    "status": "confirmed"
+  }
 }
