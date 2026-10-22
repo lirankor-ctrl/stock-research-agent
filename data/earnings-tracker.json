@@ -1574,8 +1574,22 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.98,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "post-market",
+      "actualEps": 7.4,
+      "expectedEpsAtReport": 5.7889,
+      "epsSurprisePct": 27.8,
+      "actualRevenue": 63061000000,
+      "expectedRevenueAtReport": 64635778699,
+      "revenueSurprisePct": -2.4,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
   },
   {
     "ticker": "PM",
@@ -1584,126 +1598,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 2.31,
     "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "NFLX",
-    "name": "Netflix, Inc.",
-    "earningsDate": "2026-10-20",
-    "expectedTiming": "post-market",
-    "expectedEps": 0.82,
-    "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "RTX",
-    "name": "RTX Corporation",
-    "earningsDate": "2026-10-20",
-    "expectedTiming": "pre-market",
-    "expectedEps": 1.78,
-    "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "ISRG",
-    "name": "Intuitive Surgical, Inc.",
-    "earningsDate": "2026-10-20",
-    "expectedTiming": "post-market",
-    "expectedEps": 2.13,
-    "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "TSLA",
-    "name": "Tesla, Inc.",
-    "earningsDate": "2026-10-21",
-    "expectedTiming": "post-market",
-    "expectedEps": 0.22,
-    "firstSeenAt": "2026-10-14T12:58:55.715Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "LRCX",
-    "name": "Lam Research Corporation",
-    "earningsDate": "2026-10-21",
-    "expectedTiming": "post-market",
-    "expectedEps": 2.17,
-    "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "TXN",
-    "name": "Texas Instruments Incorporated",
-    "earningsDate": "2026-10-21",
-    "expectedTiming": "post-market",
-    "expectedEps": 2.4,
-    "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "awaiting"
-  },
-  {
-    "ticker": "TMO",
-    "name": "Thermo Fisher Scientific Inc",
-    "earningsDate": "2026-10-21",
-    "expectedTiming": "pre-market",
-    "expectedEps": 6.4,
-    "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "reportedAwaitingReaction",
-    "result": {
-      "status": "available",
-      "reportedDate": "2026-10-21",
-      "reportedTiming": "pre-market",
-      "actualEps": 6.68,
-      "expectedEpsAtReport": 6.4673,
-      "epsSurprisePct": 3.3,
-      "actualRevenue": 12137000000,
-      "expectedRevenueAtReport": 12065541860,
-      "revenueSurprisePct": 0.6,
-      "reaction": null,
-      "interpretation": "Results beat estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-21T12:58:46.113Z"
-    }
-  },
-  {
-    "ticker": "ABT",
-    "name": "Abbott Laboratories",
-    "earningsDate": "2026-10-21",
-    "expectedTiming": "pre-market",
-    "expectedEps": 1.42,
-    "firstSeenAt": "2026-10-15T12:58:42.394Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "reportedAwaitingReaction",
-    "result": {
-      "status": "available",
-      "reportedDate": "2026-10-21",
-      "reportedTiming": "pre-market",
-      "actualEps": 1.42,
-      "expectedEpsAtReport": 1.4297,
-      "epsSurprisePct": -0.7,
-      "actualRevenue": 13013000000,
-      "expectedRevenueAtReport": 13127904542,
-      "revenueSurprisePct": -0.9,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-21T12:58:46.113Z"
-    }
-  },
-  {
-    "ticker": "PM",
-    "name": "Philip Morris International Inc",
-    "earningsDate": "2026-10-21",
-    "expectedTiming": "pre-market",
-    "expectedEps": 2.3,
-    "firstSeenAt": "2026-10-16T12:58:54.511Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-21",
@@ -1714,9 +1610,274 @@
       "actualRevenue": 11438000000,
       "expectedRevenueAtReport": 11615178726,
       "revenueSurprisePct": -1.5,
+      "reaction": {
+        "baselineDate": "2026-10-20",
+        "baselinePrice": 199.89999389648438,
+        "newDate": "2026-10-21",
+        "newPrice": 197.4600067138672,
+        "reactionPercent": -1.2,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "NFLX",
+    "name": "Netflix, Inc.",
+    "earningsDate": "2026-10-20",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.82,
+    "firstSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-20",
+      "reportedTiming": "post-market",
+      "actualEps": 0.87,
+      "expectedEpsAtReport": 0.8391,
+      "epsSurprisePct": 3.7,
+      "actualRevenue": 12874176000,
+      "expectedRevenueAtReport": 13130968612,
+      "revenueSurprisePct": -2,
+      "reaction": {
+        "baselineDate": "2026-10-20",
+        "baselinePrice": 68.69000244140625,
+        "newDate": "2026-10-21",
+        "newPrice": 65.04000091552734,
+        "reactionPercent": -5.3,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "RTX",
+    "name": "RTX Corporation",
+    "earningsDate": "2026-10-20",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.78,
+    "firstSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-20",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.8,
+      "expectedEpsAtReport": 1.7938,
+      "epsSurprisePct": 0.3,
+      "actualRevenue": 24965000000,
+      "expectedRevenueAtReport": 24321289435,
+      "revenueSurprisePct": 2.6,
+      "reaction": {
+        "baselineDate": "2026-10-19",
+        "baselinePrice": 192.11000061035156,
+        "newDate": "2026-10-20",
+        "newPrice": 193.33999633789062,
+        "reactionPercent": 0.6,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "ISRG",
+    "name": "Intuitive Surgical, Inc.",
+    "earningsDate": "2026-10-20",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.13,
+    "firstSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-20",
+      "reportedTiming": "post-market",
+      "actualEps": 3,
+      "expectedEpsAtReport": 2.6956,
+      "epsSurprisePct": 11.3,
+      "actualRevenue": 3048700000,
+      "expectedRevenueAtReport": 2963811429,
+      "revenueSurprisePct": 2.9,
+      "reaction": {
+        "baselineDate": "2026-10-20",
+        "baselinePrice": 438,
+        "newDate": "2026-10-21",
+        "newPrice": 428.1199951171875,
+        "reactionPercent": -2.3,
+        "basis": "post-market"
+      },
+      "interpretation": "Results beat estimates, but the stock fell — expectations may have been higher.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "TSLA",
+    "name": "Tesla, Inc.",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.22,
+    "firstSeenAt": "2026-10-14T12:58:55.715Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "post-market",
+      "actualEps": 0.48,
+      "expectedEpsAtReport": 0.4358,
+      "epsSurprisePct": 10.1,
+      "actualRevenue": 28046000000,
+      "expectedRevenueAtReport": 28440505633,
+      "revenueSurprisePct": -1.4,
       "reaction": null,
       "interpretation": "Mixed earnings result; stock reaction not yet available.",
-      "checkedAt": "2026-10-21T12:58:46.113Z"
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "LRCX",
+    "name": "Lam Research Corporation",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.17,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "post-market",
+      "actualEps": 2.2,
+      "expectedEpsAtReport": 2.2215,
+      "epsSurprisePct": -1,
+      "actualRevenue": 8219418000,
+      "expectedRevenueAtReport": 8316301087,
+      "revenueSurprisePct": -1.2,
+      "reaction": null,
+      "interpretation": "Results missed estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "TXN",
+    "name": "Texas Instruments Incorporated",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.4,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "post-market",
+      "actualEps": 2.62,
+      "expectedEpsAtReport": 2.4415,
+      "epsSurprisePct": 7.3,
+      "actualRevenue": 6055000000,
+      "expectedRevenueAtReport": 5979281446,
+      "revenueSurprisePct": 1.3,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "TMO",
+    "name": "Thermo Fisher Scientific Inc",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "pre-market",
+    "expectedEps": 6.4,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "pre-market",
+      "actualEps": 6.68,
+      "expectedEpsAtReport": 6.4673,
+      "epsSurprisePct": 3.3,
+      "actualRevenue": 12137000000,
+      "expectedRevenueAtReport": 12065541860,
+      "revenueSurprisePct": 0.6,
+      "reaction": {
+        "baselineDate": "2026-10-20",
+        "baselinePrice": 687.3699951171875,
+        "newDate": "2026-10-21",
+        "newPrice": 694.02001953125,
+        "reactionPercent": 1,
+        "basis": "pre-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "ABT",
+    "name": "Abbott Laboratories",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.42,
+    "firstSeenAt": "2026-10-15T12:58:42.394Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.42,
+      "expectedEpsAtReport": 1.4297,
+      "epsSurprisePct": -0.7,
+      "actualRevenue": 13013000000,
+      "expectedRevenueAtReport": 13127904542,
+      "revenueSurprisePct": -0.9,
+      "reaction": {
+        "baselineDate": "2026-10-20",
+        "baselinePrice": 102.44999694824219,
+        "newDate": "2026-10-21",
+        "newPrice": 100.51000213623047,
+        "reactionPercent": -1.9,
+        "basis": "pre-market"
+      },
+      "interpretation": "Weak report confirmed by negative market reaction.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "PM",
+    "name": "Philip Morris International Inc",
+    "earningsDate": "2026-10-21",
+    "expectedTiming": "pre-market",
+    "expectedEps": 2.3,
+    "firstSeenAt": "2026-10-16T12:58:54.511Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-21",
+      "reportedTiming": "pre-market",
+      "actualEps": 2.36,
+      "expectedEpsAtReport": 2.3599,
+      "epsSurprisePct": 0,
+      "actualRevenue": 11438000000,
+      "expectedRevenueAtReport": 11615178726,
+      "revenueSurprisePct": -1.5,
+      "reaction": {
+        "baselineDate": "2026-10-20",
+        "baselinePrice": 199.89999389648438,
+        "newDate": "2026-10-21",
+        "newPrice": 197.4600067138672,
+        "reactionPercent": -1.2,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
     }
   },
   {
@@ -1726,7 +1887,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.17,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
     "status": "awaiting"
   },
   {
@@ -1736,7 +1897,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 3.43,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
     "status": "awaiting"
   },
   {
@@ -1746,7 +1907,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
     "status": "awaiting"
   },
   {
@@ -1756,7 +1917,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.71,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
     "status": "awaiting"
   },
   {
@@ -1766,7 +1927,71 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-21T12:58:46.113Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AMZN",
+    "name": "Amazon.com, Inc.",
+    "earningsDate": "2026-10-29",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.01,
+    "firstSeenAt": "2026-10-22T12:59:01.268Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "PG",
+    "name": "Procter & Gamble Company (The)",
+    "earningsDate": "2026-10-22",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.89,
+    "firstSeenAt": "2026-10-22T12:59:01.268Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-22",
+      "reportedTiming": "pre-market",
+      "actualEps": 2,
+      "expectedEpsAtReport": 1.94,
+      "epsSurprisePct": 3.1,
+      "actualRevenue": 23276000000,
+      "expectedRevenueAtReport": 23479235426,
+      "revenueSurprisePct": -0.9,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-22T12:59:01.268Z"
+    }
+  },
+  {
+    "ticker": "AXP",
+    "name": "American Express Company",
+    "earningsDate": "2026-10-23",
+    "expectedTiming": "pre-market",
+    "expectedEps": 4.47,
+    "firstSeenAt": "2026-10-22T12:59:01.268Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "VZ",
+    "name": "Verizon Communications Inc.",
+    "earningsDate": "2026-10-26",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.27,
+    "firstSeenAt": "2026-10-22T12:59:01.268Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "MA",
+    "name": "Mastercard Incorporated",
+    "earningsDate": "2026-10-29",
+    "expectedTiming": "pre-market",
+    "expectedEps": 5.14,
+    "firstSeenAt": "2026-10-22T12:59:01.268Z",
+    "lastSeenAt": "2026-10-22T12:59:01.268Z",
     "status": "awaiting"
   }
 ]

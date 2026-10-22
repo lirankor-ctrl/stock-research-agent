@@ -1,12 +1,12 @@
 {
-  "lastSentUsTradingDate": "2026-10-21",
-  "lastSentAtIso": "2026-10-21T12:59:07.999Z",
-  "lastSentMessageId": "<e50f28c2-f69e-c9ab-6538-620e6d122278@gmail.com>",
-  "lastSentRunId": "39603895057",
+  "lastSentUsTradingDate": "2026-10-22",
+  "lastSentAtIso": "2026-10-22T12:59:36.762Z",
+  "lastSentMessageId": "<f0655e07-fd1b-799b-98e0-1d658ddda6e6@gmail.com>",
+  "lastSentRunId": "39782749689",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "HLT",
-    "tradingDate": "2026-10-21",
+    "ticker": "MMM",
+    "tradingDate": "2026-10-22",
     "setupType": "breakout",
     "status": "confirmed"
   }
