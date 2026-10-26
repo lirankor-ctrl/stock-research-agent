@@ -1915,7 +1915,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.17,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -1925,7 +1925,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 3.43,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -1935,7 +1935,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -1945,7 +1945,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.71,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -1955,7 +1955,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -1965,7 +1965,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.01,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -2006,8 +2006,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.47,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-23",
@@ -2018,9 +2018,16 @@
       "actualRevenue": 20062000000,
       "expectedRevenueAtReport": 20323276176,
       "revenueSurprisePct": -1.3,
-      "reaction": null,
-      "interpretation": "Mixed earnings result; stock reaction not yet available.",
-      "checkedAt": "2026-10-23T12:58:41.341Z"
+      "reaction": {
+        "baselineDate": "2026-10-22",
+        "baselinePrice": 325.1700134277344,
+        "newDate": "2026-10-23",
+        "newPrice": 313.2200012207031,
+        "reactionPercent": -3.7,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-26T13:59:19.713Z"
     }
   },
   {
@@ -2030,8 +2037,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.27,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-26",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.31,
+      "expectedEpsAtReport": 1.3111,
+      "epsSurprisePct": -0.1,
+      "actualRevenue": 34313000000,
+      "expectedRevenueAtReport": 35786346491,
+      "revenueSurprisePct": -4.1,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-26T13:59:19.713Z"
+    }
   },
   {
     "ticker": "MA",
@@ -2040,7 +2061,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 5.14,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   },
   {
@@ -2048,9 +2069,29 @@
     "name": "ExxonMobil Holdings Corporation",
     "earningsDate": "2026-10-30",
     "expectedTiming": "pre-market",
-    "expectedEps": 3.96,
+    "expectedEps": 3.9,
     "firstSeenAt": "2026-10-23T12:58:41.341Z",
-    "lastSeenAt": "2026-10-23T12:58:41.341Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "PLTR",
+    "name": "Palantir Technologies Inc.",
+    "earningsDate": "2026-11-02",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.34,
+    "firstSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AAPL",
+    "name": "Apple Inc.",
+    "earningsDate": "2026-11-02",
+    "expectedTiming": "post-market",
+    "expectedEps": 2,
+    "firstSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-26T13:59:19.713Z",
     "status": "awaiting"
   }
 ]
