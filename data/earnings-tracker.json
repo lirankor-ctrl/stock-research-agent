@@ -1915,8 +1915,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.17,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-27",
+      "reportedTiming": "pre-market",
+      "actualEps": 0.18,
+      "expectedEpsAtReport": 0.1701,
+      "epsSurprisePct": 5.8,
+      "actualRevenue": 1371120000,
+      "expectedRevenueAtReport": 1280811368,
+      "revenueSurprisePct": 7.1,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-27T13:58:37.896Z"
+    }
   },
   {
     "ticker": "V",
@@ -1925,7 +1939,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 3.43,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -1935,7 +1949,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -1945,7 +1959,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.71,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -1955,7 +1969,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -1965,7 +1979,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.01,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -2037,8 +2051,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.27,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-26",
@@ -2049,9 +2063,16 @@
       "actualRevenue": 34313000000,
       "expectedRevenueAtReport": 35786346491,
       "revenueSurprisePct": -4.1,
-      "reaction": null,
-      "interpretation": "Mixed earnings result; stock reaction not yet available.",
-      "checkedAt": "2026-10-26T13:59:19.713Z"
+      "reaction": {
+        "baselineDate": "2026-10-23",
+        "baselinePrice": 44.65999984741211,
+        "newDate": "2026-10-26",
+        "newPrice": 43.099998474121094,
+        "reactionPercent": -3.5,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-10-27T13:58:37.896Z"
     }
   },
   {
@@ -2061,7 +2082,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 5.14,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -2071,7 +2092,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.9,
     "firstSeenAt": "2026-10-23T12:58:41.341Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -2081,7 +2102,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.34,
     "firstSeenAt": "2026-10-26T13:59:19.713Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   },
   {
@@ -2091,7 +2112,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2,
     "firstSeenAt": "2026-10-26T13:59:19.713Z",
-    "lastSeenAt": "2026-10-26T13:59:19.713Z",
+    "lastSeenAt": "2026-10-27T13:58:37.896Z",
     "status": "awaiting"
   }
 ]

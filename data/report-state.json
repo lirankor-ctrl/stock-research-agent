@@ -1,13 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-10-26",
-  "lastSentAtIso": "2026-10-26T13:59:39.909Z",
-  "lastSentMessageId": "<28d9c7d8-c408-7b4f-f408-0716ce3e4229@gmail.com>",
-  "lastSentRunId": "40335283042",
+  "lastSentUsTradingDate": "2026-10-27",
+  "lastSentAtIso": "2026-10-27T13:58:56.888Z",
+  "lastSentMessageId": "<0953cd16-200c-cd1d-c154-d4e1e641eaa9@gmail.com>",
+  "lastSentRunId": "40516746337",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "SPOT",
-    "tradingDate": "2026-10-26",
-    "setupType": "breakout",
+    "ticker": "ASML",
+    "tradingDate": "2026-10-27",
+    "setupType": "meanReversion",
     "status": "confirmed"
   }
 }
