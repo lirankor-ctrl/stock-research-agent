@@ -1915,8 +1915,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.17,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-27",
@@ -1927,9 +1927,16 @@
       "actualRevenue": 1371120000,
       "expectedRevenueAtReport": 1280811368,
       "revenueSurprisePct": 7.1,
-      "reaction": null,
-      "interpretation": "Results beat estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-27T13:58:37.896Z"
+      "reaction": {
+        "baselineDate": "2026-10-26",
+        "baselinePrice": 14.460000038146973,
+        "newDate": "2026-10-27",
+        "newPrice": 16.399999618530273,
+        "reactionPercent": 13.4,
+        "basis": "pre-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-10-28T13:58:53.634Z"
     }
   },
   {
@@ -1939,8 +1946,22 @@
     "expectedTiming": "post-market",
     "expectedEps": 3.43,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-27",
+      "reportedTiming": "post-market",
+      "actualEps": 3.48,
+      "expectedEpsAtReport": 3.5044,
+      "epsSurprisePct": -0.7,
+      "actualRevenue": 12139000000,
+      "expectedRevenueAtReport": 12325777573,
+      "revenueSurprisePct": -1.5,
+      "reaction": null,
+      "interpretation": "Results missed estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-28T13:58:53.634Z"
+    }
   },
   {
     "ticker": "GOOGL",
@@ -1949,7 +1970,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -1959,7 +1980,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.71,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -1969,7 +1990,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -1979,7 +2000,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.01,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -2082,7 +2103,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 5.14,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -2092,7 +2113,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.9,
     "firstSeenAt": "2026-10-23T12:58:41.341Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -2100,9 +2121,9 @@
     "name": "Palantir Technologies Inc.",
     "earningsDate": "2026-11-02",
     "expectedTiming": "post-market",
-    "expectedEps": 0.34,
+    "expectedEps": 0.33,
     "firstSeenAt": "2026-10-26T13:59:19.713Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   },
   {
@@ -2110,9 +2131,29 @@
     "name": "Apple Inc.",
     "earningsDate": "2026-11-02",
     "expectedTiming": "post-market",
-    "expectedEps": 2,
+    "expectedEps": 1.98,
     "firstSeenAt": "2026-10-26T13:59:19.713Z",
-    "lastSeenAt": "2026-10-27T13:58:37.896Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "KLAC",
+    "name": "KLA Corporation",
+    "earningsDate": "2026-10-28",
+    "expectedTiming": "post-market",
+    "expectedEps": 1.18,
+    "firstSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AMD",
+    "name": "Advanced Micro Devices, Inc.",
+    "earningsDate": "2026-11-03",
+    "expectedTiming": "post-market",
+    "expectedEps": 1.68,
+    "firstSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-28T13:58:53.634Z",
     "status": "awaiting"
   }
 ]
