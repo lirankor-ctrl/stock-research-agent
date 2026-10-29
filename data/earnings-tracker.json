@@ -1946,8 +1946,8 @@
     "expectedTiming": "post-market",
     "expectedEps": 3.43,
     "firstSeenAt": "2026-10-20T12:58:47.954Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-10-27",
@@ -1958,9 +1958,16 @@
       "actualRevenue": 12139000000,
       "expectedRevenueAtReport": 12325777573,
       "revenueSurprisePct": -1.5,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-10-28T13:58:53.634Z"
+      "reaction": {
+        "baselineDate": "2026-10-27",
+        "baselinePrice": 401.8599853515625,
+        "newDate": "2026-10-28",
+        "newPrice": 400.6000061035156,
+        "reactionPercent": -0.3,
+        "basis": "post-market"
+      },
+      "interpretation": "Weak report confirmed by negative market reaction.",
+      "checkedAt": "2026-10-29T13:58:37.277Z"
     }
   },
   {
@@ -1970,7 +1977,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -1980,7 +1987,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.71,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -1990,7 +1997,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.94,
     "firstSeenAt": "2026-10-21T12:58:46.113Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -2000,7 +2007,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.01,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -2103,8 +2110,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 5.14,
     "firstSeenAt": "2026-10-22T12:59:01.268Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-29",
+      "reportedTiming": "pre-market",
+      "actualEps": 5.31,
+      "expectedEpsAtReport": 5.3156,
+      "epsSurprisePct": -0.1,
+      "actualRevenue": 9807000000,
+      "expectedRevenueAtReport": 9942782507,
+      "revenueSurprisePct": -1.4,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-29T13:58:37.277Z"
+    }
   },
   {
     "ticker": "XOM",
@@ -2113,7 +2134,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.9,
     "firstSeenAt": "2026-10-23T12:58:41.341Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -2123,7 +2144,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.33,
     "firstSeenAt": "2026-10-26T13:59:19.713Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -2133,7 +2154,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.98,
     "firstSeenAt": "2026-10-26T13:59:19.713Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -2143,7 +2164,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.18,
     "firstSeenAt": "2026-10-28T13:58:53.634Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   },
   {
@@ -2153,7 +2174,75 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.68,
     "firstSeenAt": "2026-10-28T13:58:53.634Z",
-    "lastSeenAt": "2026-10-28T13:58:53.634Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "INTC",
+    "name": "Intel Corporation",
+    "earningsDate": "2026-10-29",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.28,
+    "firstSeenAt": "2026-10-29T13:58:37.277Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CAT",
+    "name": "Caterpillar, Inc.",
+    "earningsDate": "2026-10-29",
+    "expectedTiming": "pre-market",
+    "expectedEps": 7.12,
+    "firstSeenAt": "2026-10-29T13:58:37.277Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-29",
+      "reportedTiming": "pre-market",
+      "actualEps": 7.2,
+      "expectedEpsAtReport": 7.1552,
+      "epsSurprisePct": 0.6,
+      "actualRevenue": 20682000000,
+      "expectedRevenueAtReport": 20750271987,
+      "revenueSurprisePct": -0.3,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-10-29T13:58:37.277Z"
+    }
+  },
+  {
+    "ticker": "LIN",
+    "name": "Linde plc",
+    "earningsDate": "2026-10-29",
+    "expectedTiming": "pre-market",
+    "expectedEps": 4.52,
+    "firstSeenAt": "2026-10-29T13:58:37.277Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-10-29",
+      "reportedTiming": "pre-market",
+      "actualEps": 4.59,
+      "expectedEpsAtReport": 4.5612,
+      "epsSurprisePct": 0.6,
+      "actualRevenue": 9404000000,
+      "expectedRevenueAtReport": 9231276204,
+      "revenueSurprisePct": 1.9,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-10-29T13:58:37.277Z"
+    }
+  },
+  {
+    "ticker": "GILD",
+    "name": "Gilead Sciences, Inc.",
+    "earningsDate": "2026-10-29",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.17,
+    "firstSeenAt": "2026-10-29T13:58:37.277Z",
+    "lastSeenAt": "2026-10-29T13:58:37.277Z",
     "status": "awaiting"
   }
 ]
