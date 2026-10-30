@@ -1,13 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-10-29",
-  "lastSentAtIso": "2026-10-29T13:58:58.834Z",
-  "lastSentMessageId": "<a4650875-1e3e-0e48-71b2-d61d3a1e1611@gmail.com>",
-  "lastSentRunId": "40886850793",
+  "lastSentUsTradingDate": "2026-10-30",
+  "lastSentAtIso": "2026-10-30T13:59:25.847Z",
+  "lastSentMessageId": "<96f6fce6-5fb6-f32e-664d-7d4e8af5e634@gmail.com>",
+  "lastSentRunId": "41067673748",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "GOOGL",
-    "tradingDate": "2026-10-29",
-    "setupType": "meanReversion",
+    "ticker": "LLY",
+    "tradingDate": "2026-10-30",
+    "setupType": "breakout",
     "status": "confirmed"
   }
 }
