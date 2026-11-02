@@ -1,13 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-10-30",
-  "lastSentAtIso": "2026-10-30T13:59:25.847Z",
-  "lastSentMessageId": "<96f6fce6-5fb6-f32e-664d-7d4e8af5e634@gmail.com>",
-  "lastSentRunId": "41067673748",
+  "lastSentUsTradingDate": "2026-11-02",
+  "lastSentAtIso": "2026-11-02T13:59:16.992Z",
+  "lastSentMessageId": "<63f456ce-2858-da96-2f87-4554963c8608@gmail.com>",
+  "lastSentRunId": "41457562714",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "LLY",
-    "tradingDate": "2026-10-30",
-    "setupType": "breakout",
+    "ticker": "FDX",
+    "tradingDate": "2026-11-02",
+    "setupType": "squeeze",
     "status": "confirmed"
   }
 }
