@@ -2349,8 +2349,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.68,
     "firstSeenAt": "2026-10-28T13:58:53.634Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-03",
+      "reportedTiming": "post-market",
+      "actualEps": 2.09,
+      "expectedEpsAtReport": 1.969,
+      "epsSurprisePct": 6.1,
+      "actualRevenue": 13377000000,
+      "expectedRevenueAtReport": 13222748108,
+      "revenueSurprisePct": 1.2,
+      "reaction": {
+        "baselineDate": "2026-11-03",
+        "baselinePrice": 483.8999938964844,
+        "newDate": "2026-11-04",
+        "newPrice": 488.7799987792969,
+        "reactionPercent": 1,
+        "basis": "post-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
   },
   {
     "ticker": "INTC",
@@ -2638,7 +2659,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 5.91,
     "firstSeenAt": "2026-10-30T13:58:55.796Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
     "status": "awaiting"
   },
   {
@@ -2648,8 +2669,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.48,
     "firstSeenAt": "2026-11-02T13:58:53.521Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-03",
+      "reportedTiming": "post-market",
+      "actualEps": 4.66,
+      "expectedEpsAtReport": 4.5926,
+      "epsSurprisePct": 1.5,
+      "actualRevenue": 8893000000,
+      "expectedRevenueAtReport": 9738989712,
+      "revenueSurprisePct": -8.7,
+      "reaction": {
+        "baselineDate": "2026-11-03",
+        "baselinePrice": 155.6699981689453,
+        "newDate": "2026-11-04",
+        "newPrice": 170.97000122070312,
+        "reactionPercent": 9.8,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
   },
   {
     "ticker": "ARM",
@@ -2658,7 +2700,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.22,
     "firstSeenAt": "2026-11-02T13:58:53.521Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
     "status": "awaiting"
   },
   {
@@ -2668,8 +2710,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.36,
     "firstSeenAt": "2026-11-03T13:59:09.030Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-11-04",
@@ -2680,9 +2722,16 @@
       "actualRevenue": 7157000000,
       "expectedRevenueAtReport": 7357417406,
       "revenueSurprisePct": -2.7,
-      "reaction": null,
-      "interpretation": "Mixed earnings result; stock reaction not yet available.",
-      "checkedAt": "2026-11-04T13:58:46.356Z"
+      "reaction": {
+        "baselineDate": "2026-11-03",
+        "baselinePrice": 263.0400085449219,
+        "newDate": "2026-11-04",
+        "newPrice": 280.2200012207031,
+        "reactionPercent": 6.5,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
     }
   },
   {
@@ -2692,8 +2741,22 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.46,
     "firstSeenAt": "2026-11-03T13:59:09.030Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-04",
+      "reportedTiming": "post-market",
+      "actualEps": 2.17,
+      "expectedEpsAtReport": 2.202,
+      "epsSurprisePct": -1.5,
+      "actualRevenue": 10442000000,
+      "expectedRevenueAtReport": 10318265215,
+      "revenueSurprisePct": 1.2,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
   },
   {
     "ticker": "UBER",
@@ -2702,8 +2765,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.94,
     "firstSeenAt": "2026-11-03T13:59:09.030Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-11-04",
@@ -2714,9 +2777,16 @@
       "actualRevenue": 14766000000,
       "expectedRevenueAtReport": 14997971451,
       "revenueSurprisePct": -1.5,
-      "reaction": null,
-      "interpretation": "Results missed estimates; stock reaction not yet available.",
-      "checkedAt": "2026-11-04T13:58:46.356Z"
+      "reaction": {
+        "baselineDate": "2026-11-03",
+        "baselinePrice": 66.5999984741211,
+        "newDate": "2026-11-04",
+        "newPrice": 69.87000274658203,
+        "reactionPercent": 4.9,
+        "basis": "pre-market"
+      },
+      "interpretation": "Results missed estimates, but the stock rose — the reaction may be pricing in other factors.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
     }
   },
   {
@@ -2726,8 +2796,22 @@
     "expectedTiming": "post-market",
     "expectedEps": 9.41,
     "firstSeenAt": "2026-11-03T13:59:09.030Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-04",
+      "reportedTiming": "post-market",
+      "actualEps": 8.83,
+      "expectedEpsAtReport": 9.5488,
+      "epsSurprisePct": -7.5,
+      "actualRevenue": 10750000000,
+      "expectedRevenueAtReport": 10876335306,
+      "revenueSurprisePct": -1.2,
+      "reaction": null,
+      "interpretation": "Results missed estimates; stock reaction not yet available.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
   },
   {
     "ticker": "ABNB",
@@ -2736,7 +2820,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.86,
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
     "status": "awaiting"
   },
   {
@@ -2746,7 +2830,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.82,
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
     "status": "awaiting"
   },
   {
@@ -2755,7 +2839,7 @@
     "earningsDate": "2026-11-06",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-04T13:58:46.356Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
     "status": "awaiting"
   },
   {
@@ -2766,6 +2850,108 @@
     "expectedEps": 1.15,
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
     "lastSeenAt": "2026-11-04T13:58:46.356Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "COP",
+    "name": "ConocoPhillips",
+    "earningsDate": "2026-11-05",
+    "expectedTiming": "pre-market",
+    "expectedEps": 3.06,
+    "firstSeenAt": "2026-11-05T13:58:53.849Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-05",
+      "reportedTiming": "pre-market",
+      "actualEps": 3.27,
+      "expectedEpsAtReport": 2.9914,
+      "epsSurprisePct": 9.3,
+      "actualRevenue": 20057000000,
+      "expectedRevenueAtReport": 18357035365,
+      "revenueSurprisePct": 9.3,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
+  },
+  {
+    "ticker": "SONY",
+    "name": "Sony Group Corporation",
+    "earningsDate": "2026-11-05",
+    "expectedTiming": "pre-market",
+    "expectedEps": 0.38,
+    "firstSeenAt": "2026-11-05T13:58:53.849Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-05",
+      "reportedTiming": "pre-market",
+      "actualEps": 76.02239999999999,
+      "expectedEpsAtReport": 63.1636,
+      "epsSurprisePct": 20.4,
+      "actualRevenue": 3413190363200,
+      "expectedRevenueAtReport": 3214790276700,
+      "revenueSurprisePct": 6.2,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
+  },
+  {
+    "ticker": "MNST",
+    "name": "Monster Beverage Corporation",
+    "earningsDate": "2026-11-05",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.3,
+    "firstSeenAt": "2026-11-05T13:58:53.849Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "PH",
+    "name": "Parker-Hannifin Corporation",
+    "earningsDate": "2026-11-05",
+    "expectedTiming": "pre-market",
+    "expectedEps": 8.23,
+    "firstSeenAt": "2026-11-05T13:58:53.849Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-05",
+      "reportedTiming": "pre-market",
+      "actualEps": 8.9,
+      "expectedEpsAtReport": 8.4333,
+      "epsSurprisePct": 5.5,
+      "actualRevenue": 5992000000,
+      "expectedRevenueAtReport": 5906544599,
+      "revenueSurprisePct": 1.4,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-11-05T13:58:53.849Z"
+    }
+  },
+  {
+    "ticker": "CSCO",
+    "name": "Cisco Systems, Inc.",
+    "earningsDate": "2026-11-12",
+    "expectedTiming": "post-market",
+    "expectedEps": 1.15,
+    "firstSeenAt": "2026-11-05T13:58:53.849Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "AMAT",
+    "name": "Applied Materials, Inc.",
+    "earningsDate": "2026-11-12",
+    "expectedTiming": "post-market",
+    "expectedEps": 4.06,
+    "firstSeenAt": "2026-11-05T13:58:53.849Z",
+    "lastSeenAt": "2026-11-05T13:58:53.849Z",
     "status": "awaiting"
   }
 ]

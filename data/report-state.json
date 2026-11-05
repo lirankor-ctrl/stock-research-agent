@@ -1,13 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-11-04",
-  "lastSentAtIso": "2026-11-04T13:59:01.048Z",
-  "lastSentMessageId": "<18633ae7-5785-6a12-b76f-917f0358a5f9@gmail.com>",
-  "lastSentRunId": "41842948501",
+  "lastSentUsTradingDate": "2026-11-05",
+  "lastSentAtIso": "2026-11-05T13:59:34.355Z",
+  "lastSentMessageId": "<eebc97ba-33dd-d754-760e-3992494a3b68@gmail.com>",
+  "lastSentRunId": "42040488064",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "FDX",
-    "tradingDate": "2026-11-04",
-    "setupType": "squeeze",
+    "ticker": "EQIX",
+    "tradingDate": "2026-11-05",
+    "setupType": "breakout",
     "status": "confirmed"
   }
 }
