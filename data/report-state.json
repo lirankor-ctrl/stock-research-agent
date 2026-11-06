@@ -1,12 +1,12 @@
 {
-  "lastSentUsTradingDate": "2026-11-05",
-  "lastSentAtIso": "2026-11-05T13:59:34.355Z",
-  "lastSentMessageId": "<eebc97ba-33dd-d754-760e-3992494a3b68@gmail.com>",
-  "lastSentRunId": "42040488064",
+  "lastSentUsTradingDate": "2026-11-06",
+  "lastSentAtIso": "2026-11-06T13:58:57.592Z",
+  "lastSentMessageId": "<059f7861-d19a-c899-b0d0-db4f830a1336@gmail.com>",
+  "lastSentRunId": "42229782374",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "EQIX",
-    "tradingDate": "2026-11-05",
+    "ticker": "COST",
+    "tradingDate": "2026-11-06",
     "setupType": "breakout",
     "status": "confirmed"
   }
