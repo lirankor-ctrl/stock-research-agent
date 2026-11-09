@@ -1,12 +1,12 @@
 {
-  "lastSentUsTradingDate": "2026-11-06",
-  "lastSentAtIso": "2026-11-06T13:58:57.592Z",
-  "lastSentMessageId": "<059f7861-d19a-c899-b0d0-db4f830a1336@gmail.com>",
-  "lastSentRunId": "42229782374",
+  "lastSentUsTradingDate": "2026-11-09",
+  "lastSentAtIso": "2026-11-09T13:59:18.076Z",
+  "lastSentMessageId": "<4493c8cf-1f78-2bea-c68a-7417a4119d3e@gmail.com>",
+  "lastSentRunId": "42630130830",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "COST",
-    "tradingDate": "2026-11-06",
+    "ticker": "ABNB",
+    "tradingDate": "2026-11-09",
     "setupType": "breakout",
     "status": "confirmed"
   }

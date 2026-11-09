@@ -2659,8 +2659,22 @@
     "expectedTiming": "unknown",
     "expectedEps": 5.91,
     "firstSeenAt": "2026-10-30T13:58:55.796Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-07",
+      "reportedTiming": "pre-market",
+      "actualEps": 8909.54,
+      "expectedEpsAtReport": 9253.7737,
+      "epsSurprisePct": -3.7,
+      "actualRevenue": 105647000000,
+      "expectedRevenueAtReport": 99781538400,
+      "revenueSurprisePct": 5.9,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
   },
   {
     "ticker": "BKNG",
@@ -2700,8 +2714,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.22,
     "firstSeenAt": "2026-11-02T13:58:53.521Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-04",
+      "reportedTiming": "post-market",
+      "actualEps": 0.52,
+      "expectedEpsAtReport": 0.4795,
+      "epsSurprisePct": 8.4,
+      "actualRevenue": 1443000000,
+      "expectedRevenueAtReport": 1389460423,
+      "revenueSurprisePct": 3.9,
+      "reaction": {
+        "baselineDate": "2026-11-04",
+        "baselinePrice": 191.8000030517578,
+        "newDate": "2026-11-05",
+        "newPrice": 166.72000122070312,
+        "reactionPercent": -13.1,
+        "basis": "post-market"
+      },
+      "interpretation": "Results beat estimates, but the stock fell — expectations may have been higher.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
   },
   {
     "ticker": "MCD",
@@ -2834,8 +2869,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.86,
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-05",
+      "reportedTiming": "post-market",
+      "actualEps": 3.16,
+      "expectedEpsAtReport": 2.9104,
+      "epsSurprisePct": 8.6,
+      "actualRevenue": 4869000000,
+      "expectedRevenueAtReport": 4843259788,
+      "revenueSurprisePct": 0.5,
+      "reaction": {
+        "baselineDate": "2026-11-05",
+        "baselinePrice": 170.1300048828125,
+        "newDate": "2026-11-06",
+        "newPrice": 189.99000549316406,
+        "reactionPercent": 11.7,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
   },
   {
     "ticker": "MCHP",
@@ -2844,8 +2900,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.82,
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-05",
+      "reportedTiming": "post-market",
+      "actualEps": 0.97,
+      "expectedEpsAtReport": 0.9482,
+      "epsSurprisePct": 2.3,
+      "actualRevenue": 1621500000,
+      "expectedRevenueAtReport": 1638920363,
+      "revenueSurprisePct": -1.1,
+      "reaction": {
+        "baselineDate": "2026-11-05",
+        "baselinePrice": 64.8499984741211,
+        "newDate": "2026-11-06",
+        "newPrice": 58.349998474121094,
+        "reactionPercent": -10,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
   },
   {
     "ticker": "BRK.A",
@@ -2853,8 +2930,22 @@
     "earningsDate": "2026-11-06",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-07",
+      "reportedTiming": "pre-market",
+      "actualEps": 8909.54,
+      "expectedEpsAtReport": 9253.7737,
+      "epsSurprisePct": -3.7,
+      "actualRevenue": 105647000000,
+      "expectedRevenueAtReport": 99781538400,
+      "revenueSurprisePct": 5.9,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
   },
   {
     "ticker": "CSCO",
@@ -2935,8 +3026,29 @@
     "expectedTiming": "post-market",
     "expectedEps": 0.3,
     "firstSeenAt": "2026-11-05T13:58:53.849Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reported",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-05",
+      "reportedTiming": "post-market",
+      "actualEps": 0.3,
+      "expectedEpsAtReport": 0.305,
+      "epsSurprisePct": -1.6,
+      "actualRevenue": 2563053000,
+      "expectedRevenueAtReport": 2545326951,
+      "revenueSurprisePct": 0.7,
+      "reaction": {
+        "baselineDate": "2026-11-05",
+        "baselinePrice": 47.83000183105469,
+        "newDate": "2026-11-06",
+        "newPrice": 45.720001220703125,
+        "reactionPercent": -4.4,
+        "basis": "post-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
   },
   {
     "ticker": "PH",
@@ -2976,7 +3088,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.15,
     "firstSeenAt": "2026-11-05T13:58:53.849Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   },
   {
@@ -2986,7 +3098,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.06,
     "firstSeenAt": "2026-11-05T13:58:53.849Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   },
   {
@@ -2996,8 +3108,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.36,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-11-06",
@@ -3008,9 +3120,16 @@
       "actualRevenue": 21174286122,
       "expectedRevenueAtReport": 16513961570,
       "revenueSurprisePct": 28.2,
-      "reaction": null,
-      "interpretation": "Results beat estimates; stock reaction not yet available.",
-      "checkedAt": "2026-11-06T13:58:39.509Z"
+      "reaction": {
+        "baselineDate": "2026-11-05",
+        "baselinePrice": 48.11000061035156,
+        "newDate": "2026-11-06",
+        "newPrice": 46.88999938964844,
+        "reactionPercent": -2.5,
+        "basis": "pre-market"
+      },
+      "interpretation": "Results beat estimates, but the stock fell — expectations may have been higher.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
     }
   },
   {
@@ -3018,9 +3137,9 @@
     "name": "Petroleo Brasileiro S.A.- Petrobras",
     "earningsDate": "2026-11-10",
     "expectedTiming": "post-market",
-    "expectedEps": 1.23,
+    "expectedEps": 1.38,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   },
   {
@@ -3030,7 +3149,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   },
   {
@@ -3040,7 +3159,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.45,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   },
   {
@@ -3050,7 +3169,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.24,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   },
   {
@@ -3060,7 +3179,64 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.21,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-06T13:58:39.509Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "KKR",
+    "name": "KKR & Co. Inc.",
+    "earningsDate": "2026-11-09",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.41,
+    "firstSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-09",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.78,
+      "expectedEpsAtReport": 1.6044,
+      "epsSurprisePct": 10.9,
+      "actualRevenue": 1855320000,
+      "expectedRevenueAtReport": 2622445052,
+      "revenueSurprisePct": -29.3,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
+  },
+  {
+    "ticker": "CEG",
+    "name": "Constellation Energy Corporation",
+    "earningsDate": "2026-11-09",
+    "expectedTiming": "pre-market",
+    "expectedEps": 3.9,
+    "firstSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-09",
+      "reportedTiming": "pre-market",
+      "actualEps": 5.06,
+      "expectedEpsAtReport": 3.8857,
+      "epsSurprisePct": 30.2,
+      "actualRevenue": 9550000000,
+      "expectedRevenueAtReport": 9465329917,
+      "revenueSurprisePct": 0.9,
+      "reaction": null,
+      "interpretation": "Results beat estimates; stock reaction not yet available.",
+      "checkedAt": "2026-11-09T13:58:53.740Z"
+    }
+  },
+  {
+    "ticker": "PBR.A",
+    "name": "Petroleo Brasileiro S.A.- Petrobras",
+    "earningsDate": "2026-11-10",
+    "expectedTiming": "post-market",
+    "firstSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-09T13:58:53.740Z",
     "status": "awaiting"
   }
 ]
