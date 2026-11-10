@@ -1,13 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-11-09",
-  "lastSentAtIso": "2026-11-09T13:59:18.076Z",
-  "lastSentMessageId": "<4493c8cf-1f78-2bea-c68a-7417a4119d3e@gmail.com>",
-  "lastSentRunId": "42630130830",
+  "lastSentUsTradingDate": "2026-11-10",
+  "lastSentAtIso": "2026-11-10T13:59:47.032Z",
+  "lastSentMessageId": "<3e96fcf4-68d5-8032-73b7-a5ec40517b8c@gmail.com>",
+  "lastSentRunId": "42829405919",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "ABNB",
-    "tradingDate": "2026-11-09",
-    "setupType": "breakout",
+    "ticker": "PSX",
+    "tradingDate": "2026-11-10",
+    "setupType": "meanReversion",
     "status": "confirmed"
   }
 }

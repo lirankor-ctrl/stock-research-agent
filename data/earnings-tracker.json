@@ -2659,7 +2659,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 5.91,
     "firstSeenAt": "2026-10-30T13:58:55.796Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -2930,7 +2930,7 @@
     "earningsDate": "2026-11-06",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -3088,7 +3088,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.15,
     "firstSeenAt": "2026-11-05T13:58:53.849Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   },
   {
@@ -3098,7 +3098,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 4.06,
     "firstSeenAt": "2026-11-05T13:58:53.849Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   },
   {
@@ -3139,7 +3139,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.38,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   },
   {
@@ -3149,7 +3149,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 0.72,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   },
   {
@@ -3159,17 +3159,17 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.45,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   },
   {
     "ticker": "SMFG",
     "name": "Sumitomo Mitsui Financial Group Inc",
     "earningsDate": "2026-11-13",
-    "expectedTiming": "unknown",
+    "expectedTiming": "pre-market",
     "expectedEps": 0.24,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   },
   {
@@ -3189,8 +3189,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.41,
     "firstSeenAt": "2026-11-09T13:58:53.740Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-11-09",
@@ -3201,9 +3201,16 @@
       "actualRevenue": 1855320000,
       "expectedRevenueAtReport": 2622445052,
       "revenueSurprisePct": -29.3,
-      "reaction": null,
-      "interpretation": "Mixed earnings result; stock reaction not yet available.",
-      "checkedAt": "2026-11-09T13:58:53.740Z"
+      "reaction": {
+        "baselineDate": "2026-11-06",
+        "baselinePrice": 96.4800033569336,
+        "newDate": "2026-11-09",
+        "newPrice": 98.08999633789062,
+        "reactionPercent": 1.7,
+        "basis": "pre-market"
+      },
+      "interpretation": "Mixed earnings result; market reaction provides the stronger signal.",
+      "checkedAt": "2026-11-10T13:59:23.639Z"
     }
   },
   {
@@ -3213,8 +3220,8 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.9,
     "firstSeenAt": "2026-11-09T13:58:53.740Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
-    "status": "reportedAwaitingReaction",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
+    "status": "reported",
     "result": {
       "status": "available",
       "reportedDate": "2026-11-09",
@@ -3225,9 +3232,16 @@
       "actualRevenue": 9550000000,
       "expectedRevenueAtReport": 9465329917,
       "revenueSurprisePct": 0.9,
-      "reaction": null,
-      "interpretation": "Results beat estimates; stock reaction not yet available.",
-      "checkedAt": "2026-11-09T13:58:53.740Z"
+      "reaction": {
+        "baselineDate": "2026-11-06",
+        "baselinePrice": 249.9499969482422,
+        "newDate": "2026-11-09",
+        "newPrice": 276.0899963378906,
+        "reactionPercent": 10.5,
+        "basis": "pre-market"
+      },
+      "interpretation": "Strong report with positive market confirmation.",
+      "checkedAt": "2026-11-10T13:59:23.639Z"
     }
   },
   {
@@ -3236,7 +3250,47 @@
     "earningsDate": "2026-11-10",
     "expectedTiming": "post-market",
     "firstSeenAt": "2026-11-09T13:58:53.740Z",
-    "lastSeenAt": "2026-11-09T13:58:53.740Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "NVDA",
+    "name": "NVIDIA Corporation",
+    "earningsDate": "2026-11-17",
+    "expectedTiming": "post-market",
+    "expectedEps": 2.49,
+    "firstSeenAt": "2026-11-10T13:59:23.639Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "HD",
+    "name": "Home Depot, Inc. (The)",
+    "earningsDate": "2026-11-17",
+    "expectedTiming": "pre-market",
+    "expectedEps": 3.86,
+    "firstSeenAt": "2026-11-10T13:59:23.639Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "DIS",
+    "name": "Walt Disney Company (The)",
+    "earningsDate": "2026-11-17",
+    "expectedTiming": "pre-market",
+    "expectedEps": 1.67,
+    "firstSeenAt": "2026-11-10T13:59:23.639Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "PDD",
+    "name": "PDD Holdings Inc.",
+    "earningsDate": "2026-11-17",
+    "expectedTiming": "unknown",
+    "expectedEps": 2.6,
+    "firstSeenAt": "2026-11-10T13:59:23.639Z",
+    "lastSeenAt": "2026-11-10T13:59:23.639Z",
     "status": "awaiting"
   }
 ]
