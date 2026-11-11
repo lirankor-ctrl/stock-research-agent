@@ -1,12 +1,12 @@
 {
-  "lastSentUsTradingDate": "2026-11-10",
-  "lastSentAtIso": "2026-11-10T13:59:47.032Z",
-  "lastSentMessageId": "<3e96fcf4-68d5-8032-73b7-a5ec40517b8c@gmail.com>",
-  "lastSentRunId": "42829405919",
+  "lastSentUsTradingDate": "2026-11-11",
+  "lastSentAtIso": "2026-11-11T13:58:52.519Z",
+  "lastSentMessageId": "<e01befb7-1975-ed00-0c72-8ef16df55834@gmail.com>",
+  "lastSentRunId": "43033951779",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "PSX",
-    "tradingDate": "2026-11-10",
+    "ticker": "OXY",
+    "tradingDate": "2026-11-11",
     "setupType": "meanReversion",
     "status": "confirmed"
   }
