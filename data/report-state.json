@@ -1,13 +1,13 @@
 {
-  "lastSentUsTradingDate": "2026-11-16",
-  "lastSentAtIso": "2026-11-16T13:59:08.855Z",
-  "lastSentMessageId": "<caa6bbfa-b644-2519-d4b9-0c5893a2e0b5@gmail.com>",
-  "lastSentRunId": "43880914122",
+  "lastSentUsTradingDate": "2026-11-17",
+  "lastSentAtIso": "2026-11-17T13:58:44.525Z",
+  "lastSentMessageId": "<01d7b583-6b9d-4e16-2f2e-9381b090760f@gmail.com>",
+  "lastSentRunId": "44098039313",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
-    "ticker": "OXY",
-    "tradingDate": "2026-11-11",
-    "setupType": "meanReversion",
+    "ticker": "SO",
+    "tradingDate": "2026-11-17",
+    "setupType": "breakout",
     "status": "confirmed"
   }
 }

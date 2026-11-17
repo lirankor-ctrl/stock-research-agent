@@ -15,9 +15,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 322.24,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": -14.218022095035266
+    "lastPrice": 316.09,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": -15.85518434713164
   },
   {
     "symbol": "META",
@@ -35,9 +35,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 641.69,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": -4.696202343645556
+    "lastPrice": 626.41,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": -6.965587916412942
   },
   {
     "symbol": "GOOGL",
@@ -55,9 +55,9 @@
     "recommendedAt": "2026-09-17T12:59:17.930Z",
     "targetDate": "2026-12-16T12:59:17.930Z",
     "status": "open",
-    "lastPrice": 295.77,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": -13.736984863067642
+    "lastPrice": 283.72,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": -17.25143640446816
   },
   {
     "symbol": "PLTR",
@@ -75,9 +75,9 @@
     "recommendedAt": "2026-09-18T12:58:34.153Z",
     "targetDate": "2026-12-17T12:58:34.153Z",
     "status": "open",
-    "lastPrice": 167.99,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": -4.681116659101225
+    "lastPrice": 160.39,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": -8.993418066273277
   },
   {
     "symbol": "CRWD",
@@ -95,9 +95,9 @@
     "recommendedAt": "2026-09-21T12:58:53.961Z",
     "targetDate": "2026-12-20T12:58:53.961Z",
     "status": "open",
-    "lastPrice": 226.61,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": -4.6454870608037
+    "lastPrice": 223.21,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": -6.076162423732379
   },
   {
     "symbol": "NVDA",
@@ -115,9 +115,9 @@
     "recommendedAt": "2026-09-22T12:58:40.109Z",
     "targetDate": "2026-12-21T12:58:40.109Z",
     "status": "open",
-    "lastPrice": 162.85,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": -28.37980473216642
+    "lastPrice": 156.14,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": -31.330811856803592
   },
   {
     "symbol": "MSFT",
@@ -135,9 +135,9 @@
     "recommendedAt": "2026-09-28T12:58:54.389Z",
     "targetDate": "2026-12-27T12:58:54.389Z",
     "status": "open",
-    "lastPrice": 523.88,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": 1.493693938043675
+    "lastPrice": 517.99,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": 0.3525970126121336
   },
   {
     "symbol": "AMZN",
@@ -155,9 +155,9 @@
     "recommendedAt": "2026-10-02T12:59:14.703Z",
     "targetDate": "2026-12-31T12:59:14.703Z",
     "status": "open",
-    "lastPrice": 266.66,
-    "lastObservedAt": "2026-11-16T13:58:56.293Z",
-    "returnPct": 7.424565926761486
+    "lastPrice": 257.75,
+    "lastObservedAt": "2026-11-17T13:58:26.707Z",
+    "returnPct": 3.8351528824074492
   },
   {
     "symbol": "AAPL",
