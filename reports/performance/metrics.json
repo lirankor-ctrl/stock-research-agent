@@ -1,13 +1,13 @@
 {
   "market": "US",
-  "generatedAt": "2026-11-20T13:58:53.293Z",
+  "generatedAt": "2026-11-23T13:58:48.712Z",
   "closedCount": 0,
   "winRate": null,
   "accuracy": null,
   "avgReturnPct": null,
   "medianReturnPct": null,
   "openCount": 9,
-  "avgOpenReturnPct": -10.2,
+  "avgOpenReturnPct": -15.18,
   "brierScore": null,
   "calibrationError": null,
   "calibration": [
@@ -53,5 +53,5 @@
   "recommendationsThisRun": 3,
   "reportQualityScore": 100,
   "actionabilityScore": 100,
-  "avgConfidence": 0.568
+  "avgConfidence": 0.552
 }
