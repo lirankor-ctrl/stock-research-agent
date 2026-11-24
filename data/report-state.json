@@ -1,8 +1,8 @@
 {
-  "lastSentUsTradingDate": "2026-11-23",
-  "lastSentAtIso": "2026-11-23T13:59:05.272Z",
-  "lastSentMessageId": "<ed9d2bfb-75e8-b170-7d70-b41904a86b82@gmail.com>",
-  "lastSentRunId": "45189188112",
+  "lastSentUsTradingDate": "2026-11-24",
+  "lastSentAtIso": "2026-11-24T13:58:56.770Z",
+  "lastSentMessageId": "<b96cda44-316d-ebdc-ab6d-fe6afb464b8a@gmail.com>",
+  "lastSentRunId": "45408912870",
   "lastSentEvent": "workflow_dispatch",
   "lastBollingerPick": {
     "ticker": "SO",

@@ -2659,7 +2659,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 5.91,
     "firstSeenAt": "2026-10-30T13:58:55.796Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -2930,7 +2930,7 @@
     "earningsDate": "2026-11-06",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-11-04T13:58:46.356Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -3326,7 +3326,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 0.21,
     "firstSeenAt": "2026-11-06T13:58:39.509Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -3411,7 +3411,7 @@
     "earningsDate": "2026-11-10",
     "expectedTiming": "post-market",
     "firstSeenAt": "2026-11-09T13:58:53.740Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "reportedAwaitingReaction",
     "result": {
       "status": "available",
@@ -3776,8 +3776,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 3.89,
     "firstSeenAt": "2026-11-17T13:58:26.707Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-24",
+      "reportedTiming": "pre-market",
+      "actualEps": 4.06,
+      "expectedEpsAtReport": 3.9221,
+      "epsSurprisePct": 3.5,
+      "actualRevenue": 4373420000,
+      "expectedRevenueAtReport": 4364793608,
+      "revenueSurprisePct": 0.2,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-24T13:58:33.559Z"
+    }
   },
   {
     "ticker": "DELL",
@@ -3786,7 +3800,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 6.55,
     "firstSeenAt": "2026-11-18T13:59:12.312Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3796,8 +3810,22 @@
     "expectedTiming": "pre-market",
     "expectedEps": 1.34,
     "firstSeenAt": "2026-11-18T13:59:12.312Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
-    "status": "awaiting"
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-24",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.34,
+      "expectedEpsAtReport": 1.3447,
+      "epsSurprisePct": -0.3,
+      "actualRevenue": 9364000000,
+      "expectedRevenueAtReport": 9576144582,
+      "revenueSurprisePct": -2.2,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-24T13:58:33.559Z"
+    }
   },
   {
     "ticker": "NTES",
@@ -3868,7 +3896,7 @@
     "expectedTiming": "pre-market",
     "expectedEps": 4.07,
     "firstSeenAt": "2026-11-19T13:58:35.891Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3878,7 +3906,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.18,
     "firstSeenAt": "2026-11-20T13:58:53.293Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3888,7 +3916,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1.72,
     "firstSeenAt": "2026-11-20T13:58:53.293Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3898,7 +3926,7 @@
     "expectedTiming": "unknown",
     "expectedEps": 1.07,
     "firstSeenAt": "2026-11-20T13:58:53.293Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3908,7 +3936,7 @@
     "expectedTiming": "post-market",
     "expectedEps": 1,
     "firstSeenAt": "2026-11-20T13:58:53.293Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3917,7 +3945,7 @@
     "earningsDate": "2026-11-24",
     "expectedTiming": "unknown",
     "firstSeenAt": "2026-11-20T13:58:53.293Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   },
   {
@@ -3927,7 +3955,61 @@
     "expectedTiming": "post-market",
     "expectedEps": 2.27,
     "firstSeenAt": "2026-11-20T13:58:53.293Z",
-    "lastSeenAt": "2026-11-23T13:58:48.712Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "CRWD",
+    "name": "CrowdStrike Holdings, Inc.",
+    "earningsDate": "2026-12-01",
+    "expectedTiming": "post-market",
+    "expectedEps": 0,
+    "firstSeenAt": "2026-11-24T13:58:33.559Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "WDAY",
+    "name": "Workday, Inc.",
+    "earningsDate": "2026-11-24",
+    "expectedTiming": "post-market",
+    "expectedEps": 1.28,
+    "firstSeenAt": "2026-11-24T13:58:33.559Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
+    "status": "awaiting"
+  },
+  {
+    "ticker": "DLTR",
+    "name": "Dollar Tree, Inc.",
+    "earningsDate": "2026-11-24",
+    "expectedTiming": "pre-market",
+    "expectedEps": 0.89,
+    "firstSeenAt": "2026-11-24T13:58:33.559Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
+    "status": "reportedAwaitingReaction",
+    "result": {
+      "status": "available",
+      "reportedDate": "2026-11-24",
+      "reportedTiming": "pre-market",
+      "actualEps": 1.16,
+      "expectedEpsAtReport": 0.9247,
+      "epsSurprisePct": 25.4,
+      "actualRevenue": 5073700000,
+      "expectedRevenueAtReport": 5138517025,
+      "revenueSurprisePct": -1.3,
+      "reaction": null,
+      "interpretation": "Mixed earnings result; stock reaction not yet available.",
+      "checkedAt": "2026-11-24T13:58:33.559Z"
+    }
+  },
+  {
+    "ticker": "MRVL",
+    "name": "Marvell Technology, Inc.",
+    "earningsDate": "2026-12-01",
+    "expectedTiming": "post-market",
+    "expectedEps": 0.79,
+    "firstSeenAt": "2026-11-24T13:58:33.559Z",
+    "lastSeenAt": "2026-11-24T13:58:33.559Z",
     "status": "awaiting"
   }
 ]
