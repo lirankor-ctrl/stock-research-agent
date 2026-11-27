@@ -1,6 +1,6 @@
 {
   "market": "US",
-  "generatedAt": "2026-11-26T13:58:37.080Z",
+  "generatedAt": "2026-11-27T13:58:50.424Z",
   "closedCount": 0,
   "winRate": null,
   "accuracy": null,
@@ -48,10 +48,10 @@
       "gap": 0
     }
   ],
-  "runDataQuality": 60,
+  "runDataQuality": 76,
   "freshness": "degraded",
   "recommendationsThisRun": 3,
   "reportQualityScore": 100,
   "actionabilityScore": 100,
-  "avgConfidence": 0.509
+  "avgConfidence": 0.56
 }
